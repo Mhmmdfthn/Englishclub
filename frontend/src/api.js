@@ -23,4 +23,12 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ name, score, words }),
     }),
+
+  stories: () => req('/api/stories'),
+
+  addStory: (name, batch, comment) =>
+    req('/api/stories', {
+      method: 'POST',
+      body: JSON.stringify({ name, batch, comment }),
+    }),
 }

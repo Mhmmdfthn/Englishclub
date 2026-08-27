@@ -8,7 +8,10 @@ dijamin tetap memiliki minimal 5 kata familiar yang bisa ditemukan.
 
 import random
 
-from dictionary import dictionary
+try:
+    from .dictionary import dictionary
+except ImportError:
+    from dictionary import dictionary
 
 SIZE = 5
 CELLS = SIZE * SIZE

@@ -1,14 +1,23 @@
 <script setup>
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { api } from './api.js'
 import { sound } from './audio.js'
 import GameBoard from './components/GameBoard.vue'
 import GameOverScreen from './components/GameOverScreen.vue'
 import HudBar from './components/HudBar.vue'
-import StartScreen from './components/StartScreen.vue'
+import LandingView from './components/LandingView.vue'
+import PlayFormView from './components/PlayFormView.vue'
+import LeaderboardPage from './components/LeaderboardPage.vue'
 import FoundWords from './components/FoundWords.vue'
 
-const screen = ref('menu')
+const screen = ref('landing')
+const loading = ref(true)
+const greetingIndex = ref(0)
+const greetings = ['Hello!', 'Welcome!', 'Good to see you!', 'Learn with us!']
+const swipeProgress = ref(0)
+let swipeStartY = 0
+let greetingTimer = null
+let loadingTimer = null
 const sessionId = ref('')
 const cells = ref([])
 const score = ref(0)
@@ -26,21 +35,56 @@ const floatingToast = ref(null)
 const isMuted = ref(sound.muted)
 
 let timerId = null
-
 const bestScore = computed(() => Number(localStorage.getItem('wh_best') || 0))
 const isFever = computed(() => combo.value >= 3)
-
-function toggleAudio() {
-  isMuted.value = sound.toggleMute()
-}
 
 function stopTimer() {
   if (timerId) { clearInterval(timerId); timerId = null }
 }
-
 function tick() {
   timeLeft.value = Math.max(0, timeLeft.value - 0.1)
   if (timeLeft.value <= 0) endGame()
+}
+onMounted(() => {
+  greetingTimer = setInterval(() => {
+    greetingIndex.value = (greetingIndex.value + 1) % greetings.length
+  }, 2600)
+  loadingTimer = setTimeout(() => {
+    loading.value = false
+    clearInterval(greetingTimer)
+  }, 9400)
+})
+
+onBeforeUnmount(() => {
+  clearInterval(greetingTimer)
+  clearTimeout(loadingTimer)
+  stopTimer()
+})
+
+function beginSwipe(event) {
+  swipeStartY = event.clientY
+  swipeProgress.value = 0
+}
+
+function moveSwipe(event) {
+  if (!swipeStartY) return
+  const distance = Math.max(0, swipeStartY - event.clientY)
+  swipeProgress.value = Math.min(1, distance / 180)
+}
+
+function finishSwipe() {
+  if (!swipeStartY) return
+  if (swipeProgress.value >= 0.72) {
+    loading.value = false
+    clearInterval(greetingTimer)
+    clearTimeout(loadingTimer)
+  }
+  swipeStartY = 0
+  swipeProgress.value = 0
+}
+
+function toggleAudio() {
+  isMuted.value = sound.toggleMute()
 }
 
 async function startGame() {
@@ -53,7 +97,7 @@ async function startGame() {
     score.value = 0
     combo.value = 1
     bestCombo.value = 1
-    timeLeft.value = data.time_limit
+    timeLeft.value = data.time_limit || 60
     activeWord.value = ''
     longestWord.value = ''
     foundWords.value = []
@@ -88,7 +132,7 @@ function showToast(text, isBonus = false) {
   floatingToast.value = { text, isBonus, key }
   setTimeout(() => {
     if (floatingToast.value?.key === key) floatingToast.value = null
-  }, 1200)
+  }, 1800)
 }
 
 async function handleSubmit(path) {
@@ -99,7 +143,6 @@ async function handleSubmit(path) {
   try {
     const res = await api.submitWord(sessionId.value, path)
     if (res.ok) {
-      // Update sel yang berubah setelah refill
       for (const c of res.cells) {
         const cell = cells.value[c.index]
         cell.letter = c.letter
@@ -113,15 +156,10 @@ async function handleSubmit(path) {
       foundWords.value.push({ word: res.word, points: res.points })
       if (res.word.length > longestWord.value.length) longestWord.value = res.word
       boardError.value = ''
-
-      if (res.combo >= 3 && prevCombo < 3) {
-        sound.playFever()
-      } else {
-        sound.playSuccess(res.combo)
-      }
-
-      const comboText = res.combo > 1 ? ` (x${res.combo} 🔥)` : ''
-      showToast(`+${res.points} PTS!${comboText}`, res.combo >= 3)
+      if (res.combo >= 3 && prevCombo < 3) sound.playFever()
+      else sound.playSuccess(res.combo)
+      const comboTxt = res.combo > 1 ? ` x${res.combo}🔥` : ''
+      showToast(`+${res.points} PTS${comboTxt}`, res.combo >= 3)
     } else {
       combo.value = 1
       shakeStamp.value++
@@ -141,11 +179,22 @@ async function handleSubmit(path) {
     busy.value = false
   }
 }
-
-onBeforeUnmount(stopTimer)
 </script>
 
 <template>
+  <transition name="loading-fade">
+    <div v-if="loading" class="loading-screen" @pointerdown="beginSwipe" @pointermove="moveSwipe" @pointerup="finishSwipe" @pointercancel="finishSwipe">
+      <div class="loading-grid" aria-hidden="true"></div>
+      <div class="loading-content" :style="{ transform: `translateY(${-swipeProgress * 120}px)` }">
+        <p class="loading-kicker">ENGLISH CLUB UPB</p>
+        <Transition name="greeting-fade" mode="out-in">
+          <p class="loading-greeting" :key="greetingIndex">{{ greetings[greetingIndex] }}</p>
+        </Transition>
+        <div class="loading-dots" aria-label="Loading"><span></span><span></span><span></span></div>
+      </div>
+    </div>
+  </transition>
+
   <!-- Sound Toggle -->
   <button class="sound-btn" :title="isMuted ? 'Nyalakan Suara' : 'Matikan Suara'" @click="toggleAudio">
     <svg v-if="!isMuted" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -165,7 +214,9 @@ onBeforeUnmount(stopTimer)
     </div>
   </transition>
 
-  <StartScreen v-if="screen === 'menu'" :best="bestScore" :error="boardError" @play="startGame" />
+  <LandingView v-if="screen === 'landing'" @goPlay="screen = 'form'" @goBoard="screen = 'board'" />
+  <PlayFormView v-else-if="screen === 'form'" :best="bestScore" :error="boardError" @play="startGame" @back="screen = 'landing'" />
+  <LeaderboardPage v-else-if="screen === 'board'" @back="screen = 'landing'" />
 
   <section v-else-if="screen === 'play'" class="screen play">
     <HudBar :score="score" :time-left="timeLeft" :combo="combo" :word="activeWord" :fever="isFever" />
@@ -179,6 +230,7 @@ onBeforeUnmount(stopTimer)
     />
     <p class="error">{{ boardError }}</p>
     <FoundWords :items="foundWords" />
+    <button class="btn ghost" style="margin-top:8px" @click="endGame">Selesai & Simpan Skor</button>
   </section>
 
   <GameOverScreen
@@ -195,7 +247,82 @@ onBeforeUnmount(stopTimer)
   padding-top: max(10px, env(safe-area-inset-top));
   gap: 8px;
 }
-
+.loading-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  color: var(--dark-navy);
+  background: #fff;
+  touch-action: none;
+  user-select: none;
+}
+.loading-grid {
+  position: absolute;
+  inset: 0;
+  opacity: .1;
+  background-image: linear-gradient(rgba(11,86,155,.45) 1px, transparent 1px), linear-gradient(90deg, rgba(11,86,155,.45) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse at center, black 10%, transparent 78%);
+}
+.loading-content {
+  position: relative;
+  width: min(100%, 420px);
+  padding: 0 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  animation: loading-rise .7s ease both;
+  transition: transform .18s ease-out;
+}
+.loading-kicker {
+  color: var(--royal-blue);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 2.4px;
+}
+.loading-greeting {
+  width: 100%;
+  max-width: calc(100vw - 48px);
+  min-height: 44px;
+  margin-top: 10px;
+  font-family: 'Outfit', sans-serif;
+  color: transparent;
+  background: linear-gradient(180deg, var(--royal-blue-light), var(--royal-blue-dark));
+  -webkit-background-clip: text;
+  background-clip: text;
+  font-size: clamp(34px, 8vw, 52px);
+  font-weight: 800;
+  letter-spacing: -.5px;
+  line-height: 1.05;
+  text-align: center;
+  overflow-wrap: break-word;
+  text-shadow: 0 4px 18px rgba(0,0,0,.2);
+}
+.greeting-fade-enter-active, .greeting-fade-leave-active { transition: opacity 1.2s ease, transform 1.2s ease; }
+.greeting-fade-enter-from { opacity: 0; transform: scale(.96); }
+.greeting-fade-leave-to { opacity: 0; transform: scale(1.04); }
+.loading-dots { display: flex; gap: 6px; margin-top: 24px; }
+.loading-dots span { width: 7px; height: 7px; border-radius: 50%; background: var(--royal-blue); animation: loading-dot .8s infinite alternate; }
+.loading-dots span:nth-child(2) { animation-delay: .15s; }
+.loading-dots span:nth-child(3) { animation-delay: .3s; }
+.loading-fade-leave-active { transition: opacity .45s ease; }
+.loading-fade-leave-to { opacity: 0; }
+@keyframes loading-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes loading-dot { from { opacity: .3; transform: translateY(0); } to { opacity: 1; transform: translateY(-4px); } }
+@media (max-width:680px) {
+  .loading-greeting {
+    min-height: 58px;
+    margin-top: 16px;
+    font-size: clamp(36px, 10vw, 54px);
+    line-height: .98;
+    text-shadow: 0 5px 24px rgba(0,0,0,.24);
+  }
+  .loading-kicker { font-size: 10px; letter-spacing: 2px; }
+}
 .sound-btn {
   position: fixed;
   top: 12px;

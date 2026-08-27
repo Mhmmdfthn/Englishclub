@@ -70,6 +70,13 @@ defineProps({
   letter-spacing: 0.5px;
 }
 
+.chip-trans {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-style: italic;
+  text-transform: lowercase;
+}
 .chip-pts {
   font-family: 'Outfit', sans-serif;
   font-weight: 800;

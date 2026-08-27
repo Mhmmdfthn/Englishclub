@@ -4,10 +4,14 @@ import secrets
 import time
 from dataclasses import dataclass, field
 
-import grid as grid_mod
-from dictionary import LETTER_VALUES, dictionary
+try:
+    from . import grid as grid_mod
+    from .dictionary import LETTER_VALUES, dictionary
+except ImportError:
+    import grid as grid_mod
+    from dictionary import LETTER_VALUES, dictionary
 
-BASE_TIME = 30.0
+BASE_TIME = 60.0
 MAX_TIME = 60.0
 SESSION_TTL = 3 * 3600.0
 COMBO_CAP = 10
@@ -54,9 +58,8 @@ def get_session(sid: str) -> Session | None:
 
 
 def _time_bonus(length: int, combo: int) -> float:
-    extra_len = max(0, length - MIN_WORD_LEN)
-    combo_bonus = min(combo, 8) * 0.4
-    return round(2.5 + (extra_len * 1.5) + combo_bonus, 2)
+    # waktu tidak bisa ditambah sama sekali — mode kompetitif murni 30 detik
+    return 0.0
 
 
 def submit_word(session: Session, path: list[int]) -> dict:
@@ -88,7 +91,7 @@ def submit_word(session: Session, path: list[int]) -> dict:
     fever_bonus = (combo_applied - 2) * 50 if combo_applied >= 3 else 0
     points = (base_points * combo_applied) + fever_bonus
 
-    bonus = _time_bonus(len(word), combo_applied)
+    bonus = 0.0  # tidak ada bonus waktu
 
     pre = session.grid[:]
     changed = grid_mod.refill_cells(session.grid, sorted(set(path)))
@@ -106,7 +109,7 @@ def submit_word(session: Session, path: list[int]) -> dict:
     session.words_found += 1
     if len(word) > len(session.longest_word):
         session.longest_word = word
-    session.ends_at = min(session.ends_at + bonus, time.monotonic() + MAX_TIME)
+    # waktu tidak ditambah — ends_at tetap
 
     return {
         "ok": True,
