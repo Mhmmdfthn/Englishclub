@@ -24,11 +24,13 @@ const score = ref(0)
 const combo = ref(1)
 const bestCombo = ref(1)
 const timeLeft = ref(0)
+const timeLimit = ref(60)
 const activeWord = ref('')
 const longestWord = ref('')
 const foundWords = ref([])
 const busy = ref(false)
 const boardError = ref('')
+const connectError = ref(false)
 const shakeStamp = ref(0)
 const finalStats = ref(null)
 const floatingToast = ref(null)
@@ -37,6 +39,7 @@ const isMuted = ref(sound.muted)
 let timerId = null
 const bestScore = computed(() => Number(localStorage.getItem('wh_best') || 0))
 const isFever = computed(() => combo.value >= 3)
+const showSoundBtn = computed(() => screen.value !== 'landing')
 
 function stopTimer() {
   if (timerId) { clearInterval(timerId); timerId = null }
@@ -48,11 +51,11 @@ function tick() {
 onMounted(() => {
   greetingTimer = setInterval(() => {
     greetingIndex.value = (greetingIndex.value + 1) % greetings.length
-  }, 2600)
+  }, 2000)
   loadingTimer = setTimeout(() => {
     loading.value = false
     clearInterval(greetingTimer)
-  }, 9400)
+  }, 2800)
 })
 
 onBeforeUnmount(() => {
@@ -83,13 +86,21 @@ function finishSwipe() {
   swipeProgress.value = 0
 }
 
+function skipLoading() {
+  loading.value = false
+  clearInterval(greetingTimer)
+  clearTimeout(loadingTimer)
+}
+
 function toggleAudio() {
   isMuted.value = sound.toggleMute()
 }
 
 async function startGame() {
   boardError.value = ''
+  connectError.value = false
   floatingToast.value = null
+  sound.init()
   try {
     const data = await api.startGame()
     sessionId.value = data.session_id
@@ -98,15 +109,18 @@ async function startGame() {
     combo.value = 1
     bestCombo.value = 1
     timeLeft.value = data.time_limit || 60
+    timeLimit.value = data.time_limit || 60
     activeWord.value = ''
     longestWord.value = ''
     foundWords.value = []
     screen.value = 'play'
     stopTimer()
     timerId = setInterval(tick, 100)
-  } catch {
-    boardError.value = 'Tidak bisa menghubungi server'
+  } catch (e) {
+    boardError.value = e && e.network ? e.message : 'Gagal memulai permainan'
+    connectError.value = true
     shakeStamp.value++
+    if (screen.value === 'over') screen.value = 'form'
   }
 }
 
@@ -158,12 +172,14 @@ async function handleSubmit(path) {
       boardError.value = ''
       if (res.combo >= 3 && prevCombo < 3) sound.playFever()
       else sound.playSuccess(res.combo)
-      const comboTxt = res.combo > 1 ? ` x${res.combo}🔥` : ''
+      sound.vibrate(res.combo >= 3 ? [15, 30, 40, 60] : [15])
+      const comboTxt = res.combo > 1 ? ` x${res.combo}` : ''
       showToast(`+${res.points} PTS${comboTxt}`, res.combo >= 3)
     } else {
       combo.value = 1
       shakeStamp.value++
       sound.playError()
+      sound.vibrate(60)
       boardError.value = {
         too_short: 'Minimal 3 huruf!',
         invalid_path: 'Huruf harus tersambung!',
@@ -173,8 +189,8 @@ async function handleSubmit(path) {
       }[res.reason] || 'Ditolak!'
       if (res.reason === 'expired') endGame()
     }
-  } catch {
-    boardError.value = 'Koneksi ke server bermasalah'
+  } catch (e) {
+    boardError.value = e && e.network ? e.message : 'Koneksi ke server bermasalah'
   } finally {
     busy.value = false
   }
@@ -184,19 +200,23 @@ async function handleSubmit(path) {
 <template>
   <transition name="loading-fade">
     <div v-if="loading" class="loading-screen" @pointerdown="beginSwipe" @pointermove="moveSwipe" @pointerup="finishSwipe" @pointercancel="finishSwipe">
-      <div class="loading-grid" aria-hidden="true"></div>
       <div class="loading-content" :style="{ transform: `translateY(${-swipeProgress * 120}px)` }">
-        <p class="loading-kicker">ENGLISH CLUB UPB</p>
-        <Transition name="greeting-fade" mode="out-in">
-          <p class="loading-greeting" :key="greetingIndex">{{ greetings[greetingIndex] }}</p>
-        </Transition>
-        <div class="loading-dots" aria-label="Loading"><span></span><span></span><span></span></div>
+        <img class="loading-logo" src="/Logo_ec.jpg" alt="Logo English Club UPB" />
+        <div class="loading-text">
+          <p class="loading-kicker">ENGLISH CLUB UPB</p>
+          <Transition name="greeting-fade" mode="out-in">
+            <p class="loading-greeting" :key="greetingIndex">{{ greetings[greetingIndex] }}</p>
+          </Transition>
+          <div class="loading-dots" aria-label="Loading"><span></span><span></span><span></span></div>
+          <p class="loading-hint">Informasi komunitas sedang dimuat</p>
+          <button class="loading-skip" type="button" @click="skipLoading">Lewati</button>
+        </div>
       </div>
     </div>
   </transition>
 
   <!-- Sound Toggle -->
-  <button class="sound-btn" :title="isMuted ? 'Nyalakan Suara' : 'Matikan Suara'" @click="toggleAudio">
+  <button v-if="showSoundBtn" class="sound-btn" :title="isMuted ? 'Nyalakan Suara' : 'Matikan Suara'" aria-label="Atur suara" @click="toggleAudio">
     <svg v-if="!isMuted" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
       <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
@@ -215,11 +235,11 @@ async function handleSubmit(path) {
   </transition>
 
   <LandingView v-if="screen === 'landing'" @goPlay="screen = 'form'" @goBoard="screen = 'board'" />
-  <PlayFormView v-else-if="screen === 'form'" :best="bestScore" :error="boardError" @play="startGame" @back="screen = 'landing'" />
+  <PlayFormView v-else-if="screen === 'form'" :best="bestScore" :error="boardError" :retriable="connectError" @play="startGame" @back="screen = 'landing'" />
   <LeaderboardPage v-else-if="screen === 'board'" @back="screen = 'landing'" />
 
   <section v-else-if="screen === 'play'" class="screen play">
-    <HudBar :score="score" :time-left="timeLeft" :combo="combo" :word="activeWord" :fever="isFever" />
+    <HudBar :score="score" :time-left="timeLeft" :time-total="timeLimit" :combo="combo" :word="activeWord" :fever="isFever" />
     <GameBoard
       :cells="cells"
       :disabled="busy"
@@ -228,7 +248,7 @@ async function handleSubmit(path) {
       @select="activeWord = $event"
       @submit="handleSubmit"
     />
-    <p class="error">{{ boardError }}</p>
+    <p class="error" role="status" aria-live="polite">{{ boardError }}</p>
     <FoundWords :items="foundWords" />
     <button class="btn ghost" style="margin-top:8px" @click="endGame">Selesai & Simpan Skor</button>
   </section>
@@ -259,14 +279,6 @@ async function handleSubmit(path) {
   touch-action: none;
   user-select: none;
 }
-.loading-grid {
-  position: absolute;
-  inset: 0;
-  opacity: .1;
-  background-image: linear-gradient(rgba(11,86,155,.45) 1px, transparent 1px), linear-gradient(90deg, rgba(11,86,155,.45) 1px, transparent 1px);
-  background-size: 44px 44px;
-  mask-image: radial-gradient(ellipse at center, black 10%, transparent 78%);
-}
 .loading-content {
   position: relative;
   width: min(100%, 420px);
@@ -278,11 +290,38 @@ async function handleSubmit(path) {
   animation: loading-rise .7s ease both;
   transition: transform .18s ease-out;
 }
+.loading-logo {
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+  mix-blend-mode: multiply;
+  filter: drop-shadow(0 6px 14px rgba(11, 86, 155, 0.25));
+  animation: loading-logo-in .7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.loading-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 14px;
+  animation: load-text-in .6s ease .5s both;
+}
+@keyframes loading-logo-in {
+  from { opacity: 0; transform: scale(0.6) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes load-text-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 .loading-kicker {
   color: var(--royal-blue);
   font-size: 11px;
   font-weight: 900;
   letter-spacing: 2.4px;
+}
+@keyframes loading-logo-in {
+  from { opacity: 0; transform: scale(0.6) translateY(6px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
 }
 .loading-greeting {
   width: 100%;
@@ -309,6 +348,30 @@ async function handleSubmit(path) {
 .loading-dots span { width: 7px; height: 7px; border-radius: 50%; background: var(--royal-blue); animation: loading-dot .8s infinite alternate; }
 .loading-dots span:nth-child(2) { animation-delay: .15s; }
 .loading-dots span:nth-child(3) { animation-delay: .3s; }
+.loading-hint {
+  margin-top: 16px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.loading-skip {
+  margin-top: 10px;
+  padding: 7px 22px;
+  border-radius: var(--radius-full);
+  background: rgba(11, 86, 155, 0.08);
+  border: 1.5px solid rgba(11, 86, 155, 0.35);
+  color: var(--royal-blue);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.loading-skip:hover {
+  background: var(--royal-blue);
+  color: var(--pure-white);
+  border-color: var(--royal-blue);
+}
 .loading-fade-leave-active { transition: opacity .45s ease; }
 .loading-fade-leave-to { opacity: 0; }
 @keyframes loading-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }

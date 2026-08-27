@@ -1,8 +1,24 @@
-async function req(url, options) {
-  const res = await fetch(url, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-  })
+async function req(url, options, timeout = 8000) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeout)
+  let res
+  try {
+    res = await fetch(url, {
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+      ...options,
+    })
+  } catch (err) {
+    const e = new Error(
+      err && err.name === 'AbortError'
+        ? 'Server tidak merespons (terlalu lama).'
+        : 'Tidak dapat terhubung ke server.',
+    )
+    e.network = true
+    throw e
+  } finally {
+    clearTimeout(timer)
+  }
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   return res.json()
 }

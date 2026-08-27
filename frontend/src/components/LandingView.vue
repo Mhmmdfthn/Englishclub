@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { onMounted, ref } from 'vue'
 import { api } from '../api.js'
 
@@ -9,284 +9,95 @@ const storyComment = ref('')
 const stories = ref([])
 const storyError = ref('')
 const storySubmitting = ref(false)
+const batchOptions = ['2026 / Ilmu Komputer', '2026 / Manajemen', '2026 / Akuntansi', '2026 / Bisnis Digital', '2026 / Sains Data', '2026 / Agribisnis']
 
 onMounted(async () => {
-  try {
-    stories.value = (await api.stories()).stories
-  } catch {
-    storyError.value = 'Cerita anggota belum dapat dimuat.'
-  }
+  try { stories.value = (await api.stories()).stories } catch { storyError.value = 'Cerita anggota belum dapat dimuat.' }
 })
 
 async function submitStory() {
   const name = storyName.value.trim()
   const comment = storyComment.value.trim()
   if (!name || !comment || storySubmitting.value) return
-
   storySubmitting.value = true
   storyError.value = ''
   try {
-    const response = await api.addStory(name, storyBatch.value.trim() || 'Anggota EC UPB', comment)
+    const response = await api.addStory(name, storyBatch.value || 'Anggota EC UPB', comment)
     stories.value.unshift(response.story)
     storyName.value = ''
     storyBatch.value = ''
     storyComment.value = ''
-  } catch {
-    storyError.value = 'Cerita belum dapat dikirim. Coba lagi.'
-  } finally {
-    storySubmitting.value = false
-  }
+  } catch { storyError.value = 'Cerita belum dapat dikirim. Coba lagi.' }
+  finally { storySubmitting.value = false }
+}
+
+function goPlay() {
+  emit('goPlay')
+}
+
+function goBoard() {
+  emit('goBoard')
 }
 </script>
 
 <template>
-  <section class="screen landing">
-    <!-- HERO UKM -->
+  <section id="top" class="screen landing">
     <div class="landing-hero">
-      <img class="landing-logo" src="/Logo_ec.jpg" alt="Logo English Club UPB" />
-      <p class="eyebrow">UNIT KEGIATAN MAHASISWA — UNIVERSITAS PUTRA BANGSA KEBUMEN</p>
+      <nav class="landing-nav" aria-label="Navigasi utama">
+        <a class="nav-brand" href="#top" aria-label="Kembali ke bagian atas"><img src="/Logo_ec.jpg" alt="Logo English Club UPB" /></a>
+        <a href="#profil">Profil</a>
+        <a href="#program">Program</a>
+        <a href="#cerita">Cerita Anggota</a>
+        <div class="nav-actions">
+          <button class="nav-button nav-board" type="button" @click="goBoard">Klasemen</button>
+          <button class="nav-button nav-play" type="button" @click="goPlay">Main Word Hunt</button>
+        </div>
+      </nav>
+      <p class="eyebrow">UNIT KEGIATAN MAHASISWA, UNIVERSITAS PUTRA BANGSA KEBUMEN</p>
       <h1 class="title">ENGLISH <span class="highlight">CLUB</span></h1>
-      <p class="subtitle">Rumah belajar bahasa Inggris yang aktif, menyenangkan, dan aplikatif — terbuka untuk semua prodi & angkatan.</p>
-      <div class="hero-stats" aria-label="Info UKM">
-        <span><b>2019</b> BERDIRI</span>
-        <span><b>150+</b> ANGGOTA</span>
-        <span><b>4</b> DIVISI</span>
-      </div>
+      <p class="subtitle">Rumah belajar bahasa Inggris yang aktif, menyenangkan, dan aplikatif serta terbuka untuk semua prodi dan angkatan.</p>
+      <div class="hero-stats"><span><b>2019</b> BERDIRI</span><span><b>150+</b> ANGGOTA</span><span><b>4</b> DIVISI</span><span><b>2x</b> MINGGUAN</span><span><b>5x5</b> WORD HUNT</span></div>
     </div>
 
-    <!-- TENTANG KAMI -->
-    <div class="section-title">
-      <span class="section-badge">TENTANG KAMI</span>
-      <h2>Profil UKM</h2>
-      <p class="muted small center">Komunitas mahasiswa yang percaya bahasa Inggris adalah jembatan beasiswa, karir, dan pergaulan global.</p>
-    </div>
+    <div id="profil" class="section-title"><span class="section-badge">TENTANG KAMI</span><h2>Profil UKM</h2><p>Komunitas mahasiswa yang percaya bahasa Inggris adalah jembatan beasiswa, karir, dan pergaulan global.</p></div>
+    <div class="card about-card"><div class="about-grid"><div class="about-text"><h3>Siapa Kami?</h3><p><b>English Club UPB</b> adalah UKM yang berfokus pada pengembangan bahasa Inggris secara aktif dan menyenangkan. Dari <i>daily conversation</i> sampai <i>debate</i> dan <i>public speaking</i>, semua dibina dengan mentor sebaya dan dosen pembina.</p><p>Tidak perlu jago dulu, di sini kita belajar bareng dengan suasana santai, anti kaku, dan penuh games.</p><ul class="check-list"><li>Terbuka semua prodi dan angkatan</li><li>2x Speaking Corner per minggu</li><li>Pembinaan lomba Speech, Debate, Story Telling</li></ul></div><div class="about-visual"><div class="mini-stats"><div class="mini-stat"><b>2019</b><span>Berdiri</span></div><div class="mini-stat"><b>150+</b><span>Alumni</span></div><div class="mini-stat"><b>4</b><span>Divisi</span></div></div><div class="quote-box">From Kebumen to the World, Speak Confidently, Lead Globally.</div></div></div></div>
 
-    <div class="card about-card">
-      <div class="about-grid">
-        <div class="about-text">
-          <h3>Siapa Kami?</h3>
-          <p><b>English Club UPB (EC UPB)</b> adalah UKM yang berfokus pada pengembangan bahasa Inggris secara <b>aktif & fun</b>. Dari <i>daily conversation</i> sampai <i>debate & public speaking</i>, semua dibina dengan mentor sebaya + dosen pembina.</p>
-          <p>Tidak perlu jago dulu — di sini kita belajar bareng dengan suasana santai, anti kaku, dan penuh games.</p>
-          <ul class="check-list">
-            <li>Terbuka semua prodi & angkatan</li>
-            <li>2× Speaking Corner / minggu</li>
-            <li>Pembinaan lomba Speech, Debate, Story Telling</li>
-          </ul>
-        </div>
-        <div class="about-visual">
-          <div class="mini-stats">
-            <div class="mini-stat"><b>2019</b><span>Berdiri</span></div>
-            <div class="mini-stat"><b>150+</b><span>Alumni</span></div>
-            <div class="mini-stat"><b>4</b><span>Divisi</span></div>
-          </div>
-          <div class="quote-box">“From Kebumen to the World — Speak Confidently, Lead Globally.”</div>
-        </div>
-      </div>
-    </div>
+    <div class="teaser-card"><div class="teaser-mark">5x5</div><div class="teaser-copy"><span class="teaser-kicker">AKTIVITAS UNGGULAN EC UPB</span><h2>Ayo Main <span>Word Hunt</span></h2><p>Latih vocabulary dengan game swipe buatan EC UPB. Susun kata bahasa Inggris, kumpulkan poin, dan tantang temanmu.</p></div><div class="teaser-actions"><button class="btn" type="button" @click="goPlay">Mulai Bermain</button><button class="btn ghost" type="button" @click="goBoard">Lihat Klasemen</button></div></div>
 
-    <!-- FEATURED ACTIVITY -->
-    <div class="teaser-card">
-      <div class="teaser-mark" aria-hidden="true">5×5</div>
-      <div class="teaser-copy">
-        <span class="teaser-kicker">AKTIVITAS UNGGULAN EC UPB</span>
-        <h2>Ayo Main <span>Word Hunt</span></h2>
-        <p>Latih vocabulary dengan game swipe buatan EC UPB. Susun kata bahasa Inggris, kumpulkan poin, dan tantang temanmu.</p>
-      </div>
-      <div class="teaser-actions">
-        <button class="btn" @click="emit('goPlay')">Mulai Bermain →</button>
-        <button class="btn ghost teaser-secondary" @click="emit('goBoard')">Lihat Klasemen</button>
-      </div>
-    </div>
+    <div id="program" class="overview-heading"><div><span class="section-badge">OVERVIEW</span><h2>Apa yang Kami Lakukan?</h2></div><p>Belajar tidak berhenti di ruang kelas. Kami menciptakan ruang untuk berlatih, tampil, dan berkembang bersama.</p></div>
+    <div class="overview-grid"><article class="overview-card"><div class="ov-icon">01</div><h3>Visi</h3><p>Menjadi UKM bahasa Inggris yang unggul, inklusif, dan berdaya saing nasional.</p></article><article class="overview-card"><div class="ov-icon">02</div><h3>Misi</h3><ul><li>Tingkatkan speaking dan listening</li><li>Bina prestasi lomba</li><li>Ruang praktik harian yang fun</li><li>Jejaring antar kampus</li></ul></article><article class="overview-card"><div class="ov-icon">03</div><h3>Program</h3><ul><li><b>English Fun Day</b>, Word Hunt dan vocab battle</li><li><b>Speaking Corner</b></li><li><b>Debate Clinic</b></li><li><b>TOEFL Prep</b></li></ul></article></div>
 
-    <!-- OVERVIEW -->
-    <div class="overview-heading">
-      <div>
-        <span class="section-badge">OVERVIEW</span>
-        <h2>Apa yang Kami Lakukan?</h2>
-      </div>
-      <p>Belajar tidak berhenti di ruang kelas. Kami menciptakan ruang untuk berlatih, tampil, dan berkembang bersama.</p>
-    </div>
+    <section id="cerita" class="values-section"><div class="values-heading"><span class="section-badge">CERITA ANGGOTA</span><h2>Suara dari keluarga EC UPB.</h2><p>Bagian ini siap diisi cerita singkat dari anggota komunitas.</p></div><div class="values-mosaic"><article v-for="(story, index) in stories" :key="`${story.name}-${index}`" class="value-panel" :class="`value-panel-${['main', 'yellow', 'light', 'outline'][index % 4]}`"><span class="value-index">{{ String(index + 1).padStart(2, '0') }}</span><span class="value-word">{{ story.comment }}</span><span class="story-author">{{ story.name }} · {{ story.batch }}</span></article></div><form class="story-form" @submit.prevent="submitStory"><div class="story-form-heading"><h3>Bagikan pengalamanmu</h3><p>Ceritamu bisa menginspirasi anggota lain.</p></div><div class="story-form-fields"><input v-model="storyName" class="story-input" maxlength="40" placeholder="Nama kamu" required /><select v-model="storyBatch" class="story-input"><option value="">Pilih angkatan / prodi</option><option v-for="option in batchOptions" :key="option" :value="option">{{ option }}</option></select><textarea v-model="storyComment" class="story-input story-textarea" maxlength="220" placeholder="Tulis komentarmu tentang English Club..." required></textarea><button class="btn story-submit" type="submit" :disabled="storySubmitting">{{ storySubmitting ? 'Mengirim...' : 'Kirim Cerita' }}</button></div><p v-if="storyError" class="story-error">{{ storyError }}</p></form></section>
 
-    <div class="overview-grid">
-      <article class="overview-card">
-        <span class="overview-number">01</span>
-        <div class="ov-icon">🎯</div>
-        <h3>Visi</h3>
-        <p>Menjadi UKM bahasa Inggris yang unggul, inklusif, dan berdaya saing nasional.</p>
-      </article>
-      <article class="overview-card">
-        <span class="overview-number">02</span>
-        <div class="ov-icon">🚀</div>
-        <h3>Misi</h3>
-        <ul>
-          <li>Tingkatkan speaking & listening</li>
-          <li>Bina prestasi lomba</li>
-          <li>Ruang praktik harian yang fun</li>
-          <li>Jejaring antar kampus</li>
-        </ul>
-      </article>
-      <article class="overview-card">
-        <span class="overview-number">03</span>
-        <div class="ov-icon">📚</div>
-        <h3>Program</h3>
-        <ul>
-          <li><b>English Fun Day</b> — Word Hunt & vocab battle</li>
-          <li><b>Speaking Corner</b></li>
-          <li><b>Debate Clinic</b></li>
-          <li><b>TOEFL Prep</b></li>
-        </ul>
-      </article>
-    </div>
-
-    <section class="values-section">
-      <div class="values-heading">
-        <span class="section-badge">CERITA ANGGOTA</span>
-        <h2>Suara dari keluarga EC UPB.</h2>
-        <p>Bagian ini siap diisi cerita singkat dari anggota komunitas.</p>
-      </div>
-      <div class="values-mosaic">
-        <article v-for="(story, index) in stories" :key="`${story.name}-${index}`" class="value-panel" :class="`value-panel-${['main', 'yellow', 'light', 'outline'][index % 4]}`"><span class="value-index">{{ String(index + 1).padStart(2, '0') }}</span><div><span class="value-word">“{{ story.comment }}”</span></div><span class="story-author">{{ story.name }} · {{ story.batch }}</span></article>
-      </div>
-      <form class="story-form" @submit.prevent="submitStory">
-        <div class="story-form-heading">
-          <h3>Bagikan pengalamanmu</h3>
-          <p>Ceritamu bisa menginspirasi anggota lain.</p>
-        </div>
-        <div class="story-form-fields">
-          <input v-model="storyName" class="story-input" maxlength="40" placeholder="Nama kamu" aria-label="Nama kamu" required />
-          <input v-model="storyBatch" class="story-input" maxlength="30" placeholder="Angkatan / prodi" aria-label="Angkatan atau prodi" />
-          <textarea v-model="storyComment" class="story-input story-textarea" maxlength="220" placeholder="Tulis komentarmu tentang English Club..." aria-label="Komentar" required></textarea>
-          <button class="btn story-submit" type="submit" :disabled="storySubmitting">{{ storySubmitting ? 'Mengirim...' : 'Kirim Cerita →' }}</button>
-        </div>
-        <p v-if="storyError" class="story-error">{{ storyError }}</p>
-      </form>
-    </section>
-
-    <p class="footer-note">© 2026 English Club — Universitas Putra Bangsa Kebumen</p>
+    <footer class="site-footer"><div><b>English Club UPB</b><span>Universitas Putra Bangsa Kebumen</span></div><div class="social-links"><a href="https://www.instagram.com/englishclubupb/" target="_blank" rel="noreferrer">Instagram</a><a href="https://www.tiktok.com/@englishclubupb" target="_blank" rel="noreferrer">TikTok</a></div><p>© 2026 English Club, Universitas Putra Bangsa Kebumen</p></footer>
   </section>
 </template>
 
 <style scoped>
-.landing { max-width: 980px; gap: 22px; padding: max(28px,5vh) 24px 40px; }
-.landing-hero { width:100%; display:flex; flex-direction:column; align-items:center; text-align:center; gap:10px; padding: 12px 0 8px; }
-.landing-logo { width: 96px; height:auto; border-radius:0; mix-blend-mode:multiply; }
-.eyebrow { color: var(--royal-blue); font-size:10.5px; font-weight:800; letter-spacing:2px; }
-.title { font-size: clamp(48px,8vw,72px); line-height:.92; letter-spacing:-1px; }
-.subtitle { max-width:560px; font-size:15.5px; line-height:1.5; color: var(--text-sub); }
-.hero-stats { display:flex; gap:18px; margin-top:8px; color:var(--text-muted); font-size:10px; font-weight:800; letter-spacing:1px; }
-.hero-stats span{ display:flex; flex-direction:column; gap:3px; }
-.hero-stats b{ color: var(--dark-navy); font-family:'Outfit',sans-serif; font-size:20px; }
-.section-title{ width:100%; display:flex; flex-direction:column; align-items:center; gap:8px; margin-top:6px; text-align:center; }
-.section-badge{ background:var(--royal-blue); color:#fff; font-size:10px; font-weight:800; letter-spacing:1.8px; padding:4px 10px; border-radius:9999px; }
-.section-title h2{ font-size:clamp(22px,4vw,28px); font-weight:900; color:var(--dark-navy); margin:0; }
-.section-title p{ max-width:560px; line-height:1.5; }
-.about-card{ width:100%; padding:16px 20px; }
-.about-grid{ display:grid; grid-template-columns:1.35fr 0.75fr; gap:22px; align-items:start; }
-.about-text h3{ font-size:16px; font-weight:900; color:var(--royal-blue); margin-bottom:8px; }
-.about-text p{ font-size:14px; line-height:1.65; color:var(--text-sub); margin-bottom:10px; }
-.check-list{ list-style:none; padding:0; display:flex; flex-direction:column; gap:6px; }
-.check-list li{ font-size:13px; font-weight:600; padding-left:22px; position:relative; color:var(--dark-navy); }
-.check-list li::before{ content:'✓'; position:absolute; left:0; color:var(--royal-blue); font-weight:900; }
-.about-visual{ display:flex; flex-direction:column; gap:14px; }
-.mini-stats{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
-.mini-stat{ background:#F4F8FC; border:1px solid rgba(29,43,58,.08); border-radius:12px; padding:12px 6px; display:flex; flex-direction:column; align-items:center; text-align:center; }
-.mini-stat b{ font-family:'Outfit',sans-serif; font-size:18px; font-weight:900; color:var(--royal-blue); }
-.mini-stat span{ font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase; }
-.quote-box{ background:linear-gradient(135deg,var(--royal-blue),var(--royal-blue-light)); color:#fff; border-radius:14px; padding:14px 16px; font-size:13px; font-weight:700; font-style:italic; text-align:center; }
-.overview-heading{ width:100%; display:flex; align-items:end; justify-content:space-between; gap:28px; padding-bottom:18px; border-bottom:1px solid rgba(11,86,155,.2); }
-.overview-heading h2{ font-size:clamp(24px,4vw,34px); font-weight:900; color:var(--dark-navy); margin-top:10px; }
-.overview-heading p{ max-width:340px; color:var(--text-muted); font-size:13.5px; line-height:1.55; text-align:right; }
-.overview-grid{ width:100%; display:grid; grid-template-columns:repeat(3,1fr); gap:0; border-bottom:1px solid rgba(11,86,155,.2); }
-.overview-card{ position:relative; min-height:230px; padding:24px 20px; display:flex; flex-direction:column; gap:10px; }
-.overview-card + .overview-card{ border-left:1px solid rgba(11,86,155,.16); }
-.overview-number{ color:var(--royal-blue); font-family:'Outfit',sans-serif; font-size:12px; font-weight:900; letter-spacing:1px; }
-.ov-icon{ width:38px; height:38px; display:grid; place-items:center; background:rgba(255,230,0,.5); border-radius:10px; font-size:18px; }
-.overview-card h3{ font-size:15px; font-weight:900; color:var(--dark-navy); }
-.overview-card p, .overview-card li{ font-size:13.5px; line-height:1.6; color:var(--text-sub); }
-.overview-card ul{ padding-left:16px; display:flex; flex-direction:column; gap:4px; }
-.values-section{ width:100%; display:grid; grid-template-columns:minmax(190px,.7fr) minmax(0,1.7fr); gap:28px; align-items:stretch; padding:10px 0 4px; }
-.values-heading{ display:flex; flex-direction:column; align-items:flex-start; justify-content:center; gap:10px; }
-.values-heading h2{ font-size:clamp(24px,4vw,34px); line-height:1.05; font-weight:900; color:var(--dark-navy); }
-.values-heading p{ color:var(--text-muted); font-size:13.5px; line-height:1.55; max-width:220px; }
-.values-mosaic{ display:grid; grid-template-columns:1.15fr .85fr; grid-auto-rows:minmax(140px,auto); gap:10px; min-height:300px; }
-.value-panel{ position:relative; display:flex; flex-direction:column; justify-content:space-between; gap:22px; min-height:140px; padding:18px; overflow:hidden; border-radius:14px; }
-.value-panel::after{ content:''; position:absolute; inset:0; opacity:.18; pointer-events:none; background-image:linear-gradient(rgba(255,255,255,.8) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.8) 1px,transparent 1px); background-size:28px 28px; mask-image:linear-gradient(to bottom,black,transparent 80%); }
-.value-panel > *{ position:relative; z-index:1; }
-.value-panel-main{ grid-row:span 2; background:var(--dark-navy); color:#fff; }
-.value-panel-yellow{ background:var(--vibrant-yellow); color:var(--dark-navy); }
-.value-panel-yellow::after{ background-image:linear-gradient(rgba(29,43,58,.35) 1px,transparent 1px),linear-gradient(90deg,rgba(29,43,58,.35) 1px,transparent 1px); }
-.value-panel-light{ background:#E9F2F9; color:var(--dark-navy); }
-.value-panel-outline{ grid-column:2; background:transparent; color:var(--dark-navy); border:1px solid rgba(11,86,155,.3); }
-.value-index{ font-family:'Outfit',sans-serif; font-size:11px; font-weight:900; letter-spacing:1.2px; opacity:.7; }
-.value-word{ display:block; font-family:'Outfit',sans-serif; font-size:clamp(22px,3vw,32px); font-weight:900; line-height:1; }
-.value-panel p{ max-width:250px; margin-top:8px; font-size:12.5px; line-height:1.5; opacity:.8; }
-.story-placeholder{ font-style:italic; }
-.story-author{ position:relative; z-index:1; font-size:11px; font-weight:800; opacity:.65; }
-.story-form{ display:grid; grid-template-columns:minmax(190px,.7fr) minmax(0,1.7fr); gap:28px; align-items:center; padding-top:20px; border-top:1px solid rgba(11,86,155,.18); }
-.story-form-heading h3{ color:var(--dark-navy); font-size:18px; font-weight:900; }
-.story-form-heading p{ color:var(--text-muted); font-size:12.5px; line-height:1.5; margin-top:5px; }
-.story-form-fields{ display:grid; grid-template-columns:1fr 1fr auto; gap:8px; }
-.story-input{ width:100%; border:1px solid rgba(29,43,58,.16); border-radius:8px; padding:10px 12px; background:rgba(255,255,255,.72); color:var(--dark-navy); font:inherit; font-size:12px; outline:none; }
-.story-input:focus{ border-color:var(--royal-blue); box-shadow:0 0 0 3px rgba(11,86,155,.1); }
-.story-textarea{ grid-column:1 / 3; min-height:58px; resize:vertical; }
-.story-submit{ padding:10px 16px; font-size:12px; align-self:stretch; }
-.story-error{ grid-column:1 / -1; color:var(--bad); font-size:12px; font-weight:700; }
-.teaser-card{ width:100%; display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:22px; padding:24px 28px; margin:8px 0; background:linear-gradient(105deg,var(--dark-navy),var(--royal-blue)); color:#fff; border-radius:18px; box-shadow:0 16px 32px rgba(11,86,155,.2); }
-.teaser-mark{ display:grid; place-items:center; width:76px; aspect-ratio:1; border:2px solid var(--vibrant-yellow); border-radius:14px; color:var(--vibrant-yellow); font-family:'Outfit',sans-serif; font-size:20px; font-weight:900; transform:rotate(-6deg); }
-.teaser-copy{ min-width:0; }
-.teaser-kicker{ color:var(--vibrant-yellow); font-size:10px; font-weight:800; letter-spacing:1.5px; }
-.teaser-copy h2{ font-size:clamp(22px,4vw,30px); font-weight:900; margin:4px 0 5px; color:#fff; }
-.teaser-copy h2 span{ color:var(--vibrant-yellow); }
-.teaser-copy p{ max-width:480px; color:rgba(255,255,255,.78); font-size:13.5px; line-height:1.5; }
-.teaser-actions{ display:flex; flex-direction:column; gap:8px; flex-shrink:0; }
-.teaser-actions .btn{ white-space:nowrap; padding:11px 18px; font-size:13px; }
-.teaser-actions .btn.ghost{ color:#fff; border-color:rgba(255,255,255,.35); }
-.teaser-actions .btn.ghost:hover{ background:rgba(255,255,255,.12); border-color:#fff; color:#fff; }
-.footer-note{ font-size:11px; color:var(--text-muted); text-align:center; }
-@media (max-width:680px){
-  .landing{ padding: max(24px, env(safe-area-inset-top)) 18px 32px; gap:20px; }
-  .landing-hero{ gap:12px; padding:18px 0 12px; }
-  .landing-logo{ width:112px; }
-  .eyebrow{ max-width:330px; font-size:9.5px; line-height:1.45; }
-  .landing-hero .title{ font-size:clamp(52px,14vw,64px); }
-  .landing-hero .subtitle{ max-width:330px; font-size:16px; line-height:1.55; }
-  .hero-stats{ gap:20px; margin-top:10px; }
-  .hero-stats b{ font-size:22px; }
-  .about-grid{ grid-template-columns:1fr; gap:16px; }
-  .about-text h3, .about-text p{ text-align:center; }
-  .overview-grid{
-    display:flex;
-    gap:0;
-    overflow-x:auto;
-    scroll-snap-type:x mandatory;
-    overscroll-behavior-x:contain;
-    padding:0 0 10px;
-    margin:0;
-  }
-  .overview-heading{ align-items:center; flex-direction:column; gap:10px; text-align:center; }
-  .overview-heading p{ text-align:center; max-width:320px; }
-  .overview-card{
-    flex:0 0 100%;
-    min-height:0;
-    text-align:center;
-    align-items:center;
-    padding:20px 18px;
-    scroll-snap-align:center;
-  }
-  .overview-card ul{ text-align:left; align-self:stretch; }
-  .overview-card + .overview-card{ border-left:0; border-top:1px solid rgba(11,86,155,.16); }
-  .values-section{ grid-template-columns:1fr; gap:18px; }
-  .values-heading{ align-items:center; text-align:center; }
-  .values-heading p{ max-width:310px; }
-  .values-mosaic{ min-height:420px; }
-  .value-panel{ padding:16px 14px; }
-  .story-form{ grid-template-columns:1fr; gap:12px; text-align:center; }
-  .story-form-fields{ grid-template-columns:1fr 1fr; }
-  .story-textarea{ grid-column:1 / -1; }
-  .story-submit{ grid-column:1 / -1; min-height:44px; }
-  .teaser-card{ grid-template-columns:1fr; text-align:center; justify-items:center; padding:24px 18px; gap:14px; }
-  .teaser-copy p{ max-width:320px; }
-  .teaser-actions{ width:100%; }
-  .teaser-actions .btn{ width:100%; justify-content:center; }
+.hero-stats { display:grid; grid-template-columns:repeat(5, minmax(0, 1fr)); width:100%; max-width:840px; }
+.hero-stats span { min-width:0; }
+.landing-hero { display:flex; width:100%; flex-direction:column; align-items:flex-start; }
+.landing-nav { font-family:'Plus Jakarta Sans', sans-serif; }
+.nav-button { font-family:'Plus Jakarta Sans', sans-serif; }
+.landing { --ink:#172B6B; --paper:#F7F4DF; --lime:#B8D96B; --green:#527F25; max-width:1200px; gap:0; padding:0 clamp(18px,4vw,52px) 52px; color:var(--ink); }
+.landing::before { content:''; position:fixed; inset:0; z-index:-1; background-color:var(--paper); background-image:radial-gradient(rgba(23,43,107,.13) 1px, transparent 1px); background-size:16px 16px; }
+.landing-hero { position:relative; display:flex; width:100%; align-items:flex-start; min-height:min(620px,72vh); padding:0 0 clamp(52px,7vw,94px); text-align:left; border-bottom:4px solid var(--ink); row-gap:24px; }
+.landing-nav { position:fixed; top:0; left:0; right:0; width:100%; margin:0; display:flex; align-items:center; gap:24px; min-height:64px; padding:10px max(14px, calc((100vw - 1100px) / 2)); background:#FFFDF5; border-bottom:3px solid var(--ink); box-shadow:0 4px 0 var(--lime); z-index:20; font-family:'Plus Jakarta Sans', sans-serif; }
+.nav-brand { display:flex; flex:0 0 auto; align-items:center; width:42px; height:42px; margin-right:6px; }.nav-brand img { display:block; width:36px; height:36px; object-fit:contain; mix-blend-mode:multiply; }.landing-nav > a { color:var(--ink); font-size:13px; font-weight:700; text-decoration:none; }.landing-nav > a:hover { color:var(--green); }.nav-actions { display:flex; align-items:center; gap:8px; margin-left:auto; }.nav-button { padding:9px 13px; color:var(--ink); background:transparent; border:2px solid var(--ink); font-family:'Plus Jakarta Sans', sans-serif; font-size:12px; font-weight:800; cursor:pointer; }.nav-button:hover { transform:translateY(-1px); }.nav-play { background:var(--lime); box-shadow:3px 3px 0 var(--ink); }
+.eyebrow,.section-badge,.teaser-kicker,.overview-number { font-family:'Outfit', sans-serif; font-weight:900; letter-spacing:.14em; }.eyebrow { width:fit-content; margin-bottom:8px; padding:7px 12px; background:var(--lime); border:2px solid var(--ink); box-shadow:4px 4px 0 var(--ink); font-size:11px; }.landing-hero .title { max-width:900px; font-size:clamp(52px,10vw,132px); line-height:.84; letter-spacing:-.075em; text-align:left; color:var(--ink); }.title .highlight { color:var(--green); }.landing-hero .subtitle { max-width:590px; margin-top:18px; color:var(--ink); font-size:clamp(16px,2vw,21px); line-height:1.5; }.hero-stats { display:flex; margin-top:36px; border:2px solid var(--ink); background:#fff; box-shadow:5px 5px 0 var(--ink); }.hero-stats span { min-width:116px; padding:10px 16px; border-right:2px solid var(--ink); font-size:10px; font-weight:800; }.hero-stats span:last-child { border-right:0; }.hero-stats b { display:block; font-size:24px; }
+.section-title { width:100%; display:flex; flex-direction:column; align-items:flex-start; gap:8px; padding:72px 0 28px; text-align:left; }.section-badge { padding:6px 11px; background:var(--lime); border:2px solid var(--ink); box-shadow:3px 3px 0 var(--ink); font-size:10px; }.section-title h2,.overview-heading h2,.values-heading h2 { color:var(--ink); }.section-title p { max-width:680px; }.about-card { width:100%; padding:0; overflow:visible; background:#fff; border:3px solid var(--ink); border-radius:0; box-shadow:7px 7px 0 var(--ink); }.about-grid { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(300px,.85fr); }.about-text { padding:clamp(22px,4vw,42px); }.about-text h3 { font-size:22px; }.about-text p,.check-list li { font-size:15px; line-height:1.6; }.check-list { padding-left:18px; }.about-visual { padding:clamp(22px,3vw,36px); border-left:3px solid var(--ink); background:var(--paper); }.mini-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }.mini-stat { padding:12px 6px; text-align:center; border:2px solid var(--ink); background:#fff; }.mini-stat b,.mini-stat span { display:block; }.quote-box { margin-top:28px; padding:16px; background:var(--green); color:#fff; border:2px solid var(--ink); box-shadow:4px 4px 0 var(--ink); font-weight:700; text-align:center; }
+.teaser-card { width:100%; display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:22px; margin:74px 0 0; padding:clamp(22px,4vw,38px); color:#fff; background:var(--ink); border:3px solid var(--ink); box-shadow:7px 7px 0 var(--green); }.teaser-mark { display:grid; place-items:center; width:76px; aspect-ratio:1; color:var(--lime); border:2px solid var(--lime); font-size:20px; font-weight:900; }.teaser-kicker,.teaser-copy h2 span { color:var(--lime); }.teaser-copy h2 { color:#fff; }.teaser-copy p { max-width:480px; font-size:13.5px; line-height:1.5; }.teaser-actions { display:flex; flex-direction:column; gap:8px; }.teaser-actions .btn { white-space:nowrap; padding:11px 18px; border:2px solid #fff; border-radius:0; box-shadow:3px 3px 0 #000; font-size:13px; }.teaser-actions .btn.ghost { color:#fff; }
+.overview-heading { width:100%; display:flex; align-items:end; justify-content:space-between; gap:28px; margin-top:86px; padding-bottom:20px; border-bottom:3px solid var(--ink); }.overview-heading p { max-width:340px; text-align:right; line-height:1.55; }.overview-grid { width:100%; display:grid; grid-template-columns:repeat(3,1fr); border-bottom:3px solid var(--ink); }.overview-card { min-height:260px; padding:28px; }.overview-card + .overview-card { border-left:2px solid var(--ink); }.ov-icon { display:grid; place-items:center; width:42px; height:42px; margin:12px 0; background:var(--lime); border:2px solid var(--ink); font-weight:900; }.overview-card p,.overview-card li { line-height:1.6; }.overview-card ul { padding-left:18px; }
+.values-section { width:100%; display:grid; grid-template-columns:minmax(250px,.7fr) minmax(0,1.7fr); gap:28px; padding:86px 0 0; }.values-heading { display:flex; flex-direction:column; gap:10px; }.values-mosaic { display:grid; grid-template-columns:1.15fr .85fr; grid-auto-rows:minmax(140px,auto); gap:14px; }.value-panel { display:flex; flex-direction:column; justify-content:space-between; min-height:140px; padding:18px; border:3px solid var(--ink); box-shadow:4px 4px 0 var(--ink); }.value-panel-main { grid-row:span 2; color:#fff; background:var(--ink); }.value-panel-yellow { background:var(--lime); }.value-panel-light { background:#fff; }.value-panel-outline { grid-column:2; background:var(--paper); }.value-word { font-size:clamp(18px,2.5vw,30px); font-weight:900; line-height:1.05; }.story-author { font-size:11px; font-weight:800; }.story-form { grid-column:1 / -1; display:grid; grid-template-columns:minmax(250px,.7fr) minmax(0,1.7fr); gap:28px; margin-top:30px; padding:30px 0 0; border-top:3px solid var(--ink); }.story-form-heading h3 { font-size:18px; }.story-form-heading p { font-size:12.5px; }.story-form-fields { display:grid; grid-template-columns:1fr 1fr; gap:12px; }.story-input { width:100%; padding:10px 12px; color:var(--ink); background:#fff; border:2px solid var(--ink); font:inherit; font-size:14px; }.story-textarea { grid-column:1 / -1; min-height:120px; resize:vertical; }.story-submit { grid-column:1 / -1; width:fit-content; padding:12px 22px; border:2px solid var(--ink); border-radius:0; background:var(--lime); box-shadow:4px 4px 0 var(--ink); font-size:12px; }.story-error { grid-column:1 / -1; color:var(--bad); font-size:12px; }.site-footer { width:100%; display:grid; grid-template-columns:1fr auto; gap:14px 28px; margin-top:70px; padding:20px 0 0; border-top:2px solid var(--ink); }.site-footer > div:first-child { display:flex; flex-direction:column; gap:4px; }.site-footer b { font-size:16px; }.site-footer span,.site-footer p { font-size:11px; }.social-links { display:flex; gap:10px; }.social-links a { padding:8px 11px; color:var(--ink); background:var(--lime); border:2px solid var(--ink); box-shadow:3px 3px 0 var(--ink); font-size:10px; font-weight:900; text-decoration:none; }.site-footer p { grid-column:1 / -1; }
+.landing-hero { padding-top:98px; }
+.section-title, .overview-heading, .values-section { scroll-margin-top:86px; }
+@media (max-width:680px) { .landing { padding:0 18px 32px; }.landing-nav { gap:10px; min-height:58px; padding:8px 10px; }.nav-brand { width:38px; height:38px; margin-right:auto; }.nav-brand img { width:31px; height:31px; }.landing-nav > a:not(.nav-brand) { display:none; }.nav-button { padding:7px 8px; font-size:12px; }.landing-hero { min-height:520px; padding-top:82px; }.landing-hero .title { font-size:clamp(54px,17vw,82px); }.hero-stats { width:100%; }.hero-stats span { min-width:0; flex:1; padding:9px 6px; }.about-grid,.overview-grid,.values-section,.story-form { grid-template-columns:1fr; }.about-visual { border-top:3px solid var(--ink); border-left:0; }.teaser-card { grid-template-columns:1fr; text-align:center; justify-items:center; margin-top:56px; }.teaser-actions { width:100%; }.teaser-actions .btn { width:100%; }.overview-heading { align-items:center; flex-direction:column; margin-top:60px; text-align:center; }.overview-heading p { text-align:center; }.overview-card + .overview-card { border-top:2px solid var(--ink); border-left:0; }.values-section { padding-top:60px; }.story-form-fields { grid-template-columns:1fr; }.story-textarea,.story-submit { grid-column:1; }.story-submit { width:100%; }.site-footer { grid-template-columns:1fr; margin-top:48px; }.site-footer p { grid-column:auto; } }
+.hero-stats { display:grid; grid-template-columns:repeat(5, minmax(0, 1fr)); width:100%; max-width:840px; }
+.hero-stats span { flex:1; min-width:0; }
+.landing-hero { display:flex; width:100%; align-items:flex-start; }
+.landing-nav, .nav-button { font-family:'Plus Jakarta Sans', sans-serif; }
+.overview-heading > div { display:flex; flex-direction:column; gap:14px; }
+@media (max-width:680px) {
+  .hero-stats { grid-template-columns:repeat(2, minmax(0, 1fr)); }
 }
 </style>

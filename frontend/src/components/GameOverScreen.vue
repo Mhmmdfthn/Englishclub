@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { api } from '../api.js'
 import Leaderboard from './Leaderboard.vue'
 
@@ -8,6 +8,20 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['replay'])
+
+const displayedScore = ref(0)
+onMounted(() => {
+  const target = props.stats.score
+  if (!target) return
+  const duration = 900
+  const start = performance.now()
+  const step = (now) => {
+    const k = Math.min(1, (now - start) / duration)
+    displayedScore.value = Math.round(target * (1 - Math.pow(1 - k, 3)))
+    if (k < 1) requestAnimationFrame(step)
+  }
+  requestAnimationFrame(step)
+})
 
 const name = ref(localStorage.getItem('wh_name') || '')
 const savedRank = ref(null)
@@ -49,7 +63,7 @@ function replay() {
     <!-- Score & Results Card -->
     <div class="card center result-card">
       <span class="res-subtitle">TOTAL SKOR AKHIR</span>
-      <p class="big-score">{{ stats.score }}</p>
+      <p class="big-score" aria-label="Total skor akhir">{{ displayedScore }}</p>
 
       <div class="stats-grid">
         <div class="stat-col">
@@ -69,7 +83,7 @@ function replay() {
       </div>
 
       <div v-if="stats.isRecord" class="new-record-pill">
-        🎉 REKOR BARU TERCIPTA!
+        REKOR BARU TERCIPTA!
       </div>
       <p v-else class="muted small record-info">Rekor perangkat: <b>{{ stats.best }}</b> pts</p>
 
@@ -95,7 +109,12 @@ function replay() {
       <p v-if="saveError" class="error">{{ saveError }}</p>
     </div>
     <div v-else class="card center saved-card">
-      <span class="saved-icon">🏆</span>
+      <span class="saved-icon" aria-hidden="true">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M6 3h12v6a6 6 0 0 1-12 0V3Z" />
+          <path d="M6 5H4a2 2 0 0 0-2 2v1a5 5 0 0 0 5 5M18 5h2a2 2 0 0 1 2 2v1a5 5 0 0 1-5 5M12 15v4M8 21h8" />
+        </svg>
+      </span>
       <p class="saved-text">
         Berhasil tersimpan di Peringkat <b>#{{ savedRank }}</b>!
       </p>

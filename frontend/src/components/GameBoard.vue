@@ -124,17 +124,23 @@ watch(
       :class="{
         shake: shaking,
         'fever-board': fever,
+        'board-disabled': disabled,
       }"
+      role="grid"
+      aria-label="Word Hunt letter board"
+      :aria-disabled="disabled"
       @pointerdown="begin"
       @touchstart.prevent="begin"
     >
-      <TileCell
+<TileCell
         v-for="cell in cells"
         :key="`${cell.i}-${cell.token}`"
         :data-idx="cell.i"
         :letter="cell.letter"
         :selected="selectedSet.has(cell.i)"
         :fresh="cell.token > 0"
+        :disabled="disabled"
+        :fever="fever && selectedSet.has(cell.i)"
       />
     </div>
   </div>
@@ -146,29 +152,68 @@ watch(
   justify-content: center;
   align-items: center;
   width: 100%;
+  padding: 2px 0 8px;
 }
 
 .board {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: clamp(4px, 1.4vw, 10px);
-  width: min(96vw, 52dvh, 460px);
+  gap: clamp(5px, 1.5vw, 10px);
+  width: min(94vw, 56dvh, 470px);
   aspect-ratio: 1;
-  padding: clamp(8px, 2vw, 14px);
-  background: linear-gradient(180deg, #FFFFFF 0%, #F2F7FC 100%);
-  border: 1.5px solid rgba(29, 43, 58, 0.12);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 12px 36px rgba(29, 43, 58, 0.14), 0 0 24px rgba(11, 86, 155, 0.12);
+  padding: clamp(8px, 2.2vw, 15px);
+  background: #172B6B;
+  border: clamp(3px, 0.8vw, 5px) solid #172B6B;
+  border-radius: clamp(18px, 4vw, 28px);
+  box-shadow: 7px 8px 0 #B8D96B, 0 12px 20px rgba(23, 43, 107, 0.18);
   touch-action: none;
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
-  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+  transition: box-shadow 0.16s ease, transform 0.16s ease, opacity 0.16s ease;
+  position: relative;
+  isolation: isolate;
+}
+
+.board::before {
+  content: 'WORD HUNT';
+  position: absolute;
+  top: -13px;
+  left: 50%;
+  z-index: 3;
+  padding: 3px 12px 4px;
+  border: 3px solid #172B6B;
+  border-radius: 8px;
+  color: #172B6B;
+  background: #F7F4DF;
+  font-family: 'Outfit', 'Plus Jakarta Sans', sans-serif;
+  font-size: clamp(9px, 2.3vw, 12px);
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  line-height: 1;
+  transform: translateX(-50%);
+  pointer-events: none;
 }
 
 .board.fever-board {
-  border-color: var(--vibrant-yellow);
-  box-shadow: 0 0 35px rgba(255, 230, 0, 0.5), 0 12px 36px rgba(29, 43, 58, 0.15);
+  border-color: #527F25;
+  box-shadow: 7px 8px 0 #B8D96B, 0 0 0 5px rgba(184, 217, 107, 0.55), 0 12px 20px rgba(23, 43, 107, 0.2);
+}
+
+.board.board-disabled {
+  opacity: 0.68;
+  cursor: not-allowed;
+}
+
+.board:not(.board-disabled):active {
+  transform: translate(2px, 2px);
+  box-shadow: 5px 6px 0 #B8D96B, 0 8px 16px rgba(23, 43, 107, 0.16);
+}
+
+@media (min-width: 700px) {
+  .board-wrapper {
+    padding-top: 8px;
+  }
 }
 
 /* Shake animation saat kata salah */

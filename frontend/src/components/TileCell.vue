@@ -3,11 +3,13 @@ defineProps({
   letter: { type: String, required: true },
   selected: { type: Boolean, default: false },
   fresh: { type: Boolean, default: false },
+  disabled: { type: Boolean, default: false },
+  fever: { type: Boolean, default: false },
 })
 </script>
 
 <template>
-  <div class="tile" :class="{ sel: selected }">
+  <div class="tile" :class="{ sel: selected, fever, disabled }" role="gridcell">
     <span class="glyph" :class="{ pop: fresh }">{{ letter.toUpperCase() }}</span>
   </div>
 </template>
@@ -17,10 +19,10 @@ defineProps({
   aspect-ratio: 1;
   display: grid;
   place-items: center;
-  background: linear-gradient(145deg, #FFFFFF, #EDF3F9);
-  border: 1.5px solid var(--tile-border);
-  border-radius: clamp(8px, 2vw, 13px);
-  box-shadow: 0 3px 8px rgba(29, 43, 58, 0.12), inset 0 1px 1px rgba(255, 255, 255, 0.9);
+  background: #FFFFFF;
+  border: clamp(2px, 0.45vw, 3px) solid #172B6B;
+  border-radius: clamp(9px, 2.2vw, 15px);
+  box-shadow: 0 3px 0 rgba(23, 43, 107, 0.88);
   transition:
     transform 0.1s cubic-bezier(0.2, 0, 0, 1),
     background 0.12s ease,
@@ -31,8 +33,14 @@ defineProps({
 }
 
 .tile:hover {
-  border-color: rgba(11, 86, 155, 0.6);
-  background: linear-gradient(145deg, #F4F9FE, #E3EEF9);
+  background: #F7F4DF;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 0 rgba(23, 43, 107, 0.88);
+}
+
+.tile:active {
+  transform: translateY(2px) scale(0.98);
+  box-shadow: 0 1px 0 rgba(23, 43, 107, 0.88);
 }
 
 .glyph {
@@ -40,7 +48,7 @@ defineProps({
   font-weight: 900;
   /* Font lebih kecil untuk 5x5 */
   font-size: clamp(18px, 5.5vw, 32px);
-  color: var(--dark-navy);
+  color: #172B6B;
   line-height: 1;
   pointer-events: none;
   user-select: none;
@@ -48,10 +56,10 @@ defineProps({
 
 /* Selected state during swipe */
 .tile.sel {
-  background: linear-gradient(145deg, #FFF04D, var(--vibrant-yellow));
-  border-color: #E6C200;
-  transform: scale(1.09);
-  box-shadow: 0 0 18px rgba(255, 230, 0, 0.75), 0 6px 14px rgba(29, 43, 58, 0.2);
+  background: #B8D96B;
+  border-color: #172B6B;
+  transform: translateY(-3px) scale(1.035);
+  box-shadow: 0 6px 0 #527F25;
   z-index: 2;
 }
 
@@ -59,6 +67,35 @@ defineProps({
   color: var(--dark-navy);
   text-shadow: none;
   font-weight: 900;
+}
+
+.tile.sel.fever {
+  background: var(--vibrant-yellow);
+  border-color: #C79000;
+  box-shadow: 0 6px 0 #C79000, 0 0 20px rgba(255, 230, 0, 0.75);
+  animation: fever-glow 0.5s infinite alternate;
+}
+
+@keyframes fever-glow {
+  from { transform: translateY(-3px) scale(1.035); filter: brightness(1); }
+  to { transform: translateY(-3px) scale(1.06); filter: brightness(1.12); }
+}
+
+.tile.disabled {
+  background: #E9E7D8;
+  color: #6B7596;
+  transform: none;
+  box-shadow: none;
+}
+
+.tile.disabled .glyph {
+  color: #6B7596;
+}
+
+.tile.disabled:hover,
+.tile.disabled:active {
+  transform: none;
+  box-shadow: none;
 }
 
 /* Fresh tile drop-in animation */

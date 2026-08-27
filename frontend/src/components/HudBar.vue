@@ -4,13 +4,14 @@ import { computed } from 'vue'
 const props = defineProps({
   score: { type: Number, default: 0 },
   timeLeft: { type: Number, default: 0 },
+  timeTotal: { type: Number, default: 60 },
   combo: { type: Number, default: 1 },
   word: { type: String, default: '' },
   fever: { type: Boolean, default: false },
 })
 
 const pct = computed(() =>
-  Math.max(0, Math.min(100, (props.timeLeft / 60) * 100)),
+  Math.max(0, Math.min(100, (props.timeLeft / Math.max(props.timeTotal, 1)) * 100)),
 )
 
 const display = computed(() => props.word || 'GESER HURUF')
@@ -35,7 +36,7 @@ const display = computed(() => props.word || 'GESER HURUF')
       </div>
       <div class="stat combo-box">
         <div class="combo-header">
-          <span v-if="combo >= 3" class="fever-tag">🔥 RUSH</span>
+          <span v-if="combo >= 3" class="fever-tag">RUSH</span>
           <span class="label">COMBO</span>
         </div>
         <span class="val combo-val" :class="{ 'combo-high': combo >= 3 }">

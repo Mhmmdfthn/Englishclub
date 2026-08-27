@@ -1,7 +1,22 @@
 <script setup>
-defineProps({
+import { nextTick, ref, watch } from 'vue'
+
+const props = defineProps({
   items: { type: Array, required: true },
 })
+
+const listRef = ref(null)
+
+watch(
+  () => props.items.length,
+  (now, before) => {
+    if (now > before && listRef.value) {
+      nextTick(() => {
+        listRef.value.scrollTo({ top: listRef.value.scrollHeight, behavior: 'smooth' })
+      })
+    }
+  },
+)
 </script>
 
 <template>
@@ -9,7 +24,7 @@ defineProps({
     <div class="found-header">
       <span class="title-found">KATA DITEMUKAN ({{ items.length }})</span>
     </div>
-    <div class="found-list">
+    <div class="found-list" ref="listRef">
       <span
         v-for="(it, n) in items"
         :key="n"
@@ -88,6 +103,12 @@ defineProps({
   border-color: var(--vibrant-yellow);
   box-shadow: 0 0 10px rgba(255, 230, 0, 0.4);
   transform: scale(1.04);
+  animation: chip-in 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes chip-in {
+  0% { transform: scale(0.6); opacity: 0; }
+  100% { transform: scale(1.04); opacity: 1; }
 }
 
 .chip.last .chip-word {

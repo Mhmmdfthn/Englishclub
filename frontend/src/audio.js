@@ -107,6 +107,13 @@ class AudioManager {
       osc.stop(this.ctx.currentTime + 0.4)
     })
   }
+
+  vibrate(pattern) {
+    if (this.muted) return
+    if (navigator.vibrate) {
+      try { navigator.vibrate(pattern) } catch { /* ignore */ }
+    }
+  }
 }
 
 export const sound = new AudioManager()
