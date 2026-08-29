@@ -52,46 +52,49 @@ function replay() {
 
 <template>
   <section class="screen over">
-    <!-- Brand Badge -->
-    <div class="brand-badge">
-      <span class="pill-english">ENGLISH</span>
-      <span class="text-club">CLUB</span>
-    </div>
-
-    <h1 class="title">WAKTU <span class="highlight">HABIS!</span></h1>
-
-    <!-- Score & Results Card -->
-    <div class="card center result-card">
-      <span class="res-subtitle">TOTAL SKOR AKHIR</span>
-      <p class="big-score" aria-label="Total skor akhir">{{ displayedScore }}</p>
-
-      <div class="stats-grid">
-        <div class="stat-col">
-          <span class="stat-num">{{ stats.words.length }}</span>
-          <span class="stat-text">Kata</span>
-        </div>
-        <div class="stat-divider" />
-        <div class="stat-col">
-          <span class="stat-num">x{{ stats.bestCombo }}</span>
-          <span class="stat-text">Max Combo</span>
-        </div>
-        <div class="stat-divider" />
-        <div class="stat-col">
-          <span class="stat-num">{{ stats.longest ? stats.longest.length : 0 }}</span>
-          <span class="stat-text">Huruf Terpanjang</span>
-        </div>
+    <div class="result-shell">
+      <div class="brand-badge">
+        <span class="pill-english">ENGLISH</span>
+        <span class="text-club">CLUB</span>
       </div>
 
-      <div v-if="stats.isRecord" class="new-record-pill">
-        REKOR BARU TERCIPTA!
-      </div>
-      <p v-else class="muted small record-info">Rekor perangkat: <b>{{ stats.best }}</b> pts</p>
+      <h1 class="title">WAKTU <span class="highlight">HABIS!</span></h1>
 
-      <div v-if="stats.longest" class="longest-box">
-        <span class="longest-label">Kata Terbaik:</span>
-        <span class="longest-word">{{ stats.longest.toUpperCase() }}</span>
+      <div class="card center result-card">
+        <div class="score-meta">
+          <span class="res-subtitle">TOTAL SKOR AKHIR</span>
+          <div class="score-value-wrap">
+            <span class="big-score" aria-label="Total skor akhir">{{ displayedScore }}</span>
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-col">
+            <span class="stat-num">{{ stats.words.length }}</span>
+            <span class="stat-text">Kata</span>
+          </div>
+          <div class="stat-divider" />
+          <div class="stat-col">
+            <span class="stat-num">x{{ stats.bestCombo }}</span>
+            <span class="stat-text">Max Combo</span>
+          </div>
+          <div class="stat-divider" />
+          <div class="stat-col">
+            <span class="stat-num">{{ stats.longest ? stats.longest.length : 0 }}</span>
+            <span class="stat-text">Huruf Terpanjang</span>
+          </div>
+        </div>
+
+        <div v-if="stats.isRecord" class="new-record-pill">
+          REKOR BARU TERCIPTA!
+        </div>
+        <p v-else class="record-info">Rekor perangkat: <b>{{ stats.best }}</b> pts</p>
+
+        <div v-if="stats.longest" class="longest-box">
+          <span class="longest-label">Kata Terbaik:</span>
+          <span class="longest-word">{{ stats.longest.toUpperCase() }}</span>
+        </div>
       </div>
-    </div>
 
     <!-- Save Score Input -->
     <div v-if="!savedRank" class="card center save-card">
@@ -120,7 +123,6 @@ function replay() {
       </p>
     </div>
 
-    <!-- Leaderboard if saved -->
     <div v-if="savedRank" class="card lb-card">
       <div class="card-header">
         <svg class="header-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -134,7 +136,6 @@ function replay() {
       <Leaderboard :entries="entries" />
     </div>
 
-    <!-- Replay CTA -->
     <button class="btn replay-btn" @click="replay">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
         <path d="M23 4v6h-6"/>
@@ -142,91 +143,182 @@ function replay() {
       </svg>
       <span>MAIN LAGI</span>
     </button>
+    </div>
   </section>
 </template>
 
 <style scoped>
 .over {
+  position: relative;
   justify-content: flex-start;
-  padding-top: max(4vh, 20px);
-  padding-bottom: 30px;
+  padding-top: max(22px, env(safe-area-inset-top));
+  padding-bottom: 32px;
+  background-color: var(--pure-white);
+  background-image: radial-gradient(rgba(29, 43, 58, 0.13) 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+
+.result-shell {
+  width: min(100%, 720px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.brand-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--pure-white);
+  border: 2px solid var(--dark-navy);
+  box-shadow: 4px 4px 0 var(--dark-navy);
+  padding: 6px 12px;
+  align-self: center;
+}
+
+.pill-english {
+  background: var(--royal-blue);
+  color: var(--pure-white);
+  font-weight: 900;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  padding: 4px 8px;
+  border: 2px solid var(--dark-navy);
+}
+
+.text-club {
+  color: var(--dark-navy);
+  font-weight: 900;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(38px, 7vw, 62px);
+  line-height: 0.92;
+  letter-spacing: -0.06em;
+  text-align: center;
+  color: var(--dark-navy);
+}
+
+.title .highlight {
+  color: var(--royal-blue);
 }
 
 .result-card {
-  background: #FFFFFF;
-  border: 1.5px solid var(--panel-border);
+  width: 100%;
+  background: var(--pure-white);
+  border: 3px solid var(--dark-navy);
+  border-radius: 0;
+  box-shadow: 7px 7px 0 var(--royal-blue);
+  gap: 12px;
+  padding: 20px 18px 18px;
+}
+
+.score-meta {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 8px;
 }
 
 .res-subtitle {
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 1.5px;
-  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  color: var(--royal-blue);
   text-transform: uppercase;
+}
+
+.score-value-wrap {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: var(--dark-navy);
+  border: 3px solid var(--dark-navy);
+  box-shadow: 5px 5px 0 var(--vibrant-yellow);
 }
 
 .big-score {
   margin: 0;
+  padding: 14px 12px 10px;
   font-family: 'Outfit', sans-serif;
-  font-size: clamp(52px, 15vw, 76px);
+  font-size: clamp(54px, 12vw, 88px);
   font-weight: 900;
-  color: var(--royal-blue);
+  color: var(--pure-white);
   line-height: 1;
+  letter-spacing: -0.08em;
   font-variant-numeric: tabular-nums;
 }
 
 .stats-grid {
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   width: 100%;
-  margin: 8px 0;
-  padding: 10px 0;
-  background: #F4F7FA;
-  border-radius: var(--radius-md);
-  border: 1px solid #E2E8F0;
+  margin: 6px 0 2px;
+  background: #f8fafc;
+  border: 3px solid var(--dark-navy);
+  box-shadow: 6px 6px 0 var(--dark-navy);
+  overflow: hidden;
 }
 
 .stat-col {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  justify-content: center;
+  gap: 4px;
+  min-height: 122px;
+  padding: 10px 8px 12px;
+}
+
+.stat-col:nth-child(2) {
+  border-left: 3px solid var(--dark-navy);
+  border-right: 3px solid var(--dark-navy);
 }
 
 .stat-num {
   font-family: 'Outfit', sans-serif;
-  font-size: 18px;
-  font-weight: 800;
+  font-size: clamp(32px, 6vw, 54px);
+  font-weight: 900;
+  line-height: 0.9;
   color: var(--dark-navy);
+  letter-spacing: -0.06em;
 }
 
 .stat-text {
   font-size: 11px;
   color: var(--text-muted);
-  font-weight: 600;
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: center;
+  letter-spacing: 0.02em;
 }
 
 .stat-divider {
-  width: 1px;
-  height: 24px;
-  background: #E2E8F0;
+  display: none;
 }
 
 .new-record-pill {
-  background: linear-gradient(135deg, var(--vibrant-yellow), #FFF04D);
+  background: var(--vibrant-yellow);
   color: var(--dark-navy);
   font-weight: 900;
-  font-size: 12px;
-  letter-spacing: 0.5px;
-  padding: 5px 14px;
-  border-radius: var(--radius-full);
-  box-shadow: 0 4px 14px rgba(255, 230, 0, 0.4);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  padding: 6px 16px;
+  border: 2px solid var(--dark-navy);
+  box-shadow: 3px 3px 0 var(--dark-navy);
 }
 
 .record-info {
-  margin: 2px 0;
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-sub);
 }
 
 .record-info b {
@@ -236,9 +328,11 @@ function replay() {
 .longest-box {
   display: flex;
   align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
   gap: 6px;
   font-size: 13px;
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
 .longest-label {
@@ -246,33 +340,49 @@ function replay() {
 }
 
 .longest-word {
-  font-weight: 800;
-  color: var(--royal-blue-light);
-  letter-spacing: 1px;
+  font-weight: 900;
+  color: var(--royal-blue);
+  letter-spacing: 0.14em;
 }
 
 .save-card {
+  width: 100%;
+  max-width: 620px;
   gap: 10px;
+  background: var(--pure-white);
+  border: 3px solid var(--dark-navy);
+  border-radius: 0;
+  box-shadow: 7px 7px 0 var(--royal-blue);
+  padding: 18px 18px 20px;
 }
 
 .save-title {
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 800;
   color: var(--text-sub);
 }
 
 .save-btn {
   width: 100%;
-  max-width: 280px;
+  max-width: 420px;
+  border-radius: 0;
+  border: 2px solid var(--dark-navy);
+  box-shadow: 4px 4px 0 var(--dark-navy);
+  font-size: 14px;
+  padding: 13px 20px;
 }
 
 .saved-card {
+  width: 100%;
+  max-width: 620px;
   flex-direction: row !important;
   justify-content: center;
   align-items: center;
   gap: 10px;
-  background: rgba(16, 185, 129, 0.15);
-  border: 1.5px solid rgba(16, 185, 129, 0.4);
+  background: rgba(16, 185, 129, 0.16);
+  border: 3px solid var(--dark-navy);
+  border-radius: 0;
+  box-shadow: 7px 7px 0 var(--dark-navy);
 }
 
 .saved-icon {
@@ -296,11 +406,21 @@ function replay() {
   gap: 8px;
   margin-bottom: 12px;
   padding-bottom: 8px;
-  border-bottom: 1px solid #E2E8F0;
+  border-bottom: 2px solid var(--dark-navy);
 }
 
 .header-icon {
-  color: var(--vibrant-yellow);
+  color: var(--royal-blue);
+}
+
+.lb-card {
+  width: 100%;
+  max-width: 620px;
+  background: var(--pure-white);
+  border: 3px solid var(--dark-navy);
+  border-radius: 0;
+  box-shadow: 7px 7px 0 var(--royal-blue);
+  padding: 18px;
 }
 
 .lb-card h3 {
@@ -308,12 +428,28 @@ function replay() {
   font-size: 13.5px;
   letter-spacing: 1.5px;
   font-weight: 800;
-  color: var(--light-gray);
+  color: var(--dark-navy);
 }
 
 .replay-btn {
   width: 100%;
   max-width: 320px;
   margin-top: 6px;
+  border-radius: 0;
+  border: 2px solid var(--dark-navy);
+  box-shadow: 4px 4px 0 var(--dark-navy);
+}
+
+@media (max-width: 680px) {
+  .result-shell {
+    width: 100%;
+  }
+
+  .save-card,
+  .saved-card,
+  .lb-card,
+  .result-card {
+    width: 100%;
+  }
 }
 </style>

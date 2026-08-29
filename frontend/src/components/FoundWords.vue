@@ -41,20 +41,22 @@ watch(
 <style scoped>
 .found-container {
   width: 100%;
-  padding: 10px 14px;
-  background: #FFFFFF;
-  border: 1px solid var(--panel-border);
+  padding: 12px 14px;
+  background: var(--pure-white);
+  border: 2px solid var(--dark-navy);
+  border-radius: 0;
+  box-shadow: 4px 4px 0 var(--dark-navy);
 }
 
 .found-header {
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 .title-found {
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 1px;
-  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.15em;
+  color: var(--royal-blue);
   text-transform: uppercase;
 }
 
@@ -62,7 +64,7 @@ watch(
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  max-height: 80px;
+  max-height: 90px;
   overflow-y: auto;
   padding-right: 4px;
 }
@@ -72,17 +74,17 @@ watch(
   align-items: center;
   gap: 5px;
   font-size: 12px;
-  font-weight: 700;
-  padding: 3px 10px;
-  border-radius: var(--radius-full);
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 0;
   background: rgba(11, 86, 155, 0.08);
-  border: 1px solid rgba(11, 86, 155, 0.35);
+  border: 2px solid var(--dark-navy);
   color: var(--royal-blue);
   transition: all 0.15s ease;
 }
 
 .chip-word {
-  letter-spacing: 0.5px;
+  letter-spacing: 0.08em;
 }
 
 .chip-trans {
@@ -95,20 +97,20 @@ watch(
 .chip-pts {
   font-family: 'Outfit', sans-serif;
   font-weight: 800;
-  color: var(--royal-blue-light);
+  color: var(--dark-navy);
 }
 
 .chip.last {
-  background: rgba(255, 230, 0, 0.28);
-  border-color: var(--vibrant-yellow);
-  box-shadow: 0 0 10px rgba(255, 230, 0, 0.4);
-  transform: scale(1.04);
+  background: rgba(255, 230, 0, 0.4);
+  border-color: var(--dark-navy);
+  box-shadow: 3px 3px 0 var(--dark-navy);
+  transform: scale(1.02);
   animation: chip-in 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 @keyframes chip-in {
   0% { transform: scale(0.6); opacity: 0; }
-  100% { transform: scale(1.04); opacity: 1; }
+  100% { transform: scale(1.02); opacity: 1; }
 }
 
 .chip.last .chip-word {

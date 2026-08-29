@@ -263,9 +263,13 @@ async function handleSubmit(path) {
 
 <style scoped>
 .screen.play {
+  position: relative;
   justify-content: flex-start;
-  padding-top: max(10px, env(safe-area-inset-top));
-  gap: 8px;
+  padding-top: max(18px, env(safe-area-inset-top));
+  gap: 12px;
+  background-color: var(--pure-white);
+  background-image: radial-gradient(rgba(29, 43, 58, 0.13) 1px, transparent 1px);
+  background-size: 16px 16px;
 }
 .loading-screen {
   position: fixed;
@@ -390,23 +394,23 @@ async function handleSubmit(path) {
   position: fixed;
   top: 12px;
   right: 14px;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.95);
-  border: 1px solid rgba(29, 43, 58, 0.15);
+  width: 38px;
+  height: 38px;
+  border-radius: 0;
+  background: var(--pure-white);
+  border: 2px solid var(--dark-navy);
   color: var(--dark-navy);
   display: grid;
   place-items: center;
   z-index: 100;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: var(--shadow-sm);
+  box-shadow: 3px 3px 0 var(--dark-navy);
 }
 .sound-btn:hover {
-  background: var(--royal-blue);
-  color: var(--pure-white);
-  border-color: var(--royal-blue);
+  background: var(--vibrant-yellow);
+  color: var(--dark-navy);
+  border-color: var(--dark-navy);
 }
 
 .float-toast {

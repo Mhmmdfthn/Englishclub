@@ -158,14 +158,14 @@ watch(
 .board {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: clamp(5px, 1.5vw, 10px);
+  gap: clamp(6px, 1.5vw, 10px);
   width: min(94vw, 56dvh, 470px);
   aspect-ratio: 1;
   padding: clamp(8px, 2.2vw, 15px);
-  background: #172B6B;
-  border: clamp(3px, 0.8vw, 5px) solid #172B6B;
-  border-radius: clamp(18px, 4vw, 28px);
-  box-shadow: 7px 8px 0 #B8D96B, 0 12px 20px rgba(23, 43, 107, 0.18);
+  background: var(--dark-navy);
+  border: 3px solid var(--dark-navy);
+  border-radius: 0;
+  box-shadow: 7px 7px 0 var(--royal-blue);
   touch-action: none;
   -webkit-touch-callout: none;
   -webkit-user-select: none;
@@ -182,10 +182,10 @@ watch(
   left: 50%;
   z-index: 3;
   padding: 3px 12px 4px;
-  border: 3px solid #172B6B;
-  border-radius: 8px;
-  color: #172B6B;
-  background: #F7F4DF;
+  border: 3px solid var(--dark-navy);
+  border-radius: 0;
+  color: var(--dark-navy);
+  background: var(--pure-white);
   font-family: 'Outfit', 'Plus Jakarta Sans', sans-serif;
   font-size: clamp(9px, 2.3vw, 12px);
   font-weight: 900;
@@ -193,11 +193,12 @@ watch(
   line-height: 1;
   transform: translateX(-50%);
   pointer-events: none;
+  box-shadow: 3px 3px 0 var(--dark-navy);
 }
 
 .board.fever-board {
-  border-color: #527F25;
-  box-shadow: 7px 8px 0 #B8D96B, 0 0 0 5px rgba(184, 217, 107, 0.55), 0 12px 20px rgba(23, 43, 107, 0.2);
+  border-color: var(--dark-navy);
+  box-shadow: 7px 7px 0 var(--vibrant-yellow);
 }
 
 .board.board-disabled {
@@ -207,7 +208,7 @@ watch(
 
 .board:not(.board-disabled):active {
   transform: translate(2px, 2px);
-  box-shadow: 5px 6px 0 #B8D96B, 0 8px 16px rgba(23, 43, 107, 0.16);
+  box-shadow: 5px 5px 0 var(--royal-blue);
 }
 
 @media (min-width: 700px) {

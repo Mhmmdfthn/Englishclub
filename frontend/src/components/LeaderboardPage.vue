@@ -40,9 +40,9 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.board-page{ --page-ink:#172B6B; --page-paper:#F7F4DF; --page-lime:#B8D96B; position:relative; isolation:isolate; max-width:1200px; min-height:100dvh; gap:18px; padding:0 clamp(18px,4vw,52px) 52px; color:var(--page-ink); background-color:var(--page-paper); background-image:radial-gradient(rgba(23,43,107,.13) 1px, transparent 1px); background-size:16px 16px; }
-.board-page::before{ content:''; position:fixed; inset:0; z-index:-1; background:var(--page-paper); background-image:radial-gradient(rgba(23,43,107,.13) 1px, transparent 1px); background-size:16px 16px; }
-.page-nav{ position:sticky; top:0; z-index:10; width:100%; min-height:64px; display:flex; align-items:center; gap:16px; padding:10px 14px; margin-bottom:24px; background:#FFFDF5; border-bottom:3px solid var(--page-ink); box-shadow:0 0 0 100vmax #FFFDF5, 0 4px 0 var(--page-lime); clip-path:inset(0 -100vmax); }
+.board-page{ --page-ink:var(--dark-navy); --page-paper:var(--pure-white); --page-lime:var(--vibrant-yellow); position:relative; isolation:isolate; max-width:1200px; min-height:100dvh; gap:18px; padding:0 clamp(18px,4vw,52px) 52px; color:var(--page-ink); background-color:var(--page-paper); background-image:radial-gradient(rgba(29,43,58,.13) 1px, transparent 1px); background-size:16px 16px; }
+.board-page::before{ content:''; position:fixed; inset:0; z-index:-1; background:var(--page-paper); background-image:radial-gradient(rgba(29,43,58,.13) 1px, transparent 1px); background-size:16px 16px; }
+.page-nav{ position:sticky; top:0; z-index:10; width:100%; min-height:64px; display:flex; align-items:center; gap:16px; padding:10px 14px; margin-bottom:24px; background:var(--pure-white); border-bottom:3px solid var(--page-ink); box-shadow:0 0 0 100vmax var(--pure-white), 0 4px 0 var(--page-lime); clip-path:inset(0 -100vmax); }
 .page-brand{ display:flex; align-items:center; justify-content:center; width:42px; height:42px; padding:0; background:transparent; border:0; cursor:pointer; }
 .page-brand img{ width:36px; height:36px; object-fit:contain; mix-blend-mode:multiply; }
 .page-nav-title{ color:var(--page-ink); font-family:'Plus Jakarta Sans', sans-serif; font-size:13px; font-weight:800; letter-spacing:.08em; }

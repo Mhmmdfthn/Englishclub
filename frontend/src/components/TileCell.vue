@@ -20,9 +20,9 @@ defineProps({
   display: grid;
   place-items: center;
   background: #FFFFFF;
-  border: clamp(2px, 0.45vw, 3px) solid #172B6B;
-  border-radius: clamp(9px, 2.2vw, 15px);
-  box-shadow: 0 3px 0 rgba(23, 43, 107, 0.88);
+  border: 3px solid var(--dark-navy);
+  border-radius: 0;
+  box-shadow: 0 4px 0 rgba(29, 43, 58, 0.9);
   transition:
     transform 0.1s cubic-bezier(0.2, 0, 0, 1),
     background 0.12s ease,
@@ -33,22 +33,21 @@ defineProps({
 }
 
 .tile:hover {
-  background: #F7F4DF;
+  background: var(--light-gray);
   transform: translateY(-2px);
-  box-shadow: 0 5px 0 rgba(23, 43, 107, 0.88);
+  box-shadow: 0 6px 0 rgba(29, 43, 58, 0.9);
 }
 
 .tile:active {
   transform: translateY(2px) scale(0.98);
-  box-shadow: 0 1px 0 rgba(23, 43, 107, 0.88);
+  box-shadow: 0 2px 0 rgba(29, 43, 58, 0.9);
 }
 
 .glyph {
   font-family: 'Outfit', sans-serif;
   font-weight: 900;
-  /* Font lebih kecil untuk 5x5 */
   font-size: clamp(18px, 5.5vw, 32px);
-  color: #172B6B;
+  color: var(--dark-navy);
   line-height: 1;
   pointer-events: none;
   user-select: none;
@@ -56,10 +55,10 @@ defineProps({
 
 /* Selected state during swipe */
 .tile.sel {
-  background: #B8D96B;
-  border-color: #172B6B;
-  transform: translateY(-3px) scale(1.035);
-  box-shadow: 0 6px 0 #527F25;
+  background: var(--vibrant-yellow);
+  border-color: var(--dark-navy);
+  transform: translateY(-3px) scale(1.032);
+  box-shadow: 0 6px 0 var(--dark-navy);
   z-index: 2;
 }
 
@@ -71,8 +70,8 @@ defineProps({
 
 .tile.sel.fever {
   background: var(--vibrant-yellow);
-  border-color: #C79000;
-  box-shadow: 0 6px 0 #C79000, 0 0 20px rgba(255, 230, 0, 0.75);
+  border-color: var(--dark-navy);
+  box-shadow: 0 6px 0 var(--dark-navy), 0 0 18px rgba(255, 230, 0, 0.7);
   animation: fever-glow 0.5s infinite alternate;
 }
 
@@ -82,14 +81,14 @@ defineProps({
 }
 
 .tile.disabled {
-  background: #E9E7D8;
-  color: #6B7596;
+  background: var(--light-gray);
+  color: var(--dark-navy);
   transform: none;
   box-shadow: none;
 }
 
 .tile.disabled .glyph {
-  color: #6B7596;
+  color: var(--dark-navy);
 }
 
 .tile.disabled:hover,

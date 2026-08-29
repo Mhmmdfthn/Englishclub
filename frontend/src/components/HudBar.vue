@@ -70,36 +70,39 @@ const display = computed(() => props.word || 'GESER HURUF')
 <style scoped>
 .hud {
   width: 100%;
-  padding: 12px 16px;
-  background: #FFFFFF;
-  border: 1.5px solid var(--panel-border);
+  padding: 12px 16px 14px;
+  background: var(--pure-white);
+  border: 3px solid var(--dark-navy);
+  border-radius: 0;
+  box-shadow: 6px 6px 0 var(--dark-navy);
   transition: all 0.3s ease;
 }
 .hud.fever-mode {
-  border-color: var(--vibrant-yellow);
-  box-shadow: 0 0 25px rgba(255, 230, 0, 0.45), var(--shadow-md);
-  background: #FFFDEB;
+  border-color: var(--dark-navy);
+  box-shadow: 6px 6px 0 var(--dark-navy), 0 0 0 5px rgba(255, 230, 0, 0.4);
+  background: var(--vibrant-yellow);
 }
 .row {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
 }
 .stat {
   display: flex;
   flex-direction: column;
-  min-width: 65px;
+  min-width: 70px;
 }
 .stat .label {
   color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 1px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 .stat .val {
   font-family: 'Outfit', sans-serif;
-  font-size: 22px;
+  font-size: clamp(22px, 4vw, 28px);
   font-weight: 900;
   color: var(--dark-navy);
   line-height: 1.1;
@@ -111,15 +114,17 @@ const display = computed(() => props.word || 'GESER HURUF')
 .combo-header {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 4px;
 }
 .fever-tag {
-  background: linear-gradient(90deg, #F97316, var(--vibrant-yellow));
-  color: var(--dark-navy);
+  background: var(--royal-blue);
+  color: var(--pure-white);
   font-weight: 900;
-  font-size: 9px;
-  padding: 1px 5px;
-  border-radius: var(--radius-full);
+  font-size: 8px;
+  padding: 2px 6px;
+  border: 2px solid var(--dark-navy);
+  letter-spacing: 0.14em;
   animation: bounce 0.6s infinite alternate;
 }
 @keyframes bounce {
@@ -131,14 +136,14 @@ const display = computed(() => props.word || 'GESER HURUF')
   transition: transform 0.15s ease;
 }
 .combo-val.combo-high {
-  font-size: 25px;
-  color: #C79000 !important;
+  font-size: clamp(24px, 4.5vw, 30px);
+  color: var(--royal-blue) !important;
   text-shadow: none;
   animation: pulse-combo 0.6s infinite alternate;
 }
 @keyframes pulse-combo {
   from { transform: scale(1); }
-  to { transform: scale(1.1); }
+  to { transform: scale(1.08); }
 }
 .time-container {
   display: flex;
@@ -149,11 +154,11 @@ const display = computed(() => props.word || 'GESER HURUF')
   display: flex;
   align-items: center;
   gap: 4px;
-  background: rgba(11, 86, 155, 0.10);
-  border: 1px solid rgba(11, 86, 155, 0.35);
+  background: rgba(11, 86, 155, 0.1);
+  border: 2px solid var(--dark-navy);
   padding: 4px 14px;
-  border-radius: var(--radius-full);
   color: var(--royal-blue);
+  box-shadow: 3px 3px 0 var(--dark-navy);
   font-family: 'Outfit', sans-serif;
   font-weight: 900;
   transition: all 0.2s ease;
@@ -169,9 +174,10 @@ const display = computed(() => props.word || 'GESER HURUF')
   font-weight: 700;
 }
 .time-container.low .time-badge {
-  background: rgba(239, 68, 68, 0.25);
+  background: rgba(220, 38, 38, 0.12);
   border-color: var(--bad);
   color: var(--bad);
+  box-shadow: 3px 3px 0 var(--bad);
   animation: pulse 0.8s infinite alternate;
 }
 .time-container.low .time-unit {
@@ -179,31 +185,30 @@ const display = computed(() => props.word || 'GESER HURUF')
 }
 @keyframes pulse {
   0% { transform: scale(1); opacity: 1; }
-  100% { transform: scale(1.06); opacity: 0.7; }
+  100% { transform: scale(1.04); opacity: 0.7; }
 }
 .bar-track {
-  height: 6px;
-  margin-top: 10px;
-  border-radius: var(--radius-full);
-  background: #EDF2F7;
-  border: 1px solid rgba(29, 43, 58, 0.08);
+  height: 10px;
+  margin-top: 12px;
+  border-radius: 0;
+  background: #edf2f7;
+  border: 2px solid var(--dark-navy);
   overflow: hidden;
 }
 .bar-fill {
   height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, var(--royal-blue-light) 0%, var(--vibrant-yellow) 100%);
+  border-radius: 0;
+  background: linear-gradient(90deg, var(--royal-blue) 0%, var(--vibrant-yellow) 100%);
   transition: width 0.1s linear;
 }
 .bar-fill.fever {
-  background: linear-gradient(90deg, #F97316 0%, var(--vibrant-yellow) 100%);
-  box-shadow: 0 0 10px rgba(255, 230, 0, 0.6);
+  background: linear-gradient(90deg, #f97316 0%, var(--vibrant-yellow) 100%);
 }
 .bar-fill.low {
-  background: linear-gradient(90deg, #F97316 0%, var(--bad) 100%);
+  background: linear-gradient(90deg, #f97316 0%, var(--bad) 100%);
 }
 .word-container {
-  margin-top: 10px;
+  margin-top: 12px;
   display: flex;
   justify-content: center;
 }
@@ -211,44 +216,43 @@ const display = computed(() => props.word || 'GESER HURUF')
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 18px;
-  min-height: 38px;
-  border-radius: var(--radius-full);
-  background: #F4F7FA;
-  border: 1.5px dashed #CBD5E1;
+  padding: 7px 18px;
+  min-height: 42px;
+  border-radius: 0;
+  background: #f8fafc;
+  border: 2px dashed var(--dark-navy);
   color: var(--text-muted);
   font-family: 'Outfit', sans-serif;
   font-size: 18px;
   font-weight: 800;
-  letter-spacing: 2px;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   transition: all 0.15s ease;
 }
 .word-pill.active {
   border-style: solid;
-  border-color: var(--royal-blue-light);
+  border-color: var(--dark-navy);
   background: rgba(11, 86, 155, 0.08);
   color: var(--dark-navy);
 }
 .word-pill.ready {
-  border-color: var(--vibrant-yellow);
-  background: rgba(255, 230, 0, 0.22);
+  border-color: var(--dark-navy);
+  background: rgba(255, 230, 0, 0.35);
   color: var(--dark-navy);
-  box-shadow: 0 0 16px rgba(255, 230, 0, 0.4);
-  transform: scale(1.02);
+  box-shadow: 3px 3px 0 var(--dark-navy);
 }
 .word-pill.ready.fever {
-  background: rgba(255, 230, 0, 0.32);
-  box-shadow: 0 0 20px rgba(255, 230, 0, 0.6);
-  border-color: #E6C200;
+  background: rgba(255, 230, 0, 0.6);
+  box-shadow: 3px 3px 0 var(--dark-navy);
 }
 .len-badge {
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.5px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
   background: var(--vibrant-yellow);
   color: var(--dark-navy);
-  padding: 2px 7px;
-  border-radius: var(--radius-full);
+  padding: 3px 8px;
+  border: 2px solid var(--dark-navy);
+  border-radius: 0;
 }
 </style>
