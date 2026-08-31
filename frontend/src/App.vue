@@ -40,6 +40,7 @@ let timerId = null
 const bestScore = computed(() => Number(localStorage.getItem('wh_best') || 0))
 const isFever = computed(() => combo.value >= 3)
 const showSoundBtn = computed(() => screen.value !== 'landing')
+const showBackBtn = computed(() => screen.value === 'play')
 
 function stopTimer() {
   if (timerId) { clearInterval(timerId); timerId = null }
@@ -122,6 +123,11 @@ async function startGame() {
     shakeStamp.value++
     if (screen.value === 'over') screen.value = 'form'
   }
+}
+
+function goHome() {
+  stopTimer()
+  screen.value = 'landing'
 }
 
 function endGame() {
@@ -215,6 +221,13 @@ async function handleSubmit(path) {
     </div>
   </transition>
 
+  <!-- Back Button (play screen only) -->
+  <button v-if="showBackBtn" class="back-btn" title="Kembali ke Beranda" aria-label="Kembali ke Beranda" @click="goHome">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <polyline points="15 18 9 12 15 6"/>
+    </svg>
+  </button>
+
   <!-- Sound Toggle -->
   <button v-if="showSoundBtn" class="sound-btn" :title="isMuted ? 'Nyalakan Suara' : 'Matikan Suara'" aria-label="Atur suara" @click="toggleAudio">
     <svg v-if="!isMuted" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -258,6 +271,7 @@ async function handleSubmit(path) {
     :stats="finalStats"
     :error="boardError"
     @replay="startGame"
+    @home="goHome"
   />
 </template>
 
@@ -265,7 +279,7 @@ async function handleSubmit(path) {
 .screen.play {
   position: relative;
   justify-content: flex-start;
-  padding-top: max(18px, env(safe-area-inset-top));
+  padding-top: max(62px, calc(env(safe-area-inset-top) + 44px));
   gap: 12px;
   background-color: var(--pure-white);
   background-image: radial-gradient(rgba(29, 43, 58, 0.13) 1px, transparent 1px);
@@ -408,6 +422,29 @@ async function handleSubmit(path) {
   box-shadow: 3px 3px 0 var(--dark-navy);
 }
 .sound-btn:hover {
+  background: var(--vibrant-yellow);
+  color: var(--dark-navy);
+  border-color: var(--dark-navy);
+}
+
+.back-btn {
+  position: fixed;
+  top: 12px;
+  left: 14px;
+  width: 38px;
+  height: 38px;
+  border-radius: 0;
+  background: var(--pure-white);
+  border: 2px solid var(--dark-navy);
+  color: var(--dark-navy);
+  display: grid;
+  place-items: center;
+  z-index: 100;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 3px 3px 0 var(--dark-navy);
+}
+.back-btn:hover {
   background: var(--vibrant-yellow);
   color: var(--dark-navy);
   border-color: var(--dark-navy);

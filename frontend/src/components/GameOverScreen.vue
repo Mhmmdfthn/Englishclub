@@ -7,7 +7,7 @@ const props = defineProps({
   stats: { type: Object, required: true },
 })
 
-const emit = defineEmits(['replay'])
+const emit = defineEmits(['replay', 'home'])
 
 const displayedScore = ref(0)
 onMounted(() => {
@@ -142,6 +142,9 @@ function replay() {
         <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
       </svg>
       <span>MAIN LAGI</span>
+    </button>
+    <button class="btn ghost replay-btn home-btn" @click="emit('home')">
+      <span>KEMBALI KE BERANDA</span>
     </button>
     </div>
   </section>
@@ -438,6 +441,11 @@ function replay() {
   border-radius: 0;
   border: 2px solid var(--dark-navy);
   box-shadow: 4px 4px 0 var(--dark-navy);
+}
+
+.home-btn {
+  max-width: 280px;
+  margin-top: 2px;
 }
 
 @media (max-width: 680px) {
