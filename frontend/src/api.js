@@ -47,4 +47,44 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ name, batch, comment }),
     }),
+
+  registerMember: (nama, no_hp, jurusan) =>
+    req('/api/members', {
+      method: 'POST',
+      body: JSON.stringify({ nama, no_hp, jurusan }),
+    }),
+
+  members: (token) =>
+    req('/api/members', {
+      headers: token ? { 'Content-Type': 'application/json', 'x-admin-token': token } : { 'Content-Type': 'application/json' },
+    }),
+
+  verifyAdmin: (token) =>
+    req('/api/admin/verify', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    }),
+
+  loginAdmin: (username, password) =>
+    req('/api/admin/login', {
+      method: 'POST',
+      body: JSON.stringify({ username, password }),
+    }),
+
+  membersHighlight: () => req('/api/members/highlight'),
+
+  proker: () => req('/api/proker'),
+  prokerDetail: (id) => req(`/api/proker/${id}`),
+  updateProkerCaption: (id, caption, token) =>
+    req(`/api/proker/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ caption }),
+    }),
+  updateProker: (id, data, token) =>
+    req(`/api/proker/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(data),
+    }),
 }

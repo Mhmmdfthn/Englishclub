@@ -7,7 +7,7 @@ const props = defineProps({
   stats: { type: Object, required: true },
 })
 
-const emit = defineEmits(['replay'])
+const emit = defineEmits(['replay', 'back'])
 
 const displayedScore = ref(0)
 onMounted(() => {
@@ -136,13 +136,21 @@ function replay() {
       <Leaderboard :entries="entries" />
     </div>
 
-    <button class="btn replay-btn" @click="replay">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-        <path d="M23 4v6h-6"/>
-        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-      </svg>
-      <span>MAIN LAGI</span>
-    </button>
+    <div class="over-actions">
+      <button class="btn replay-btn" @click="replay">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M23 4v6h-6"/>
+          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+        </svg>
+        <span>MAIN LAGI</span>
+      </button>
+      <button class="btn back-btn" @click="emit('back')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/>
+        </svg>
+        <span>KEMBALI</span>
+      </button>
+    </div>
     </div>
   </section>
 </template>
@@ -416,11 +424,12 @@ function replay() {
 .lb-card {
   width: 100%;
   max-width: 620px;
-  background: var(--pure-white);
+  background: var(--vibrant-yellow);
   border: 3px solid var(--dark-navy);
   border-radius: 0;
-  box-shadow: 7px 7px 0 var(--royal-blue);
+  box-shadow: 7px 7px 0 var(--dark-navy);
   padding: 18px;
+  color: var(--dark-navy);
 }
 
 .lb-card h3 {
@@ -431,13 +440,63 @@ function replay() {
   color: var(--dark-navy);
 }
 
+.over-actions {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
 .replay-btn {
   width: 100%;
-  max-width: 320px;
-  margin-top: 6px;
+  padding: 16px 24px;
+  font-size: 15px;
+  letter-spacing: 0.08em;
+  border-radius: 0;
+  border: 3px solid var(--dark-navy);
+  background: var(--vibrant-yellow);
+  color: var(--dark-navy);
+  box-shadow: 6px 6px 0 var(--dark-navy);
+  transition: transform 0.16s cubic-bezier(0.2,0.8,0.2,1), box-shadow 0.16s ease, background 0.16s ease;
+}
+
+.replay-btn:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 7px 7px 0 var(--dark-navy);
+  background: var(--vibrant-yellow-hover);
+}
+
+.replay-btn:active {
+  transform: translate(1px, 1px);
+  box-shadow: 3px 3px 0 var(--dark-navy);
+}
+
+.back-btn {
+  width: 100%;
+  padding: 12px 20px;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  font-weight: 800;
   border-radius: 0;
   border: 2px solid var(--dark-navy);
-  box-shadow: 4px 4px 0 var(--dark-navy);
+  background: var(--pure-white);
+  color: var(--dark-navy);
+  box-shadow: 4px 4px 0 rgba(29,43,58,0.18);
+  transition: transform 0.16s cubic-bezier(0.2,0.8,0.2,1), box-shadow 0.16s ease, background 0.16s ease, color 0.16s ease;
+}
+
+.back-btn:hover {
+  background: var(--dark-navy);
+  color: var(--pure-white);
+  transform: translate(-1px, -1px);
+  box-shadow: 5px 5px 0 var(--royal-blue);
+}
+
+.back-btn:active {
+  transform: translate(1px, 1px);
+  box-shadow: 2px 2px 0 var(--dark-navy);
 }
 
 @media (max-width: 680px) {

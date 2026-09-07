@@ -6,6 +6,8 @@ frontend/node_modules/
 
 # Build outputs
 frontend/dist/
+backend/node_modules/
+backup-custom/
 dist/
 build/
 *.tsbuildinfo
@@ -23,7 +25,18 @@ env/
 .env.local
 backend/__pycache__/
 backend/data/translations_cache.json
-backend/data/leaderboard.db
+backend-python/data/leaderboard.db
+backend-python/data/members.csv
+backend-python/data/members.corrupt.csv
+backend/server/data/members.csv
+backend/server/data/members.corrupt.csv
+backend/server/data/scores.json
+backend/server/data/stories.json
+backend/server/data/tokens.json
+backend/server/data/admins.json
+backend/server/data/proker.json
+**/valid_words.txt
+backend/server/data/uploads/
 *.db
 
 # IDE & OS

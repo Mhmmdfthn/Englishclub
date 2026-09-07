@@ -1,5 +1,6 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { api } from './api.js'
 import { sound } from './audio.js'
 import GameBoard from './components/GameBoard.vue'
@@ -8,10 +9,33 @@ import HudBar from './components/HudBar.vue'
 import LandingView from './components/LandingView.vue'
 import PlayFormView from './components/PlayFormView.vue'
 import LeaderboardPage from './components/LeaderboardPage.vue'
+import MemberRegisterMini from './components/MemberRegisterMini.vue'
 import FoundWords from './components/FoundWords.vue'
 
+const route = useRoute()
+const router = useRouter()
 const screen = ref('landing')
 const loading = ref(true)
+const isHiddenAdminRoute = computed(() => route.path === '/ec-admin-2026')
+
+const routeToScreen = { '/': 'landing', '/daftar': 'register', '/board': 'board', '/main': 'form' }
+const screenToRoute = { landing: '/', register: '/daftar', board: '/board', form: '/main' }
+
+function syncScreenFromRoute() {
+  if (isHiddenAdminRoute.value) return
+  const mapped = routeToScreen[route.path]
+  if (mapped && mapped !== screen.value && screen.value !== 'play' && screen.value !== 'over') {
+    screen.value = mapped
+  }
+}
+
+watch(() => route.path, syncScreenFromRoute)
+
+function navigate(screenName) {
+  screen.value = screenName
+  const path = screenToRoute[screenName]
+  if (path && route.path !== path) router.push(path)
+}
 const greetingIndex = ref(0)
 const greetings = ['Hello!', 'Welcome!', 'Good to see you!', 'Learn with us!']
 const swipeProgress = ref(0)
@@ -39,7 +63,7 @@ const isMuted = ref(sound.muted)
 let timerId = null
 const bestScore = computed(() => Number(localStorage.getItem('wh_best') || 0))
 const isFever = computed(() => combo.value >= 3)
-const showSoundBtn = computed(() => screen.value !== 'landing')
+const showSoundBtn = computed(() => !isHiddenAdminRoute.value && !['landing','register'].includes(screen.value))
 
 function stopTimer() {
   if (timerId) { clearInterval(timerId); timerId = null }
@@ -49,6 +73,7 @@ function tick() {
   if (timeLeft.value <= 0) endGame()
 }
 onMounted(() => {
+  syncScreenFromRoute()
   greetingTimer = setInterval(() => {
     greetingIndex.value = (greetingIndex.value + 1) % greetings.length
   }, 2000)
@@ -94,6 +119,10 @@ function skipLoading() {
 
 function toggleAudio() {
   isMuted.value = sound.toggleMute()
+}
+
+function goLanding() {
+  navigate('landing')
 }
 
 async function startGame() {
@@ -234,31 +263,34 @@ async function handleSubmit(path) {
     </div>
   </transition>
 
-  <LandingView v-if="screen === 'landing'" @goPlay="screen = 'form'" @goBoard="screen = 'board'" />
-  <PlayFormView v-else-if="screen === 'form'" :best="bestScore" :error="boardError" :retriable="connectError" @play="startGame" @back="screen = 'landing'" />
-  <LeaderboardPage v-else-if="screen === 'board'" @back="screen = 'landing'" />
-
-  <section v-else-if="screen === 'play'" class="screen play">
-    <HudBar :score="score" :time-left="timeLeft" :time-total="timeLimit" :combo="combo" :word="activeWord" :fever="isFever" />
-    <GameBoard
-      :cells="cells"
-      :disabled="busy"
-      :shake-stamp="shakeStamp"
-      :fever="isFever"
-      @select="activeWord = $event"
-      @submit="handleSubmit"
+  <router-view v-if="isHiddenAdminRoute" />
+  <template v-else>
+    <LandingView v-if="screen === 'landing'" @goPlay="navigate('form')" @goBoard="navigate('board')" @goRegister="navigate('register')" />
+    <PlayFormView v-else-if="screen === 'form'" :best="bestScore" :error="boardError" :retriable="connectError" @play="startGame" @back="goLanding" />
+    <LeaderboardPage v-else-if="screen === 'board'" @back="goLanding" />
+    <MemberRegisterMini v-else-if="screen === 'register'" @back="goLanding" />
+    <section v-else-if="screen === 'play'" class="screen play">
+      <HudBar :score="score" :time-left="timeLeft" :time-total="timeLimit" :combo="combo" :word="activeWord" :fever="isFever" />
+      <GameBoard
+        :cells="cells"
+        :disabled="busy"
+        :shake-stamp="shakeStamp"
+        :fever="isFever"
+        @select="activeWord = $event"
+        @submit="handleSubmit"
+      />
+      <p class="error" role="status" aria-live="polite">{{ boardError }}</p>
+      <FoundWords :items="foundWords" />
+      <button class="btn ghost" style="margin-top:8px" @click="endGame">Selesai & Simpan Skor</button>
+    </section>
+    <GameOverScreen
+      v-else-if="screen === 'over' && finalStats"
+      :stats="finalStats"
+      :error="boardError"
+      @replay="startGame"
+      @back="goLanding"
     />
-    <p class="error" role="status" aria-live="polite">{{ boardError }}</p>
-    <FoundWords :items="foundWords" />
-    <button class="btn ghost" style="margin-top:8px" @click="endGame">Selesai & Simpan Skor</button>
-  </section>
-
-  <GameOverScreen
-    v-else-if="screen === 'over' && finalStats"
-    :stats="finalStats"
-    :error="boardError"
-    @replay="startGame"
-  />
+  </template>
 </template>
 
 <style scoped>
@@ -361,15 +393,16 @@ async function handleSubmit(path) {
 .loading-skip {
   margin-top: 10px;
   padding: 7px 22px;
-  border-radius: var(--radius-full);
+  border-radius: 0;
   background: rgba(11, 86, 155, 0.08);
-  border: 1.5px solid rgba(11, 86, 155, 0.35);
+  border: 2px solid var(--dark-navy);
   color: var(--royal-blue);
   font-family: 'Plus Jakarta Sans', sans-serif;
   font-size: 13px;
   font-weight: 800;
   cursor: pointer;
   transition: all 0.2s ease;
+  box-shadow: 3px 3px 0 var(--dark-navy);
 }
 .loading-skip:hover {
   background: var(--royal-blue);
