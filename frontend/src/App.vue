@@ -63,7 +63,7 @@ const isMuted = ref(sound.muted)
 let timerId = null
 const bestScore = computed(() => Number(localStorage.getItem('wh_best') || 0))
 const isFever = computed(() => combo.value >= 3)
-const showSoundBtn = computed(() => !isHiddenAdminRoute.value && !['landing','register'].includes(screen.value))
+const showSoundBtn = computed(() => false)
 
 function stopTimer() {
   if (timerId) { clearInterval(timerId); timerId = null }

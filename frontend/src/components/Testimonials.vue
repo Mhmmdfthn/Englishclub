@@ -24,14 +24,14 @@ const durations = [15, 19, 17]
   >
     <div class="testimonials-header">
       <div class="testimonials-badge">
-        Cerita Anggota
+        Prospek Kampus
       </div>
 
       <h2 id="testimonials-heading" class="testimonials-title">
-        Suara dari Peserta
+        Cerita Saat Prospek Kampus
       </h2>
       <p class="testimonials-subtitle">
-        Dengarkan pengalaman anggota English Club UPB dalam perjalanan belajar bahasa Inggris mereka.
+        Dengarkan kesan mereka saat pertama kali mengenal English Club di antara UKM lain di UPB.
       </p>
     </div>
 

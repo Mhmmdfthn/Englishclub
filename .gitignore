@@ -35,7 +35,7 @@ backend/server/data/stories.json
 backend/server/data/tokens.json
 backend/server/data/admins.json
 backend/server/data/proker.json
-**/valid_words.txt
+# **/valid_words.txt  # reallow semua valid_words.txt 358k untuk bundle Vercel + env tetap
 backend/server/data/uploads/
 *.db
 
