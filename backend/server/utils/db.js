@@ -1,6 +1,7 @@
-import { existsSync, mkdirSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
+import { isDbEnabled, getDb } from './pg.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const isVercel = !!process.env.VERCEL
@@ -8,7 +9,6 @@ const origDataDir = join(__dirname, '../data')
 const dataDir = isVercel ? join('/tmp', 'data') : origDataDir
 
 try { if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true }) } catch {}
-// copy seed files to /tmp on Vercel if missing
 if (isVercel) {
   for (const f of ['scores.json','stories.json']) {
     try {
@@ -21,10 +21,6 @@ if (isVercel) {
   }
 }
 
-// simple JSON file DB for backup (no native sqlite needed)
-// Keep compatible with Python sqlite schema but using JSON files
-import { readFileSync, writeFileSync } from 'fs'
-
 function loadJson(file, fallback) {
   const p = join(dataDir, file)
   if (!existsSync(p)) return fallback
@@ -35,28 +31,48 @@ function saveJson(file, data) {
 }
 
 export const db = {
-  // scores: [{name,score,words,created_at}]
   getScores() { return loadJson('scores.json', []) },
-  addScore(name, score, words) {
+  async addScore(name, score, words) {
+    if (isDbEnabled()) {
+      const pool = getDb()
+      await pool.query('INSERT INTO scores (name, score, words) VALUES ($1,$2,$3)', [name.slice(0,20), score, words])
+      const { rows } = await pool.query('SELECT COUNT(*) FROM scores WHERE score > $1', [score])
+      return parseInt(rows[0].count, 10) + 1
+    }
     const arr = loadJson('scores.json', [])
     arr.push({ name: name.slice(0, 20), score, words, created_at: new Date().toISOString() })
     saveJson('scores.json', arr)
     const better = arr.filter(s => s.score > score).length
     return better + 1
   },
-  top(limit = 10) {
+  async top(limit = 10) {
+    if (isDbEnabled()) {
+      const pool = getDb()
+      const { rows } = await pool.query('SELECT name, score, words, created_at FROM scores ORDER BY score DESC, created_at ASC LIMIT $1', [limit])
+      return rows
+    }
     const arr = loadJson('scores.json', [])
     return [...arr].sort((a, b) => b.score - a.score || new Date(a.created_at) - new Date(b.created_at)).slice(0, limit)
   },
   getStories() { return loadJson('stories.json', []) },
-  addStory(name, batch, comment) {
+  async addStory(name, batch, comment) {
+    if (isDbEnabled()) {
+      const pool = getDb()
+      const { rows } = await pool.query('INSERT INTO stories (name, batch, comment) VALUES ($1,$2,$3) RETURNING name, batch, comment', [name.slice(0,40), batch.slice(0,30), comment.slice(0,220)])
+      return rows[0]
+    }
     const arr = loadJson('stories.json', [])
     const row = { name: name.slice(0, 40), batch: batch.slice(0, 30), comment: comment.slice(0, 220), created_at: new Date().toISOString() }
     arr.push(row)
     saveJson('stories.json', arr)
     return row
   },
-  latest(limit = 100) {
+  async latest(limit = 100) {
+    if (isDbEnabled()) {
+      const pool = getDb()
+      const { rows } = await pool.query('SELECT name, batch, comment FROM stories ORDER BY id DESC LIMIT $1', [limit])
+      return rows
+    }
     const arr = loadJson('stories.json', [])
     return [...arr].reverse().slice(0, limit).map(r => ({ name: r.name, batch: r.batch, comment: r.comment }))
   },

@@ -1,15 +1,18 @@
 import { Router } from 'express'
 import { addMember, allMembers, highlight, csvFilePath } from '../utils/membersStore.js'
-import { verifyToken } from '../utils/auth.js'
+import { verifyToken, verifyTokenAsync } from '../utils/auth.js'
+import { isDbEnabled } from '../utils/pg.js'
 
 const r = Router()
 const ALLOWED = new Set(['Ilmu Komputer','Manajemen','Akuntansi','Bisnis Digital','Sains Data','Agribisnis','Lainnya'])
 
-function requireAdmin(req, res, next) {
+async function requireAdmin(req, res, next) {
   const bearer = (req.header('authorization') || '').replace(/^Bearer\s+/i, '')
   const legacy = req.header('x-admin-token')
   const token = bearer || legacy
-  const username = verifyToken(token)
+  let username = null
+  if (isDbEnabled()) username = await verifyTokenAsync(token)
+  else username = verifyToken(token)
   if (username) { req.admin = { username }; return next() }
   const expected = process.env.ADMIN_TOKEN
   if (expected && token === expected) { req.admin = { username: 'admin' }; return next() }
@@ -18,19 +21,19 @@ function requireAdmin(req, res, next) {
 }
 
 // public highlight
-r.get('/highlight', (req, res) => {
-  const hl = highlight(30)
-  const total = allMembers(1000).length
+r.get('/highlight', async (req, res) => {
+  const hl = await highlight(30)
+  const total = (await allMembers(1000)).length
   res.json({ highlight: hl, total })
 })
 
 // admin list
-r.get('/', requireAdmin, (req, res) => {
-  res.json({ members: allMembers(100) })
+r.get('/', requireAdmin, async (req, res) => {
+  res.json({ members: await allMembers(100) })
 })
 
 // public post
-r.post('/', (req, res) => {
+r.post('/', async (req, res) => {
   let { nama, no_hp, jurusan } = req.body
   if (!nama || typeof nama !== 'string' || nama.trim().length < 2 || nama.trim().length > 40) return res.status(422).json({ detail: 'nama 2-40' })
   if (!no_hp || typeof no_hp !== 'string') return res.status(422).json({ detail: 'no_hp required' })
@@ -38,7 +41,7 @@ r.post('/', (req, res) => {
   if (!/^08[0-9]{8,11}$/.test(hp)) return res.status(422).json({ detail: 'No HP harus format 08xxxxxxxxxx (10-13 digit)' })
   if (!jurusan || !ALLOWED.has(jurusan)) return res.status(422).json({ detail: 'Jurusan harus salah satu: ' + [...ALLOWED].join(', ') })
   try {
-    const row = addMember(nama.trim(), hp, jurusan.trim())
+    const row = await addMember(nama.trim(), hp, jurusan.trim())
     res.json({ ok: true, member: row })
   } catch (e) {
     res.status(400).json({ detail: String(e.message || e) })

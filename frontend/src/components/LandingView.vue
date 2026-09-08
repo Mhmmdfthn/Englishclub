@@ -5,7 +5,7 @@ import { api } from '../api.js'
 import Testimonials from './Testimonials.vue'
 import ProgramModal from './ProgramModal.vue'
 
-const emit = defineEmits(['goPlay', 'goBoard', 'goRegister'])
+const emit = defineEmits(['goPlay', 'goBoard', 'goRegister', 'openAdmin'])
 const storyName = ref('')
 const storyBatch = ref('')
 const storyComment = ref('')
@@ -22,6 +22,22 @@ function closeProker() { selectedProker.value = null; document.body.style.overfl
 const mobileOpen = ref(false)
 function toggleMobile() { mobileOpen.value = !mobileOpen.value }
 function closeMobile() { mobileOpen.value = false }
+
+const logoClicks = ref(0)
+let logoTimer = null
+function handleLogoClick() {
+  closeMobile()
+  logoClicks.value++
+  clearTimeout(logoTimer)
+  logoTimer = setTimeout(() => { logoClicks.value = 0 }, 800)
+  if (logoClicks.value >= 5) {
+    logoClicks.value = 0
+    emit('openAdmin')
+  }
+}
+let pressTimer = null
+function logoPressStart() { pressTimer = setTimeout(() => emit('openAdmin'), 800) }
+function logoPressEnd() { clearTimeout(pressTimer) }
 
 onMounted(async () => {
   try { stories.value = (await api.stories()).stories } catch { storyError.value = 'Cerita anggota belum dapat dimuat.' }
@@ -61,7 +77,7 @@ function goRegister() {
   <section id="top" class="screen landing">
     <div class="landing-hero">
       <nav class="landing-nav" aria-label="Navigasi utama">
-        <a class="nav-brand" href="#top" aria-label="Kembali ke bagian atas" @click="closeMobile"><img src="/Logo_ec.jpg" alt="Logo English Club UPB" /></a>
+        <a class="nav-brand" href="#top" aria-label="Kembali ke bagian atas" @click="handleLogoClick" @pointerdown="logoPressStart" @pointerup="logoPressEnd" @pointerleave="logoPressEnd"><img src="/Logo_ec.jpg" alt="Logo English Club UPB" /></a>
         <a href="#profil" class="nav-link" @click="closeMobile">Profil</a>
         <a href="#program" class="nav-link" @click="closeMobile">Program</a>
         <a href="#cerita" class="nav-link" @click="closeMobile">Cerita Anggota</a>

@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
+import { isDbEnabled, getDb } from './pg.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const isVercel = !!process.env.VERCEL
@@ -57,12 +58,23 @@ function parseCsv() {
   return rows
 }
 
-export function addMember(nama, no_hp, jurusan) {
-  ensureFile()
+export async function addMember(nama, no_hp, jurusan) {
   const n = sanitize(nama.trim()).slice(0,40)
   const hp = sanitize(no_hp.trim()).slice(0,15)
   const j = sanitize(jurusan.trim()).slice(0,30)
   if (!ALLOWED_JURUSAN.has(j)) throw new Error(`Jurusan tidak valid: ${j}`)
+  if (isDbEnabled()) {
+    const pool = getDb()
+    const { rows } = await pool.query(
+      'INSERT INTO members (nama, no_hp, jurusan) VALUES ($1,$2,$3) RETURNING timestamp, nama, no_hp, jurusan',
+      [n, hp, j]
+    )
+    const r = rows[0]
+    // format timestamp to ISO slice
+    r.timestamp = new Date(r.timestamp).toISOString().slice(0,19)
+    return r
+  }
+  ensureFile()
   const ts = new Date().toISOString().slice(0,19)
   const row = { timestamp: ts, nama: n, no_hp: hp, jurusan: j }
   const line = FIELDS.map(f=>row[f]).join(',')+'\n'
@@ -71,13 +83,18 @@ export function addMember(nama, no_hp, jurusan) {
   return row
 }
 
-export function allMembers(limit=100){
+export async function allMembers(limit=100){
+  if (isDbEnabled()) {
+    const pool = getDb()
+    const { rows } = await pool.query('SELECT timestamp, nama, no_hp, jurusan FROM members ORDER BY id DESC LIMIT $1', [limit])
+    return rows.map(r => ({ ...r, timestamp: new Date(r.timestamp).toISOString().slice(0,19) }))
+  }
   const rows=parseCsv()
   return [...rows].reverse().slice(0,limit)
 }
 
-export function highlight(limit=30){
-  const rows=allMembers(limit)
+export async function highlight(limit=30){
+  const rows= await allMembers(limit)
   return rows.map(r=>({ nama:r.nama, jurusan:r.jurusan, timestamp:r.timestamp }))
 }
 

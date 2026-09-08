@@ -10,6 +10,7 @@ import LandingView from './components/LandingView.vue'
 import PlayFormView from './components/PlayFormView.vue'
 import LeaderboardPage from './components/LeaderboardPage.vue'
 import MemberRegisterMini from './components/MemberRegisterMini.vue'
+import AdminView from './components/AdminView.vue'
 import FoundWords from './components/FoundWords.vue'
 
 const route = useRoute()
@@ -17,6 +18,9 @@ const router = useRouter()
 const screen = ref('landing')
 const loading = ref(true)
 const isHiddenAdminRoute = computed(() => route.path === '/ec-admin-2026')
+const showAdminModal = ref(false)
+function openAdminModal() { showAdminModal.value = true; document.body.style.overflow = 'hidden' }
+function closeAdminModal() { showAdminModal.value = false; document.body.style.overflow = '' }
 
 const routeToScreen = { '/': 'landing', '/daftar': 'register', '/board': 'board', '/main': 'form' }
 const screenToRoute = { landing: '/', register: '/daftar', board: '/board', form: '/main' }
@@ -72,8 +76,16 @@ function tick() {
   timeLeft.value = Math.max(0, timeLeft.value - 0.1)
   if (timeLeft.value <= 0) endGame()
 }
+function handleAdminKey(e) {
+  if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'a') {
+    e.preventDefault()
+    openAdminModal()
+  }
+  if (e.key === 'Escape' && showAdminModal.value) closeAdminModal()
+}
 onMounted(() => {
   syncScreenFromRoute()
+  window.addEventListener('keydown', handleAdminKey)
   greetingTimer = setInterval(() => {
     greetingIndex.value = (greetingIndex.value + 1) % greetings.length
   }, 2000)
@@ -87,6 +99,7 @@ onBeforeUnmount(() => {
   clearInterval(greetingTimer)
   clearTimeout(loadingTimer)
   stopTimer()
+  window.removeEventListener('keydown', handleAdminKey)
 })
 
 function beginSwipe(event) {
@@ -265,7 +278,7 @@ async function handleSubmit(path) {
 
   <router-view v-if="isHiddenAdminRoute" />
   <template v-else>
-    <LandingView v-if="screen === 'landing'" @goPlay="navigate('form')" @goBoard="navigate('board')" @goRegister="navigate('register')" />
+    <LandingView v-if="screen === 'landing'" @goPlay="navigate('form')" @goBoard="navigate('board')" @goRegister="navigate('register')" @openAdmin="openAdminModal" />
     <PlayFormView v-else-if="screen === 'form'" :best="bestScore" :error="boardError" :retriable="connectError" @play="startGame" @back="goLanding" />
     <LeaderboardPage v-else-if="screen === 'board'" @back="goLanding" />
     <MemberRegisterMini v-else-if="screen === 'register'" @back="goLanding" />
@@ -291,6 +304,14 @@ async function handleSubmit(path) {
       @back="goLanding"
     />
   </template>
+  <Transition name="admin-modal">
+    <div v-if="showAdminModal" class="admin-modal-overlay" @click.self="closeAdminModal">
+      <div class="admin-modal-card">
+        <button class="modal-close" aria-label="Tutup" @click="closeAdminModal">×</button>
+        <AdminView />
+      </div>
+    </div>
+  </Transition>
 </template>
 
 <style scoped>
@@ -481,4 +502,43 @@ async function handleSubmit(path) {
   40%  { transform:translate(-50%,-5px) scale(1); }
   100% { opacity:0; transform:translate(-50%,-35px) scale(0.95); }
 }
+.admin-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: start center;
+  padding: 18px;
+  background: rgba(29,43,58,0.62);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  overflow: auto;
+}
+.admin-modal-card {
+  position: relative;
+  width: min(100%, 1100px);
+  max-height: 90dvh;
+  overflow: auto;
+  background: var(--bg-secondary, #F1F5F9);
+  border: 3px solid var(--dark-navy);
+  box-shadow: 8px 8px 0 var(--dark-navy);
+  padding: 0;
+}
+.modal-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  border: 2px solid var(--dark-navy);
+  font-size: 22px;
+  font-weight: 900;
+  cursor: pointer;
+  z-index: 2;
+}
+.admin-modal-enter-active, .admin-modal-leave-active { transition: opacity 0.22s ease; }
+.admin-modal-enter-from, .admin-modal-leave-to { opacity: 0; }
 </style>

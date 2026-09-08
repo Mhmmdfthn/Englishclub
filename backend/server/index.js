@@ -12,8 +12,10 @@ app.use(cors({ origin: '*', methods: '*', allowedHeaders: '*' }))
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
-// seed 1 akun admin jika belum ada
+// init DB + seed admin
+import { ensureDb } from './utils/pg.js'
 import { ensureSeed } from './utils/auth.js'
+try { await ensureDb() } catch (e) { console.warn('ensureDb failed (fallback file):', e.message) }
 await ensureSeed()
 
 // routes

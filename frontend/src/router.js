@@ -3,8 +3,7 @@ import LandingView from './components/LandingView.vue'
 import PlayFormView from './components/PlayFormView.vue'
 import LeaderboardPage from './components/LeaderboardPage.vue'
 import MemberRegisterMini from './components/MemberRegisterMini.vue'
-
-const AdminView = () => import('./components/AdminView.vue')
+import AdminView from './components/AdminView.vue'
 
 function adminGuard() {
   // auth handled inside AdminView via /api/admin/verify (server-side)
