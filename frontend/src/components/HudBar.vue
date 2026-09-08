@@ -8,7 +8,10 @@ const props = defineProps({
   combo: { type: Number, default: 1 },
   word: { type: String, default: '' },
   fever: { type: Boolean, default: false },
+  muted: { type: Boolean, default: false },
 })
+
+const emit = defineEmits(['back', 'toggle-sound'])
 
 const pct = computed(() =>
   Math.max(0, Math.min(100, (props.timeLeft / Math.max(props.timeTotal, 1)) * 100)),
@@ -20,6 +23,11 @@ const display = computed(() => props.word || 'GESER HURUF')
 <template>
   <header class="hud card" :class="{ 'fever-mode': fever }">
     <div class="row">
+      <button class="back-btn" type="button" title="Kembali ke Beranda" aria-label="Kembali ke Beranda" @click="emit('back')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+      </button>
       <div class="stat score-box">
         <span class="label">SKOR</span>
         <span class="val">{{ score }}</span>
@@ -43,6 +51,16 @@ const display = computed(() => props.word || 'GESER HURUF')
           x{{ combo }}
         </span>
       </div>
+      <button class="hud-sound" type="button" :title="muted ? 'Nyalakan Suara' : 'Matikan Suara'" aria-label="Atur suara" @click="emit('toggle-sound')">
+        <svg v-if="!muted" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+        </svg>
+        <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+          <line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/>
+        </svg>
+      </button>
     </div>
     <div class="bar-track">
       <div
@@ -87,6 +105,40 @@ const display = computed(() => props.word || 'GESER HURUF')
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+}
+.back-btn {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: var(--dark-navy);
+  background: var(--pure-white);
+  border: 2px solid var(--dark-navy);
+  box-shadow: 3px 3px 0 var(--dark-navy);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.back-btn:hover {
+  background: var(--vibrant-yellow);
+}
+.hud-sound {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: var(--dark-navy);
+  background: var(--pure-white);
+  border: 2px solid var(--dark-navy);
+  box-shadow: 3px 3px 0 var(--dark-navy);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.hud-sound:hover {
+  background: var(--vibrant-yellow);
 }
 .stat {
   display: flex;
