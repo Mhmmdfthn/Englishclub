@@ -5,10 +5,20 @@ import { randomBytes } from 'crypto'
 import bcrypt from 'bcrypt'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const dataDir = join(__dirname, '../data')
+const isVercelAuth = !!process.env.VERCEL
+const origDataDirAuth = join(__dirname, '../data')
+const dataDir = isVercelAuth ? join('/tmp', 'data') : origDataDirAuth
 const adminsPath = join(dataDir, 'admins.json')
 
-if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true })
+try { if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true }) } catch {}
+if (isVercelAuth) {
+  try {
+    const origAdmins = join(origDataDirAuth, 'admins.json')
+    if (!existsSync(adminsPath) && existsSync(origAdmins)) {
+      writeFileSync(adminsPath, readFileSync(origAdmins, 'utf-8'), 'utf-8')
+    }
+  } catch {}
+}
 
 function loadAdmins() {
   if (!existsSync(adminsPath)) return []

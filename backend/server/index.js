@@ -33,12 +33,17 @@ app.use('/api/members', members)
 app.use('/api/admin', admin)
 app.use('/api/proker', proker)
 
-// serve uploads for gallery
+// serve uploads for gallery (Vercel: /tmp writable only)
 import { existsSync as existsUpload } from 'fs'
-const uploadsDir = join(__dirname, 'data/uploads')
-if (!existsUpload(uploadsDir)) {
-  const { mkdirSync } = await import('fs')
-  mkdirSync(uploadsDir, { recursive: true })
+const isVercelUpload = !!process.env.VERCEL
+const uploadsDir = isVercelUpload ? join('/tmp', 'uploads') : join(__dirname, 'data/uploads')
+try {
+  if (!existsUpload(uploadsDir)) {
+    const { mkdirSync } = await import('fs')
+    mkdirSync(uploadsDir, { recursive: true })
+  }
+} catch (e) {
+  console.warn('uploads mkdir failed:', e.message)
 }
 app.use('/uploads', expressStatic.static(uploadsDir))
 

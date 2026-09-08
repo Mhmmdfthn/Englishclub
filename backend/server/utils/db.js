@@ -3,9 +3,23 @@ import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const dataDir = join(__dirname, '../data')
+const isVercel = !!process.env.VERCEL
+const origDataDir = join(__dirname, '../data')
+const dataDir = isVercel ? join('/tmp', 'data') : origDataDir
 
-if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true })
+try { if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true }) } catch {}
+// copy seed files to /tmp on Vercel if missing
+if (isVercel) {
+  for (const f of ['scores.json','stories.json']) {
+    try {
+      const orig = join(origDataDir, f)
+      const dest = join(dataDir, f)
+      if (!existsSync(dest) && existsSync(orig)) {
+        writeFileSync(dest, readFileSync(orig, 'utf-8'), 'utf-8')
+      }
+    } catch {}
+  }
+}
 
 // simple JSON file DB for backup (no native sqlite needed)
 // Keep compatible with Python sqlite schema but using JSON files

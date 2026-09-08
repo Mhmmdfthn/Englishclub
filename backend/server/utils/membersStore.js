@@ -3,15 +3,24 @@ import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const dataDir = join(__dirname, '../data')
+const isVercel = !!process.env.VERCEL
+const origDataDir = join(__dirname, '../data')
+const dataDir = isVercel ? join('/tmp', 'data') : origDataDir
 const csvPath = join(dataDir, 'members.csv')
+const origCsvPath = join(origDataDir, 'members.csv')
 const FIELDS = ['timestamp', 'nama', 'no_hp', 'jurusan']
 const ALLOWED_JURUSAN = new Set(['Ilmu Komputer','Manajemen','Akuntansi','Bisnis Digital','Sains Data','Agribisnis','Lainnya'])
 
 function ensureFile() {
-  if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true })
+  try { if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true }) } catch {}
   if (!existsSync(csvPath)) {
-    writeFileSync(csvPath, FIELDS.join(',')+'\n', 'utf-8')
+    try {
+      if (isVercel && existsSync(origCsvPath)) {
+        writeFileSync(csvPath, readFileSync(origCsvPath, 'utf-8'), 'utf-8')
+        return
+      }
+    } catch {}
+    try { writeFileSync(csvPath, FIELDS.join(',')+'\n', 'utf-8') } catch {}
   } else {
     try {
       const header = readFileSync(csvPath, 'utf-8').split('\n')[0].trim()

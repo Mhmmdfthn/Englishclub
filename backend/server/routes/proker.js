@@ -7,8 +7,13 @@ import { getAll, getById, updateCaption, updateProker, addPhotos, removePhoto } 
 import { verifyToken } from '../utils/auth.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const uploadsDir = join(__dirname, '../data/uploads')
-if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true })
+const isVercel = !!process.env.VERCEL
+const uploadsDir = isVercel ? join('/tmp', 'uploads') : join(__dirname, '../data/uploads')
+try {
+  if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true })
+} catch (e) {
+  console.warn('uploads mkdir failed (Vercel read-only, using /tmp):', e.message)
+}
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadsDir),

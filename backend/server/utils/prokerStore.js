@@ -3,8 +3,11 @@ import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const dataDir = join(__dirname, '../data')
+const isVercel = !!process.env.VERCEL
+const origDataDir = join(__dirname, '../data')
+const dataDir = isVercel ? join('/tmp', 'data') : origDataDir
 const prokerPath = join(dataDir, 'proker.json')
+const origProkerPath = join(origDataDir, 'proker.json')
 
 const DEFAULT = [
   { id: 'english-fun-day', title: 'English Fun Day', caption: 'Word Hunt dan vocabulary battle untuk melatih kemampuan bahasa Inggris dengan cara yang menyenangkan dan interaktif.', photos: [], order: 1 },
@@ -14,9 +17,18 @@ const DEFAULT = [
 ]
 
 function ensure() {
-  if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true })
+  try {
+    if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true })
+  } catch {}
   if (!existsSync(prokerPath)) {
-    writeFileSync(prokerPath, JSON.stringify(DEFAULT, null, 2), 'utf-8')
+    // copy from orig if exists (Vercel)
+    try {
+      if (isVercel && existsSync(origProkerPath)) {
+        writeFileSync(prokerPath, readFileSync(origProkerPath, 'utf-8'), 'utf-8')
+        return
+      }
+    } catch {}
+    try { writeFileSync(prokerPath, JSON.stringify(DEFAULT, null, 2), 'utf-8') } catch {}
   }
 }
 
