@@ -425,8 +425,8 @@ async function handleSubmit(path) {
 }
 .sound-btn {
   position: fixed;
-  top: 12px;
-  right: 14px;
+  top: calc(12px + env(safe-area-inset-top));
+  right: calc(14px + env(safe-area-inset-right));
   width: 38px;
   height: 38px;
   border-radius: 0;
