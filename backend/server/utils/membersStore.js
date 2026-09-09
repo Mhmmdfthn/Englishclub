@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { isDbEnabled, getDb } from './pg.js'
+import { addMemberToSheets, cloudMembers, isSheetsEnabled } from './cloudStore.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const isVercel = !!process.env.VERCEL
@@ -63,6 +64,10 @@ export async function addMember(nama, no_hp, jurusan) {
   const hp = sanitize(no_hp.trim()).slice(0,15)
   const j = sanitize(jurusan.trim()).slice(0,30)
   if (!ALLOWED_JURUSAN.has(j)) throw new Error(`Jurusan tidak valid: ${j}`)
+  if (isSheetsEnabled()) {
+    const row = { timestamp: new Date().toISOString().slice(0,19), nama: n, no_hp: hp, jurusan: j }
+    return addMemberToSheets(row)
+  }
   if (isDbEnabled()) {
     const pool = getDb()
     const { rows } = await pool.query(
@@ -84,6 +89,7 @@ export async function addMember(nama, no_hp, jurusan) {
 }
 
 export async function allMembers(limit=100){
+  if (isSheetsEnabled()) return cloudMembers(limit)
   if (isDbEnabled()) {
     const pool = getDb()
     const { rows } = await pool.query('SELECT timestamp, nama, no_hp, jurusan FROM members ORDER BY id DESC LIMIT $1', [limit])

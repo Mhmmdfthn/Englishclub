@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { isDbEnabled, getDb } from './pg.js'
+import { cloudAddScore, cloudAddStory, cloudLatestStories, cloudTopScores, isKvEnabled } from './cloudStore.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const isVercel = !!process.env.VERCEL
@@ -33,6 +34,7 @@ function saveJson(file, data) {
 export const db = {
   getScores() { return loadJson('scores.json', []) },
   async addScore(name, score, words) {
+    if (isKvEnabled()) return cloudAddScore(name, score, words)
     if (isDbEnabled()) {
       const pool = getDb()
       await pool.query('INSERT INTO scores (name, score, words) VALUES ($1,$2,$3)', [name.slice(0,20), score, words])
@@ -46,6 +48,7 @@ export const db = {
     return better + 1
   },
   async top(limit = 10) {
+    if (isKvEnabled()) return cloudTopScores(limit)
     if (isDbEnabled()) {
       const pool = getDb()
       const { rows } = await pool.query('SELECT name, score, words, created_at FROM scores ORDER BY score DESC, created_at ASC LIMIT $1', [limit])
@@ -56,6 +59,7 @@ export const db = {
   },
   getStories() { return loadJson('stories.json', []) },
   async addStory(name, batch, comment) {
+    if (isKvEnabled()) return cloudAddStory(name, batch, comment)
     if (isDbEnabled()) {
       const pool = getDb()
       const { rows } = await pool.query('INSERT INTO stories (name, batch, comment) VALUES ($1,$2,$3) RETURNING name, batch, comment', [name.slice(0,40), batch.slice(0,30), comment.slice(0,220)])
@@ -68,6 +72,7 @@ export const db = {
     return row
   },
   async latest(limit = 100) {
+    if (isKvEnabled()) return cloudLatestStories(limit)
     if (isDbEnabled()) {
       const pool = getDb()
       const { rows } = await pool.query('SELECT name, batch, comment FROM stories ORDER BY id DESC LIMIT $1', [limit])

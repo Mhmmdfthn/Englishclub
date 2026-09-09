@@ -21,6 +21,7 @@ onMounted(() => {
     if (k < 1) requestAnimationFrame(step)
   }
   requestAnimationFrame(step)
+  save()
 })
 
 const name = ref(localStorage.getItem('wh_name') || '')
@@ -38,9 +39,8 @@ async function save() {
     const r = await api.saveScore(usedName, props.stats.score, props.stats.words.length)
     localStorage.setItem('wh_name', usedName)
     savedRank.value = r.rank
-    entries.value = (await api.topScores()).entries
   } catch (e) {
-    saveError.value = 'Gagal menyimpan skor. Coba lagi.'
+    saveError.value = 'Skor belum tersimpan. Coba lagi.'
   }
   saving.value = false
 }

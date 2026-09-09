@@ -17,7 +17,9 @@ const proker = ref([])
 const prokerLoading = ref(false)
 const captionDraft = ref({})
 const titleDraft = ref({})
+const prokerDraft = ref({})
 const galleryUploading = ref({})
+const newProker = ref({ title: '', description: '', imageUrl: '', date: '', status: 'upcoming' })
 
 async function checkAuth() {
   const t = localStorage.getItem('admin_token') || ''
@@ -47,7 +49,7 @@ async function login() {
     password.value = ''
     await Promise.all([fetchMembers(), loadProker()])
   } catch (e) {
-    error.value = e?.message?.includes('401') ? 'Username atau password salah' : 'Gagal login'
+    error.value = e?.message?.includes('401') ? 'Username atau password salah.' : 'Login belum berhasil.'
   } finally { loading.value = false }
 }
 
@@ -67,13 +69,13 @@ async function fetchMembers() {
   try {
     const t = localStorage.getItem('admin_token') || ''
     const res = await fetch('/api/members', { headers: { Authorization: `Bearer ${t}`, 'x-admin-token': t } })
-    if (res.status === 401) { error.value = 'Sesi habis — silakan login lagi'; authed.value = false; localStorage.removeItem('admin_token'); return }
+    if (res.status === 401) { error.value = 'Sesi habis. Login lagi.'; authed.value = false; localStorage.removeItem('admin_token'); return }
     if (res.status === 500) { error.value = 'Server belum konfigurasi ADMIN_TOKEN'; return }
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const data = await res.json()
     members.value = data.members || []
   } catch (e) {
-    error.value = e?.message || 'Gagal memuat data'
+    error.value = e?.message || 'Data belum dapat dimuat.'
   } finally { loading.value = false }
 }
 
@@ -81,13 +83,13 @@ function exportCsv() {
   const t = localStorage.getItem('admin_token') || ''
   fetch('/api/members/export', { headers: { Authorization: `Bearer ${t}`, 'x-admin-token': t } }).then(async r => {
     if (r.status === 401) { error.value = 'Unauthorized — login lagi'; authed.value = false; return }
-    if (!r.ok) { error.value = 'Export gagal'; return }
+    if (!r.ok) { error.value = 'Export belum berhasil.'; return }
     const blob = await r.blob()
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url; a.download = 'pendaftaran_ec.csv'; a.click()
     URL.revokeObjectURL(url)
-  }).catch(() => { error.value = 'Export gagal' })
+  }).catch(() => { error.value = 'Export belum berhasil.' })
 }
 
 async function loadProker() {
@@ -95,22 +97,43 @@ async function loadProker() {
   try {
     const data = await api.proker()
     proker.value = data.proker || []
-    proker.value.forEach(p => { captionDraft.value[p.id] = p.caption; titleDraft.value[p.id] = p.title })
-  } catch (e) { error.value = 'Gagal muat proker' }
+    proker.value.forEach(p => {
+      captionDraft.value[p.id] = p.description || p.caption || ''
+      titleDraft.value[p.id] = p.title
+      prokerDraft.value[p.id] = { title: p.title, description: p.description || p.caption || '', imageUrl: p.imageUrl || p.photos?.[0] || '', date: p.date || '', status: p.status || 'upcoming' }
+    })
+  } catch (e) { error.value = 'Proker belum dapat dimuat.' }
   finally { prokerLoading.value = false }
 }
 
 async function saveProker(p) {
   const t = localStorage.getItem('admin_token') || ''
-  const cap = captionDraft.value[p.id] || ''
-  const ttl = titleDraft.value[p.id] || ''
-  if (ttl.trim().length < 3 || ttl.trim().length > 40) { error.value = 'Judul 3-40 karakter'; return }
-  if (cap.trim().length < 5 || cap.length > 280) { error.value = 'Caption 5-280 karakter'; return }
+  const draft = prokerDraft.value[p.id]
+  if (draft.title.trim().length < 3 || draft.title.trim().length > 80) { error.value = 'Judul 3-80 karakter'; return }
+  if (draft.description.trim().length < 5 || draft.description.length > 1000) { error.value = 'Deskripsi 5-1000 karakter'; return }
   try {
-    await api.updateProker(p.id, { title: ttl.trim(), caption: cap.trim() }, t)
+    await api.updateProker(p.id, { ...draft, title: draft.title.trim(), description: draft.description.trim() }, t)
     await loadProker()
     error.value = ''
-  } catch (e) { error.value = e?.message || 'Gagal simpan proker' }
+  } catch (e) { error.value = e?.message || 'Proker belum tersimpan.' }
+}
+
+async function createProker() {
+  const draft = newProker.value
+  if (draft.title.trim().length < 3 || draft.description.trim().length < 5) { error.value = 'Judul dan deskripsi wajib diisi'; return }
+  try {
+    await api.addProker({ ...draft, title: draft.title.trim(), description: draft.description.trim() }, localStorage.getItem('admin_token') || '')
+    newProker.value = { title: '', description: '', imageUrl: '', date: '', status: 'upcoming' }
+    await loadProker()
+    error.value = ''
+  } catch (e) { error.value = e?.message || 'Proker belum ditambahkan.' }
+}
+
+async function removeProker(p) {
+  try {
+    await api.deleteProker(p.id, localStorage.getItem('admin_token') || '')
+    await loadProker()
+  } catch (e) { error.value = e?.message || 'Proker belum dihapus.' }
 }
 
 async function uploadGallery(p, event) {
@@ -125,7 +148,7 @@ async function uploadGallery(p, event) {
     const res = await fetch(`/api/proker/${p.id}/photos`, { method:'POST', headers: { Authorization: `Bearer ${t}`, 'x-admin-token': t }, body: fd })
     if (!res.ok) { const j = await res.json().catch(()=>({})); throw new Error(j.detail || `HTTP ${res.status}`) }
     await loadProker()
-  } catch (e) { error.value = e?.message || 'Gagal upload foto' }
+  } catch (e) { error.value = e?.message || 'Foto belum diunggah.' }
   finally { galleryUploading.value[p.id] = false; event.target.value = '' }
 }
 
@@ -135,7 +158,7 @@ async function deletePhoto(p, idx) {
     const res = await fetch(`/api/proker/${p.id}/photos/${idx}`, { method:'DELETE', headers: { Authorization: `Bearer ${t}`, 'x-admin-token': t } })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     await loadProker()
-  } catch (e) { error.value = 'Gagal hapus foto' }
+  } catch (e) { error.value = 'Foto belum dihapus.' }
 }
 
 const filtered = computed(() => {
@@ -263,9 +286,16 @@ onMounted(async () => {
         <div v-else>
           <div class="toolbar">
             <h2 style="font-size:18px; font-weight:900;">Kelola Proker</h2>
-            <span class="tiny muted">Judul 3-40 • Caption 5-280 • Gallery 3 foto • 5MB/foto</span>
+            <span class="tiny muted">Data tersimpan di KV saat env cloud aktif</span>
           </div>
           <p v-if="error" class="error">{{ error }}</p>
+          <form class="proker-create" @submit.prevent="createProker">
+            <strong>Tambah Proker</strong>
+            <input v-model="newProker.title" class="field" maxlength="80" placeholder="Judul" required />
+            <textarea v-model="newProker.description" class="field textarea" maxlength="1000" rows="2" placeholder="Deskripsi" required></textarea>
+            <input v-model="newProker.imageUrl" class="field" type="url" placeholder="URL gambar Cloudinary (opsional)" />
+            <div class="proker-form-row"><input v-model="newProker.date" class="field" type="date" /><select v-model="newProker.status" class="field"><option value="upcoming">Akan datang</option><option value="ongoing">Sedang berlangsung</option><option value="completed">Selesai</option></select><button class="btn sm" type="submit">Tambah</button></div>
+          </form>
           <div v-if="prokerLoading" class="tiny muted">Memuat proker...</div>
           <div class="proker-grid">
             <article v-for="p in proker" :key="p.id" class="proker-card">
@@ -274,7 +304,7 @@ onMounted(async () => {
                 <span class="order-badge">#{{ p.order }}</span>
               </div>
               <label class="field-label">Judul</label>
-              <input v-model="titleDraft[p.id]" class="field sm" maxlength="40" placeholder="Judul proker..." />
+              <input v-model="prokerDraft[p.id].title" class="field sm" maxlength="80" placeholder="Judul proker..." />
               <div class="gallery">
                 <div v-for="(ph,idx) in p.photos" :key="idx" class="gallery-item">
                   <img :src="ph" :alt="p.title" />
@@ -286,10 +316,12 @@ onMounted(async () => {
                 </label>
               </div>
               <label class="field-label">Caption</label>
-              <textarea v-model="captionDraft[p.id]" class="field textarea" rows="3" maxlength="280" placeholder="Caption..."></textarea>
+              <textarea v-model="prokerDraft[p.id].description" class="field textarea" rows="3" maxlength="1000" placeholder="Deskripsi..."></textarea>
+              <input v-model="prokerDraft[p.id].imageUrl" class="field" type="url" placeholder="URL gambar Cloudinary" />
+              <div class="proker-form-row"><input v-model="prokerDraft[p.id].date" class="field" type="date" /><select v-model="prokerDraft[p.id].status" class="field"><option value="upcoming">Akan datang</option><option value="ongoing">Sedang berlangsung</option><option value="completed">Selesai</option></select></div>
               <div class="card-actions">
-                <span class="tiny muted">{{ (captionDraft[p.id]||'').length }}/280</span>
-                <button class="btn sm" @click="saveProker(p)">Simpan</button>
+                <span class="tiny muted">{{ (prokerDraft[p.id]?.description||'').length }}/1000</span>
+                <div><button class="btn sm" @click="saveProker(p)">Simpan</button><button class="btn sm danger" @click="removeProker(p)">Hapus</button></div>
               </div>
             </article>
           </div>
@@ -352,6 +384,10 @@ onMounted(async () => {
 .empty { text-align: center; padding: 18px; color: var(--text-muted); }
 .members-cards { display: none; }
 .proker-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+.proker-create { display: grid; gap: 10px; margin: 14px 0 18px; padding: 16px; background: #fff; border: 3px solid var(--dark-navy); box-shadow: 5px 5px 0 var(--dark-navy); }
+.proker-form-row { display: flex; align-items: center; gap: 10px; }
+.proker-form-row .field { flex: 1; min-width: 0; }
+.danger { margin-left: 8px; color: #fff; background: #b42318; }
 .proker-card { padding: 16px; background: #fff; border: 3px solid var(--dark-navy); box-shadow: 6px 6px 0 var(--dark-navy); }
 .gallery { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
 .gallery-item { position: relative; width: 80px; height: 80px; border: 2px solid var(--dark-navy); overflow: hidden; }
@@ -368,6 +404,7 @@ onMounted(async () => {
   .side-spacer { display: none; }
   .stats-row { grid-template-columns: 1fr; }
   .proker-grid { grid-template-columns: 1fr; }
+  .proker-form-row { flex-direction: column; align-items: stretch; }
 }
 @media (max-width: 680px) {
   .admin-shell { overflow-x: hidden; }

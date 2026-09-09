@@ -62,7 +62,7 @@ if (existsSync(join(dist, 'index.html'))) {
 }
 
 const PORT = process.env.PORT || 3001
-if (process.env.NODE_ENV !== 'test') {
+if (!process.env.VERCEL && process.env.NODE_ENV !== 'test') {
   app.listen(PORT, () => console.log(`Backup custom Vue+Express listening on ${PORT}`))
 }
 

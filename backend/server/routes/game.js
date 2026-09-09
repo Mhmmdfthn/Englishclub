@@ -1,11 +1,22 @@
 import { Router } from 'express'
+import { readFileSync } from 'fs'
+import { join, dirname } from 'path'
+import { fileURLToPath } from 'url'
 import { create_session, get_session, submit_word, BASE_TIME } from '../utils/gameStore.js'
 
 const r = Router()
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 r.post('/', (req, res) => {
   const session = create_session()
   res.json({ session_id: session.id, grid: session.grid, time_limit: BASE_TIME })
+})
+
+r.get('/dictionary', (req, res) => {
+  res.type('text/plain')
+  const validWords = readFileSync(join(__dirname, '../data/valid_words.txt'), 'utf8')
+  const seedWords = readFileSync(join(__dirname, '../data/words.txt'), 'utf8')
+  res.send(`${validWords}\n${seedWords}`)
 })
 
 r.post('/:session_id/word', (req, res) => {

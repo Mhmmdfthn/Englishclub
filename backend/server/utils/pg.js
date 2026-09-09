@@ -1,14 +1,38 @@
 import pg from 'pg'
+import { readFileSync, existsSync } from 'fs'
+import { join, dirname } from 'path'
+import { fileURLToPath } from 'url'
 
 const { Pool } = pg
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 let pool = null
 
+function resolveDatabaseUrl() {
+  if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) return process.env.DATABASE_URL
+  const candidates = [
+    join(__dirname, '../../global-config.json'),
+    join(__dirname, '../../../englishclub-global-config.json'),
+    join(__dirname, '../../server/data/global-config.json'),
+  ]
+  for (const p of candidates) {
+    try {
+      if (existsSync(p)) {
+        const j = JSON.parse(readFileSync(p, 'utf-8'))
+        if (j.DATABASE_URL && j.DATABASE_URL.startsWith('postgres')) return j.DATABASE_URL
+        if (j.databaseUrl && j.databaseUrl.startsWith('postgres')) return j.databaseUrl
+      }
+    } catch {}
+  }
+  return null
+}
+
 function getPool() {
-  if (!process.env.DATABASE_URL) return null
+  const url = resolveDatabaseUrl()
+  if (!url) return null
   if (pool) return pool
   pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
+    connectionString: url,
     ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
   })
   pool.on('error', (e) => console.error('pg pool error', e.message))
@@ -16,7 +40,7 @@ function getPool() {
 }
 
 export function isDbEnabled() {
-  return !!process.env.DATABASE_URL
+  return !!resolveDatabaseUrl()
 }
 
 export function getDb() {
@@ -67,8 +91,10 @@ export async function ensureDb() {
       username TEXT REFERENCES admins(username) ON DELETE CASCADE,
       exp TIMESTAMPTZ NOT NULL
     );
+    CREATE INDEX IF NOT EXISTS idx_scores_score ON scores(score DESC, created_at ASC);
+    CREATE INDEX IF NOT EXISTS idx_stories_id ON stories(id DESC);
+    CREATE INDEX IF NOT EXISTS idx_members_jurusan ON members(jurusan);
   `)
-  // seed proker default jika kosong
   const { rows } = await p.query('SELECT COUNT(*) FROM proker')
   if (parseInt(rows[0].count, 10) === 0) {
     await p.query(`

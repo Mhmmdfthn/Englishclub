@@ -3,7 +3,7 @@ import multer from 'multer'
 import { join, dirname, extname } from 'path'
 import { fileURLToPath } from 'url'
 import { existsSync, mkdirSync, unlinkSync } from 'fs'
-import { getAll, getById, updateCaption, updateProker, addPhotos, removePhoto } from '../utils/prokerStore.js'
+import { getAll, getById, addProker, deleteProker, updateProker, addPhotos, removePhoto } from '../utils/prokerStore.js'
 import { verifyToken, verifyTokenAsync } from '../utils/auth.js'
 import { isDbEnabled } from '../utils/pg.js'
 
@@ -58,15 +58,32 @@ r.get('/:id', async (req, res) => {
   res.json({ proker: p })
 })
 
+r.post('/', requireAdmin, async (req, res) => {
+  try {
+    const proker = await addProker(req.body)
+    res.status(201).json({ ok: true, proker })
+  } catch (e) {
+    res.status(422).json({ detail: e.message })
+  }
+})
+
 // admin — bisa ganti judul dan/atau caption
 r.put('/:id', requireAdmin, async (req, res) => {
-  const { title, caption } = req.body
-  if (title === undefined && caption === undefined) return res.status(422).json({ detail: 'title atau caption wajib' })
+  if (!Object.keys(req.body).length) return res.status(422).json({ detail: 'data proker wajib' })
   try {
-    const p = await updateProker(req.params.id, { title, caption })
+    const p = await updateProker(req.params.id, req.body)
     res.json({ ok: true, proker: p })
   } catch (e) {
     res.status(e.message.includes('tidak ditemukan') ? 404 : 422).json({ detail: e.message })
+  }
+})
+
+r.delete('/:id', requireAdmin, async (req, res) => {
+  try {
+    await deleteProker(req.params.id)
+    res.json({ ok: true })
+  } catch (e) {
+    res.status(404).json({ detail: e.message })
   }
 })
 

@@ -8,7 +8,7 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 const currentPhoto = ref(0)
-const photos = computed(() => props.program?.photos || [])
+const photos = computed(() => props.program?.photos?.length ? props.program.photos : (props.program?.imageUrl ? [props.program.imageUrl] : ['/Logo_ec.jpg']))
 
 function close() { emit('close') }
 function next() { if (photos.value.length) currentPhoto.value = (currentPhoto.value + 1) % photos.value.length }
@@ -44,7 +44,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
           <div class="modal-body">
             <span class="panel-kicker">{{ program.id }}</span>
             <h3 class="modal-title">{{ program.title }}</h3>
-            <p class="modal-caption">{{ program.caption }}</p>
+            <p class="modal-caption">{{ program.description || program.caption }}</p>
+            <div class="modal-meta"><span>{{ program.status === 'completed' ? 'Selesai' : program.status === 'ongoing' ? 'Sedang berlangsung' : 'Akan datang' }}</span><time v-if="program.date">{{ program.date }}</time></div>
           </div>
           <div class="modal-actions">
             <button class="btn ghost" @click="close">Tutup</button>
@@ -107,6 +108,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 .modal-body .panel-kicker { color: var(--royal-blue); font-size: 10px; font-weight: 900; letter-spacing: .16em; }
 .modal-title { margin: 6px 0 10px; font-size: 22px; font-weight: 900; line-height: 1; letter-spacing: -0.03em; color: var(--dark-navy); }
 .modal-caption { margin: 0; font-size: 14px; line-height: 1.6; color: var(--dark-navy); white-space: pre-wrap; }
+.modal-meta { display:flex; gap:10px; margin-top:14px; color:var(--royal-blue); font-size:12px; font-weight:800; }
 .modal-actions { padding: 0 24px 20px; display: flex; justify-content: flex-end; }
 .modal-fade-enter-active, .modal-fade-leave-active { transition: opacity 0.22s ease; }
 .modal-fade-enter-from, .modal-fade-leave-to { opacity: 0; }

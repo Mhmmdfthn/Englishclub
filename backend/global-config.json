@@ -1,0 +1,4 @@
+{
+  "database": "englishclub-global-config",
+  "note": "Global config untuk DB. Isi DATABASE_URL di sini atau di Vercel Env. Fallback ke env."
+}

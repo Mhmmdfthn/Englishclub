@@ -23,8 +23,22 @@ async function req(url, options, timeout = 8000) {
   return res.json()
 }
 
+async function reqText(url, timeout = 30000) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeout)
+  try {
+    const res = await fetch(url, { signal: controller.signal })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return res.text()
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 export const api = {
   startGame: () => req('/api/game', { method: 'POST' }),
+
+  dictionary: async () => (await reqText('/api/game/dictionary')).split(/\s+/).filter(Boolean),
 
   submitWord: (sessionId, path) =>
     req(`/api/game/${sessionId}/word`, {
@@ -75,6 +89,17 @@ export const api = {
 
   proker: () => req('/api/proker'),
   prokerDetail: (id) => req(`/api/proker/${id}`),
+  addProker: (data, token) =>
+    req('/api/proker', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(data),
+    }),
+  deleteProker: (id, token) =>
+    req(`/api/proker/${id}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    }),
   updateProkerCaption: (id, caption, token) =>
     req(`/api/proker/${id}`, {
       method: 'PUT',

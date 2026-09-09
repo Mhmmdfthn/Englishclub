@@ -127,7 +127,7 @@ watch(
         'board-disabled': disabled,
       }"
       role="grid"
-      aria-label="Word Hunt letter board"
+      aria-label="Papan huruf Word Hunt"
       :aria-disabled="disabled"
       @pointerdown="begin"
       @touchstart.prevent="begin"

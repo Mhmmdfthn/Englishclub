@@ -5,6 +5,7 @@ defineProps({
   best: { type: Number, default: 0 },
   error: { type: String, default: '' },
   retriable: { type: Boolean, default: false },
+  dictionaryReady: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['play', 'back'])
@@ -32,7 +33,7 @@ function submit() {
       <aside class="mode-panel">
         <span class="panel-kicker">PILIH MODE</span>
         <h1>Temukan kata dengan caramu.</h1>
-        <p class="mode-intro">Pilih pengalaman bermain yang ingin kamu coba hari ini.</p>
+        <p class="mode-intro">Pilih mode permainan.</p>
 
         <button class="mode-option mode-active" :class="{ selected: selectedMode === 'santai' }" @click="selectedMode = 'santai'">
           <span class="mode-icon">01</span>
@@ -41,7 +42,7 @@ function submit() {
         </button>
         <button class="mode-option mode-disabled" disabled>
           <span class="mode-icon">02</span>
-          <span class="mode-copy"><b>Hard</b><small>Segera hadir untuk tantangan berikutnya.</small></span>
+          <span class="mode-copy"><b>Hard</b><small>Belum tersedia.</small></span>
           <span class="mode-soon">SOON</span>
         </button>
 
@@ -55,7 +56,7 @@ function submit() {
         <div class="form-heading">
           <span class="panel-kicker">WORD HUNT</span>
           <h2>Siap untuk bermain?</h2>
-          <p>Masukkan nama kamu untuk mencatat skor di klasemen.</p>
+          <p>Isi nama untuk menyimpan skor.</p>
         </div>
 
         <label class="name-label" for="player-name">Nama pemain</label>
@@ -64,7 +65,7 @@ function submit() {
           v-model="name"
           class="field"
           maxlength="20"
-          placeholder="Ketik nama kamu..."
+          placeholder="Nama pemain"
           @keyup.enter="submit"
         />
 
@@ -73,7 +74,8 @@ function submit() {
           <span class="score-val">{{ best }} <small>PTS</small></span>
         </div>
 
-        <button class="btn play-btn" @click="submit">
+        <p v-if="!dictionaryReady" class="dictionary-status">Memuat kamus data...</p>
+        <button class="btn play-btn" :disabled="!dictionaryReady" @click="submit">
           <span>MULAI WORD HUNT</span>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
         </button>
@@ -87,7 +89,7 @@ function submit() {
           <span>Coba Lagi</span>
         </button>
         <button class="system-info-button" type="button" @click="showSystemInfo = !showSystemInfo">
-          {{ showSystemInfo ? 'Sembunyikan info sistem' : 'Lihat info sistem' }}
+          {{ showSystemInfo ? 'Sembunyikan info' : 'Lihat aturan' }}
           <span>{{ showSystemInfo ? '↑' : '↓' }}</span>
         </button>
         <div v-if="showSystemInfo" class="system-info">

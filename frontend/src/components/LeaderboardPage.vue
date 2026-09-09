@@ -20,22 +20,22 @@ onMounted(async () => {
       <button class="page-brand" type="button" @click="$emit('back')" aria-label="Kembali ke profil">
         <img src="/Logo_ec.jpg" alt="Logo English Club UPB" />
       </button>
-      <span class="page-nav-title">ENGLISH CLUB UPB</span>
-      <button class="page-back" type="button" @click="$emit('back')">Kembali ke Profil</button>
+      <span class="page-nav-title">PAPAN SKOR</span>
+      <button class="page-back" type="button" @click="$emit('back')">Kembali</button>
     </nav>
 
     <div class="section-title">
-      <span class="section-badge">KLASEMEN</span>
+      <span class="section-badge">PAPAN SKOR</span>
       <h2>Top 10 Pemain</h2>
-      <p class="muted small center">Skor tertinggi Word Hunt, mode santai tanpa waktu.</p>
+      <p class="muted small center">10 skor tertinggi Word Hunt.</p>
     </div>
 
     <div class="card lb-card">
-      <p v-if="loading" class="muted small center py-2">Memuat klasemen...</p>
+      <p v-if="loading" class="muted small center py-2">Memuat skor...</p>
       <Leaderboard v-else :entries="entries" />
     </div>
 
-    <button class="btn ghost" @click="$emit('back')">Kembali ke Profil</button>
+    <button class="btn ghost" @click="$emit('back')">Kembali</button>
   </section>
 </template>
 

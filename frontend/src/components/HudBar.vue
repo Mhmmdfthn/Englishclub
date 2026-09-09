@@ -17,13 +17,13 @@ const pct = computed(() =>
   Math.max(0, Math.min(100, (props.timeLeft / Math.max(props.timeTotal, 1)) * 100)),
 )
 
-const display = computed(() => props.word || 'GESER HURUF')
+const display = computed(() => props.word || 'PILIH HURUF')
 </script>
 
 <template>
   <header class="hud card" :class="{ 'fever-mode': fever }">
     <div class="row">
-      <button class="back-btn" type="button" title="Kembali ke Beranda" aria-label="Kembali ke Beranda" @click="emit('back')">
+      <button class="back-btn" type="button" title="Kembali ke beranda" aria-label="Kembali ke beranda" @click="emit('back')">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
           <polyline points="15 18 9 12 15 6"/>
         </svg>

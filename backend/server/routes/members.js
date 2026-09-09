@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { addMember, allMembers, highlight, csvFilePath } from '../utils/membersStore.js'
+import { addMember, allMembers, highlight } from '../utils/membersStore.js'
 import { verifyToken, verifyTokenAsync } from '../utils/auth.js'
 import { isDbEnabled } from '../utils/pg.js'
 
@@ -42,16 +42,20 @@ r.post('/', async (req, res) => {
   if (!jurusan || !ALLOWED.has(jurusan)) return res.status(422).json({ detail: 'Jurusan harus salah satu: ' + [...ALLOWED].join(', ') })
   try {
     const row = await addMember(nama.trim(), hp, jurusan.trim())
-    res.json({ ok: true, member: row })
+    res.status(row.queued ? 202 : 200).json({ ok: true, queued: row.queued, member: row })
   } catch (e) {
     res.status(400).json({ detail: String(e.message || e) })
   }
 })
 
-// admin export
-r.get('/export', requireAdmin, (req, res) => {
-  const path = csvFilePath()
-  res.download(path, 'pendaftaran_ec.csv')
+// admin export — generate CSV from the configured member source
+r.get('/export', requireAdmin, async (req, res) => {
+  const rows = await allMembers(10000)
+  const header = 'timestamp,nama,no_hp,jurusan\n'
+  const csv = header + rows.map(row => `${row.timestamp},${row.nama},${row.no_hp},${row.jurusan}`).join('\n')
+  res.header('Content-Type', 'text/csv')
+  res.attachment('pendaftaran_ec.csv')
+  res.send(csv)
 })
 
 export default r

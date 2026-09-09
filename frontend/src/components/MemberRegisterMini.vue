@@ -19,7 +19,7 @@ function validate() {
   if (!nama.value.trim() || nama.value.trim().length < 2) return 'Nama minimal 2 huruf'
   const hp = no_hp.value.trim().replace(/\s|-/g, '')
   if (!/^08[0-9]{8,11}$/.test(hp)) return 'No HP harus 08xxxxxxxxxx (10-13 digit)'
-  if (!jurusan.value) return 'Pilih jurusan'
+  if (!jurusan.value) return 'Jurusan wajib dipilih'
   return ''
 }
 
@@ -64,7 +64,7 @@ async function loadHighlight() {
     if (msg.includes('422') || msg.includes('400')) {
       error.value = msg.includes('jurusan') ? 'Jurusan tidak valid' : msg.includes('08') ? 'No HP harus 08xxxxxxxxxx (10-13 digit)' : 'Data tidak valid, periksa kembali'
     } else if (e?.network) error.value = 'Tidak dapat terhubung ke server.'
-    else error.value = 'Gagal menyimpan. Coba lagi.'
+    else error.value = 'Data belum tersimpan. Coba lagi.'
   } finally {
     submitting.value = false
   }
@@ -107,7 +107,7 @@ onMounted(loadHighlight)
 
         <label class="name-label" for="reg-jurusan">Jurusan</label>
         <select id="reg-jurusan" v-model="jurusan" class="field" style="text-align:left; text-align-last:center;" :disabled="submitting" @change="error=''">
-          <option value="">Pilih jurusan</option>
+          <option value="">Pilih jurusan...</option>
           <option v-for="o in jurusanOptions" :key="o" :value="o">{{ o }}</option>
         </select>
 

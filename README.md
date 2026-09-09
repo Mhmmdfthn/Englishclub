@@ -6,7 +6,7 @@ Game arcade pencarian kata 5×5 + form pendaftaran anggota untuk UKM English Clu
 
 - **Frontend:** Vue 3 + Vite + vue-router (`frontend/src/*`, `App.vue` + `router.js`)
 - **Backend:** Node Express (`backend/server/index.js`, `type:module`) — translate 1:1 dari Python FastAPI lama (sekarang di `backend-python/`)
-- **Data:** JSON/CSV file `backend/server/data/` (`members.csv`, `proker.json`, `scores.json`, `stories.json`, `tokens.json`, `admins.json`, `uploads/`), `words.txt` 332 + `valid_words.txt` 358k
+- **Data:** Vercel KV untuk leaderboard/stories dan Google Sheets untuk members saat env cloud tersedia; JSON/CSV tetap menjadi fallback lokal
 - **Auth:** 1 akun `admin / ec2026onlyblue` (`bcrypt` + Bearer 8h persisten `tokens.json`), guard `Authorization: Bearer` + legacy `x-admin-token`
 
 ## Dokumentasi
@@ -60,6 +60,17 @@ Englishclub/
 │   └── package.json
 └── docs/
 ```
+
+## Penyimpanan Production
+
+Set env berikut di Vercel untuk mengaktifkan hybrid storage:
+
+- `KV_REST_API_URL` dan `KV_REST_API_TOKEN` untuk leaderboard/stories.
+- `GOOGLE_CLIENT_EMAIL`, `GOOGLE_PRIVATE_KEY`, `GOOGLE_SHEETS_ID`, dan opsional `GOOGLE_SHEETS_RANGE` untuk members.
+
+Sheet harus memiliki header `timestamp,nama,no_hp,jurusan`. Pembacaan members di-cache dua menit. Jika append ke Sheets gagal, payload disimpan di KV pada key `failed_members_queue` dan dicoba ulang ketika ada pendaftaran berikutnya.
+
+Tanpa env tersebut, development lokal tetap memakai PostgreSQL jika `DATABASE_URL` tersedia, lalu fallback JSON/CSV.
 
 ## Quick Start
 

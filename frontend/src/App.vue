@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from './api.js'
+import { loadDictionary } from './dictionary.js'
 import { sound } from './audio.js'
 import GameBoard from './components/GameBoard.vue'
 import GameOverScreen from './components/GameOverScreen.vue'
@@ -59,6 +60,9 @@ const foundWords = ref([])
 const busy = ref(false)
 const boardError = ref('')
 const connectError = ref(false)
+const dictionaryReady = ref(false)
+const dictionaryError = ref('')
+const wordSet = ref(new Set())
 const shakeStamp = ref(0)
 const finalStats = ref(null)
 const floatingToast = ref(null)
@@ -68,6 +72,8 @@ let timerId = null
 const bestScore = computed(() => Number(localStorage.getItem('wh_best') || 0))
 const isFever = computed(() => combo.value >= 3)
 const showSoundBtn = computed(() => false)
+const LETTER_VALUES = { a: 1, b: 3, c: 3, d: 2, e: 1, f: 4, g: 2, h: 4, i: 1, j: 8, k: 5, l: 1, m: 3, n: 1, o: 1, p: 3, q: 10, r: 1, s: 1, t: 1, u: 1, v: 4, w: 4, x: 8, y: 4, z: 10 }
+const LETTERS = 'abcdefghijklmnopqrstuvwxyz'
 
 function stopTimer() {
   if (timerId) { clearInterval(timerId); timerId = null }
@@ -85,6 +91,9 @@ function handleAdminKey(e) {
 }
 onMounted(() => {
   syncScreenFromRoute()
+  loadDictionary(api.dictionary)
+    .then((words) => { wordSet.value = words; dictionaryReady.value = true })
+    .catch(() => { dictionaryError.value = 'Kamus belum dapat dimuat. Periksa koneksi lalu coba lagi.' })
   window.addEventListener('keydown', handleAdminKey)
   greetingTimer = setInterval(() => {
     greetingIndex.value = (greetingIndex.value + 1) % greetings.length
@@ -143,6 +152,10 @@ async function startGame() {
   connectError.value = false
   floatingToast.value = null
   sound.init()
+  if (!dictionaryReady.value) {
+    boardError.value = dictionaryError.value || 'Kamus sedang dimuat, tunggu sebentar.'
+    return
+  }
   try {
     const data = await api.startGame()
     sessionId.value = data.session_id
@@ -159,7 +172,7 @@ async function startGame() {
     stopTimer()
     timerId = setInterval(tick, 100)
   } catch (e) {
-    boardError.value = e && e.network ? e.message : 'Gagal memulai permainan'
+    boardError.value = e && e.network ? 'Server tidak merespons. Coba lagi.' : 'Permainan belum dapat dimulai.'
     connectError.value = true
     shakeStamp.value++
     if (screen.value === 'over') screen.value = 'form'
@@ -197,18 +210,29 @@ async function handleSubmit(path) {
 
   const attempt = path.map((i) => cells.value[i].letter).join('')
   try {
-    const res = await api.submitWord(sessionId.value, path)
-    if (res.ok) {
-      for (const c of res.cells) {
-        const cell = cells.value[c.index]
-        cell.letter = c.letter
-        cell.token = (cell.token ?? 0) + 1
+    const fail = (reason) => ({ ok: false, reason })
+    let res = { ok: false }
+    if (timeLeft.value <= 0) res = fail('expired')
+    else if (path.length < 3) res = fail('too_short')
+    else if (new Set(path).size !== path.length || path.some((i) => i < 0 || i >= cells.value.length)) res = fail('invalid_path')
+    else if (path.some((i, n) => n > 0 && !areAdjacent(path[n - 1], i))) res = fail('invalid_path')
+    else if (!wordSet.value.has(attempt)) res = fail('not_a_word')
+    else if (foundWords.value.some((item) => item.word === attempt)) res = fail('already_found')
+    else {
+      const comboApplied = combo.value
+      const letterSum = [...attempt].reduce((sum, letter) => sum + (LETTER_VALUES[letter] || 1), 0)
+      const points = letterSum * attempt.length * 2 * comboApplied + (comboApplied >= 3 ? (comboApplied - 2) * 50 : 0)
+      for (const index of [...new Set(path)].sort((a, b) => a - b)) {
+        cells.value[index].letter = LETTERS[Math.floor(Math.random() * LETTERS.length)]
+        cells.value[index].token = (cells.value[index].token ?? 0) + 1
       }
+      res = { ok: true, word: attempt, points, combo: comboApplied, combo_next: Math.min(comboApplied + 1, 10), score: score.value + points }
+    }
+    if (res.ok) {
       score.value = res.score
       const prevCombo = combo.value
       combo.value = res.combo_next
       bestCombo.value = Math.max(bestCombo.value, res.combo)
-      timeLeft.value = Math.max(timeLeft.value, res.remaining)
       foundWords.value.push({ word: res.word, points: res.points })
       if (res.word.length > longestWord.value.length) longestWord.value = res.word
       boardError.value = ''
@@ -223,19 +247,25 @@ async function handleSubmit(path) {
       sound.playError()
       sound.vibrate(60)
       boardError.value = {
-        too_short: 'Minimal 3 huruf!',
-        invalid_path: 'Huruf harus tersambung!',
-        not_a_word: `"${attempt.toUpperCase()}" bukan kata Inggris`,
-        already_found: `"${attempt.toUpperCase()}" sudah ditemukan!`,
-        expired: 'Waktu habis!',
-      }[res.reason] || 'Ditolak!'
+        too_short: 'Pilih minimal 3 huruf.',
+        invalid_path: 'Pilih huruf yang berdekatan.',
+        not_a_word: `"${attempt.toUpperCase()}" tidak ada di kamus.`,
+        already_found: `"${attempt.toUpperCase()}" sudah dipakai.`,
+        expired: 'Waktu habis.',
+      }[res.reason] || 'Kata ditolak.'
       if (res.reason === 'expired') endGame()
     }
   } catch (e) {
-    boardError.value = e && e.network ? e.message : 'Koneksi ke server bermasalah'
+    boardError.value = e && e.network ? e.message : 'Kata tidak dapat diproses'
   } finally {
     busy.value = false
   }
+}
+
+function areAdjacent(a, b) {
+  const rowA = Math.floor(a / 5), colA = a % 5
+  const rowB = Math.floor(b / 5), colB = b % 5
+  return a !== b && Math.abs(rowA - rowB) <= 1 && Math.abs(colA - colB) <= 1
 }
 </script>
 
@@ -279,7 +309,7 @@ async function handleSubmit(path) {
   <router-view v-if="isHiddenAdminRoute" />
   <template v-else>
     <LandingView v-if="screen === 'landing'" @goPlay="navigate('form')" @goBoard="navigate('board')" @goRegister="navigate('register')" @openAdmin="openAdminModal" />
-    <PlayFormView v-else-if="screen === 'form'" :best="bestScore" :error="boardError" :retriable="connectError" @play="startGame" @back="goLanding" />
+    <PlayFormView v-else-if="screen === 'form'" :best="bestScore" :error="boardError || dictionaryError" :retriable="connectError" :dictionary-ready="dictionaryReady" @play="startGame" @back="goLanding" />
     <LeaderboardPage v-else-if="screen === 'board'" @back="goLanding" />
     <MemberRegisterMini v-else-if="screen === 'register'" @back="goLanding" />
     <section v-else-if="screen === 'play'" class="screen play">
