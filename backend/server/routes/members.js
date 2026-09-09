@@ -48,6 +48,17 @@ r.post('/', async (req, res) => {
   }
 })
 
+// sync endpoint for Google Apps Script
+r.get('/sync', async (req, res) => {
+  const syncToken = req.header('x-sync-token') || (req.header('authorization') || '').replace(/^Bearer\s+/i, '')
+  const expected = process.env.SYNC_TOKEN || process.env.ADMIN_TOKEN
+  if (!expected || syncToken !== expected) {
+    return res.status(401).json({ detail: 'Unauthorized. Invalid or missing x-sync-token.' })
+  }
+  const rows = await allMembers(10000)
+  res.json({ ok: true, count: rows.length, members: rows })
+})
+
 // admin export — generate CSV from the configured member source
 r.get('/export', requireAdmin, async (req, res) => {
   const rows = await allMembers(10000)

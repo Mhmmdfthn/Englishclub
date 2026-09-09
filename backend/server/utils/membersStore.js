@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { isDbEnabled, getDb } from './pg.js'
-import { addMemberToSheets, cloudMembers, isSheetsEnabled } from './cloudStore.js'
+import { addMemberToSheets, cloudMembers, isSheetsEnabled, cloudAddMember, cloudAllMembers, isKvEnabled } from './cloudStore.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const isVercel = !!process.env.VERCEL
@@ -64,8 +64,11 @@ export async function addMember(nama, no_hp, jurusan) {
   const hp = sanitize(no_hp.trim()).slice(0,15)
   const j = sanitize(jurusan.trim()).slice(0,30)
   if (!ALLOWED_JURUSAN.has(j)) throw new Error(`Jurusan tidak valid: ${j}`)
+  const row = { timestamp: new Date().toISOString().slice(0,19), nama: n, no_hp: hp, jurusan: j }
+  if (isKvEnabled()) {
+    return cloudAddMember(row)
+  }
   if (isSheetsEnabled()) {
-    const row = { timestamp: new Date().toISOString().slice(0,19), nama: n, no_hp: hp, jurusan: j }
     return addMemberToSheets(row)
   }
   if (isDbEnabled()) {
@@ -80,8 +83,6 @@ export async function addMember(nama, no_hp, jurusan) {
     return r
   }
   ensureFile()
-  const ts = new Date().toISOString().slice(0,19)
-  const row = { timestamp: ts, nama: n, no_hp: hp, jurusan: j }
   const line = FIELDS.map(f=>row[f]).join(',')+'\n'
   const cur = readFileSync(csvPath,'utf-8')
   writeFileSync(csvPath, cur + line, 'utf-8')
@@ -89,6 +90,7 @@ export async function addMember(nama, no_hp, jurusan) {
 }
 
 export async function allMembers(limit=100){
+  if (isKvEnabled()) return cloudAllMembers(limit)
   if (isSheetsEnabled()) return cloudMembers(limit)
   if (isDbEnabled()) {
     const pool = getDb()

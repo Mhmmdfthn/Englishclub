@@ -1,7 +1,7 @@
 import { kv } from '@vercel/kv'
 import { google } from 'googleapis'
 
-const KV_KEYS = { scores: 'leaderboard', stories: 'stories', proker: 'proker', failedMembers: 'failed_members_queue' }
+const KV_KEYS = { scores: 'leaderboard', stories: 'stories', proker: 'proker', members: 'members', failedMembers: 'failed_members_queue' }
 const CACHE_TTL = 2 * 60 * 1000
 let membersCache = { expiresAt: 0, rows: null }
 let sheetsClient = null
@@ -35,8 +35,32 @@ function sheetRange() {
 }
 
 async function readKvList(key) {
-  const value = await kv.get(key)
-  return Array.isArray(value) ? value : []
+  try {
+    const list = await kv.lrange(key, 0, -1)
+    if (Array.isArray(list) && list.length > 0) return list
+  } catch {}
+  try {
+    const value = await kv.get(key)
+    return Array.isArray(value) ? value : []
+  } catch {
+    return []
+  }
+}
+
+export async function cloudAddMember(row) {
+  try {
+    await kv.lpush(KV_KEYS.members, row)
+    await kv.ltrim(KV_KEYS.members, 0, 9999)
+  } catch {
+    const existing = await readKvList(KV_KEYS.members)
+    await kv.set(KV_KEYS.members, [row, ...existing])
+  }
+  return { ...row, queued: false }
+}
+
+export async function cloudAllMembers(limit = 1000) {
+  const rows = await readKvList(KV_KEYS.members)
+  return rows.slice(0, limit)
 }
 
 export async function cloudTopScores(limit = 10) {
