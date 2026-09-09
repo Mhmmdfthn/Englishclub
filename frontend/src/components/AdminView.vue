@@ -3,7 +3,14 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../api.js'
 
+const props = defineProps({ isModal: Boolean })
+const emit = defineEmits(['back'])
 const router = useRouter()
+
+function goBack() {
+  if (props.isModal) emit('back')
+  else router.push('/')
+}
 const username = ref('')
 const password = ref('')
 const authed = ref(false)
@@ -188,7 +195,7 @@ onMounted(async () => {
         <span class="topbar-title">ADMIN <b>EC UPB</b></span>
         <span v-if="authed" class="user-chip">{{ authedUser }}</span>
       </div>
-      <button class="page-back" type="button" @click="router.push('/')">← Kembali</button>
+      <button class="page-back" type="button" @click="goBack">← Kembali</button>
     </nav>
 
     <!-- Login -->

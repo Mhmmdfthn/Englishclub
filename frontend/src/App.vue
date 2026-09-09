@@ -338,7 +338,7 @@ function areAdjacent(a, b) {
     <div v-if="showAdminModal" class="admin-modal-overlay" @click.self="closeAdminModal">
       <div class="admin-modal-card">
         <button class="modal-close" aria-label="Tutup" @click="closeAdminModal">×</button>
-        <AdminView />
+        <AdminView is-modal @back="closeAdminModal" />
       </div>
     </div>
   </Transition>
