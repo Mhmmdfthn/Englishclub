@@ -4,10 +4,7 @@
   "outputDirectory": "frontend/dist",
   "functions": {
     "api/index.js": {
-      "includeFiles": [
-        "backend/server/data/valid_words.txt",
-        "backend/server/data/words.txt"
-      ]
+      "includeFiles": "backend/server/data/*.txt"
     }
   },
   "rewrites": [
