@@ -210,8 +210,11 @@ function goRegister() {
   .join-cta .hero-register { width:100%; min-height:48px; }
   .overview-heading { flex-direction:column; align-items:stretch; margin-top:32px; padding-bottom:14px; gap:12px; }
   .overview-heading p { text-align:left; max-width:100%; }
-  .overview-card { min-height:auto; padding:18px 14px; }
+  .overview-card { min-height:auto; padding:20px 18px; border-left:none !important; }
+  .overview-card + .overview-card { border-left:none; border-top:2px solid var(--ink); }
   .overview-card h3 { font-size:16px; }
+  .overview-card ul { padding-left:20px; }
+  .overview-card li { font-size:14px; line-height:1.6; margin-bottom:6px; }
   .story-section { padding-top:36px; }
   .story-form { gap:12px; padding-top:18px; }
   .story-form-fields { grid-template-columns:1fr; gap:10px; }
