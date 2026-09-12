@@ -49,13 +49,23 @@ const r = Router()
 
 // public
 r.get('/', async (req, res) => {
-  res.json({ proker: await getAll() })
+  try {
+    res.json({ proker: await getAll() })
+  } catch (e) {
+    console.error('Proker GET error:', e)
+    res.status(503).json({ error: 'Database sibuk, silakan coba lagi' })
+  }
 })
 
 r.get('/:id', async (req, res) => {
-  const p = await getById(req.params.id)
-  if (!p) return res.status(404).json({ detail: 'Proker tidak ditemukan' })
-  res.json({ proker: p })
+  try {
+    const p = await getById(req.params.id)
+    if (!p) return res.status(404).json({ detail: 'Proker tidak ditemukan' })
+    res.json({ proker: p })
+  } catch (e) {
+    console.error('Proker GET id error:', e)
+    res.status(503).json({ error: 'Database sibuk, silakan coba lagi' })
+  }
 })
 
 r.post('/', requireAdmin, async (req, res) => {
@@ -63,7 +73,11 @@ r.post('/', requireAdmin, async (req, res) => {
     const proker = await addProker(req.body)
     res.status(201).json({ ok: true, proker })
   } catch (e) {
-    res.status(422).json({ detail: e.message })
+    if (e.message?.includes('wajib') || e.message?.includes('karakter') || e.message?.includes('valid')) {
+      return res.status(422).json({ detail: e.message })
+    }
+    console.error('Proker POST error:', e)
+    res.status(503).json({ error: 'Database sibuk, silakan coba lagi' })
   }
 })
 
@@ -74,7 +88,12 @@ r.put('/:id', requireAdmin, async (req, res) => {
     const p = await updateProker(req.params.id, req.body)
     res.json({ ok: true, proker: p })
   } catch (e) {
-    res.status(e.message.includes('tidak ditemukan') ? 404 : 422).json({ detail: e.message })
+    if (e.message?.includes('tidak ditemukan')) return res.status(404).json({ detail: e.message })
+    if (e.message?.includes('wajib') || e.message?.includes('karakter') || e.message?.includes('valid')) {
+      return res.status(422).json({ detail: e.message })
+    }
+    console.error('Proker PUT error:', e)
+    res.status(503).json({ error: 'Database sibuk, silakan coba lagi' })
   }
 })
 
@@ -83,7 +102,9 @@ r.delete('/:id', requireAdmin, async (req, res) => {
     await deleteProker(req.params.id)
     res.json({ ok: true })
   } catch (e) {
-    res.status(404).json({ detail: e.message })
+    if (e.message?.includes('tidak ditemukan')) return res.status(404).json({ detail: e.message })
+    console.error('Proker DELETE error:', e)
+    res.status(503).json({ error: 'Database sibuk, silakan coba lagi' })
   }
 })
 
@@ -94,7 +115,10 @@ r.post('/:id/photos', requireAdmin, upload.array('photos', 3), async (req, res) 
     res.json({ ok: true, proker: p })
   } catch (e) {
     for (const f of (req.files || [])) { try { unlinkSync(join(uploadsDir, f.filename)) } catch {} }
-    res.status(e.message.includes('Maksimal') ? 400 : 404).json({ detail: e.message })
+    if (e.message?.includes('tidak ditemukan')) return res.status(404).json({ detail: e.message })
+    if (e.message?.includes('Maksimal')) return res.status(400).json({ detail: e.message })
+    console.error('Proker photos POST error:', e)
+    res.status(503).json({ error: 'Database sibuk, silakan coba lagi' })
   }
 })
 
@@ -110,7 +134,9 @@ r.delete('/:id/photos/:idx', requireAdmin, async (req, res) => {
     }
     res.json({ ok: true, proker: p })
   } catch (e) {
-    res.status(404).json({ detail: e.message })
+    if (e.message?.includes('tidak ditemukan')) return res.status(404).json({ detail: e.message })
+    console.error('Proker photo DELETE error:', e)
+    res.status(503).json({ error: 'Database sibuk, silakan coba lagi' })
   }
 })
 

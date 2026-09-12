@@ -44,7 +44,11 @@ r.post('/', async (req, res) => {
     const row = await addMember(nama.trim(), hp, jurusan.trim())
     res.status(row.queued ? 202 : 200).json({ ok: true, queued: row.queued, member: row })
   } catch (e) {
-    res.status(400).json({ detail: String(e.message || e) })
+    if (e.message && e.message.startsWith('Jurusan tidak valid')) {
+      return res.status(422).json({ detail: e.message })
+    }
+    console.error('Members POST error:', e)
+    res.status(503).json({ error: 'Database sibuk, silakan coba lagi' })
   }
 })
 
