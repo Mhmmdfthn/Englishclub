@@ -6,12 +6,26 @@ import bcrypt from 'bcrypt'
 import { isDbEnabled, getDb } from './pg.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const isVercelAuth = !!process.env.VERCEL
+const isVercelAuth = Boolean(
+  process.env.VERCEL ||
+  process.env.VERCEL_ENV ||
+  process.env.NOW_REGION ||
+  process.env.AWS_LAMBDA_FUNCTION_NAME ||
+  process.env.LAMBDA_TASK_ROOT ||
+  __dirname.includes('task') ||
+  __dirname.startsWith('/var')
+)
 const origDataDirAuth = join(__dirname, '../data')
-const dataDir = isVercelAuth ? join('/tmp', 'data') : origDataDirAuth
+let dataDir = isVercelAuth ? join('/tmp', 'data') : origDataDirAuth
+
+try {
+  if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true })
+} catch (e) {
+  dataDir = join('/tmp', 'data')
+  try { if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true }) } catch {}
+}
 const adminsPath = join(dataDir, 'admins.json')
 
-try { if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true }) } catch {}
 if (isVercelAuth) {
   try {
     const origAdmins = join(origDataDirAuth, 'admins.json')

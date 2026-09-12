@@ -37,15 +37,27 @@ app.use('/api/proker', proker)
 
 // serve uploads for gallery (Vercel: /tmp writable only)
 import { existsSync as existsUpload } from 'fs'
-const isVercelUpload = !!process.env.VERCEL
-const uploadsDir = isVercelUpload ? join('/tmp', 'uploads') : join(__dirname, 'data/uploads')
+const isVercelUpload = Boolean(
+  process.env.VERCEL ||
+  process.env.VERCEL_ENV ||
+  process.env.NOW_REGION ||
+  process.env.AWS_LAMBDA_FUNCTION_NAME ||
+  process.env.LAMBDA_TASK_ROOT ||
+  __dirname.includes('task') ||
+  __dirname.startsWith('/var')
+)
+let uploadsDir = isVercelUpload ? join('/tmp', 'uploads') : join(__dirname, 'data/uploads')
 try {
   if (!existsUpload(uploadsDir)) {
     const { mkdirSync } = await import('fs')
     mkdirSync(uploadsDir, { recursive: true })
   }
 } catch (e) {
-  console.warn('uploads mkdir failed:', e.message)
+  uploadsDir = join('/tmp', 'uploads')
+  try {
+    const { mkdirSync } = await import('fs')
+    if (!existsUpload(uploadsDir)) mkdirSync(uploadsDir, { recursive: true })
+  } catch {}
 }
 app.use('/uploads', expressStatic.static(uploadsDir))
 

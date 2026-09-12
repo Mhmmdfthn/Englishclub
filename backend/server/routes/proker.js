@@ -8,12 +8,23 @@ import { verifyToken, verifyTokenAsync } from '../utils/auth.js'
 import { isDbEnabled } from '../utils/pg.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const isVercel = !!process.env.VERCEL
-const uploadsDir = isVercel ? join('/tmp', 'uploads') : join(__dirname, '../data/uploads')
+const isServerless = Boolean(
+  process.env.VERCEL ||
+  process.env.VERCEL_ENV ||
+  process.env.NOW_REGION ||
+  process.env.AWS_LAMBDA_FUNCTION_NAME ||
+  process.env.LAMBDA_TASK_ROOT ||
+  __dirname.includes('task') ||
+  __dirname.startsWith('/var')
+)
+let uploadsDir = isServerless ? join('/tmp', 'uploads') : join(__dirname, '../data/uploads')
 try {
   if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true })
 } catch (e) {
-  console.warn('uploads mkdir failed (Vercel read-only, using /tmp):', e.message)
+  uploadsDir = join('/tmp', 'uploads')
+  try {
+    if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true })
+  } catch (err) {}
 }
 
 const storage = multer.diskStorage({
