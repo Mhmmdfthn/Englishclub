@@ -116,6 +116,10 @@ async function loadProker() {
 async function saveProker(p) {
   const t = localStorage.getItem('admin_token') || ''
   const draft = prokerDraft.value[p.id]
+  if (!draft || typeof draft.title !== 'string' || typeof draft.description !== 'string') {
+    error.value = 'Data Proker belum siap disimpan.'
+    return
+  }
   if (draft.title.trim().length < 3 || draft.title.trim().length > 80) { error.value = 'Judul 3-80 karakter'; return }
   if (draft.description.trim().length < 5 || draft.description.length > 1000) { error.value = 'Deskripsi 5-1000 karakter'; return }
   try {

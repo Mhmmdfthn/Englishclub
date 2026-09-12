@@ -84,6 +84,7 @@ r.post('/', requireAdmin, async (req, res) => {
     const proker = await addProker(req.body)
     res.status(201).json({ ok: true, proker })
   } catch (e) {
+    if (e.code === 'INVALID_PROKER_PAYLOAD') return res.status(400).json({ error: 'Payload tidak valid' })
     if (e.message?.includes('wajib') || e.message?.includes('karakter') || e.message?.includes('valid')) {
       return res.status(422).json({ detail: e.message })
     }
@@ -99,6 +100,7 @@ r.put('/:id', requireAdmin, async (req, res) => {
     const p = await updateProker(req.params.id, req.body)
     res.json({ ok: true, proker: p })
   } catch (e) {
+    if (e.code === 'INVALID_PROKER_PAYLOAD') return res.status(400).json({ error: 'Payload tidak valid' })
     if (e.message?.includes('tidak ditemukan')) return res.status(404).json({ detail: e.message })
     if (e.message?.includes('wajib') || e.message?.includes('karakter') || e.message?.includes('valid')) {
       return res.status(422).json({ detail: e.message })
@@ -126,6 +128,7 @@ r.post('/:id/photos', requireAdmin, upload.array('photos', 3), async (req, res) 
     res.json({ ok: true, proker: p })
   } catch (e) {
     for (const f of (req.files || [])) { try { unlinkSync(join(uploadsDir, f.filename)) } catch {} }
+    if (e.code === 'INVALID_PROKER_PAYLOAD') return res.status(400).json({ error: 'Payload tidak valid' })
     if (e.message?.includes('tidak ditemukan')) return res.status(404).json({ detail: e.message })
     if (e.message?.includes('Maksimal')) return res.status(400).json({ detail: e.message })
     console.error('Proker photos POST error:', e)

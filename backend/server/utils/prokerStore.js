@@ -61,14 +61,24 @@ function validateData({ title, description, imageUrl, date, status }, required =
   if (status !== undefined && !STATUSES.has(status)) throw new Error('Status tidak valid')
 }
 
+export async function saveProkers(data) {
+  if (!data || !Array.isArray(data) || data.length === 0) {
+    const error = new Error('Payload tidak valid')
+    error.code = 'INVALID_PROKER_PAYLOAD'
+    throw error
+  }
+  if (isKvEnabled()) await cloudSaveProker(data)
+  else if (!isDbEnabled()) memoryProker = data
+  return data
+}
+
 export async function addProker(data) {
   validateData(data, true)
   const rows = await getAll()
   const id = `${data.title.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}-${Date.now().toString(36)}`
   const row = normalize({ ...data, id, order: rows.length + 1 })
   rows.push(row)
-  if (isKvEnabled()) await cloudSaveProker(rows)
-  else if (!isDbEnabled()) { memoryProker = rows }
+  await saveProkers(rows)
   return row
 }
 
@@ -77,8 +87,7 @@ export async function deleteProker(id) {
   const next = rows.filter(p => p.id !== id)
   if (next.length === rows.length) throw new Error('Proker tidak ditemukan')
   next.forEach((p, i) => { p.order = i + 1 })
-  if (isKvEnabled()) await cloudSaveProker(next)
-  else if (!isDbEnabled()) { memoryProker = next }
+  await saveProkers(next)
   return true
 }
 
@@ -93,7 +102,7 @@ export async function updateProker(id, data) {
     if (index < 0) throw new Error('Proker tidak ditemukan')
     rows[index] = normalize({ ...rows[index], ...rest })
     rows[index].updatedAt = new Date().toISOString()
-    await cloudSaveProker(rows)
+    await saveProkers(rows)
     return rows[index]
   }
   if (isDbEnabled()) {
@@ -161,7 +170,7 @@ export async function addPhotos(id, urls) {
     if (cur.length + urls.length > 3) throw new Error('Maksimal 3 foto per proker')
     rows[idx].photos = [...cur, ...urls]
     rows[idx].updatedAt = new Date().toISOString()
-    await cloudSaveProker(rows)
+    await saveProkers(rows)
     return rows[idx]
   }
   const idx = memoryProker.findIndex(p => p.id === id)
@@ -193,7 +202,7 @@ export async function removePhoto(id, photoIdx) {
     photos.splice(photoIdx, 1)
     rows[idx].photos = photos
     rows[idx].updatedAt = new Date().toISOString()
-    await cloudSaveProker(rows)
+    await saveProkers(rows)
     return rows[idx]
   }
   const idx = memoryProker.findIndex(p => p.id === id)

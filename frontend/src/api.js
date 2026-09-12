@@ -19,7 +19,12 @@ async function req(url, options, timeout = 8000) {
   } finally {
     clearTimeout(timer)
   }
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  if (!res.ok) {
+    const payload = await res.json().catch(() => null)
+    const error = new Error(payload?.error || payload?.detail || `HTTP ${res.status}`)
+    error.status = res.status
+    throw error
+  }
   return res.json()
 }
 
