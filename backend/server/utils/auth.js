@@ -32,7 +32,9 @@ if (isVercelAuth) {
     if (!existsSync(adminsPath) && existsSync(origAdmins)) {
       writeFileSync(adminsPath, readFileSync(origAdmins, 'utf-8'), 'utf-8')
     }
-  } catch {}
+  } catch (e) {
+    console.error('Auth seed copy failed:', e.message)
+  }
 }
 
 function loadAdmins() {
@@ -62,7 +64,9 @@ function loadTokens() {
 function saveTokens() {
   if (isDbEnabled()) return // DB handles
   const arr = [...tokens.entries()].map(([token, { username, exp }]) => ({ token, username, exp }))
-  try { writeFileSync(tokensPath, JSON.stringify(arr, null, 2), 'utf-8') } catch {}
+  try { writeFileSync(tokensPath, JSON.stringify(arr, null, 2), 'utf-8') } catch (e) {
+    console.error('Auth saveTokens failed:', e.message)
+  }
 }
 
 const tokens = loadTokens()

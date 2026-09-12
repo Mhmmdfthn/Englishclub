@@ -124,6 +124,11 @@ export async function cloudGetProker() {
 }
 
 export async function cloudSaveProker(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    const error = new Error('Payload tidak valid')
+    error.code = 'INVALID_PROKER_PAYLOAD'
+    throw error
+  }
   await kv.set(KV_KEYS.proker, rows)
   return rows
 }

@@ -6,25 +6,35 @@ const r = Router()
 
 // lama: token verify (tetap dukung untuk kompatibel)
 r.post('/verify', async (req, res) => {
-  const token = req.body.token
-  let username = null
-  if (isDbEnabled()) username = await verifyTokenAsync(token)
-  else username = verifyToken(token)
-  if (username) return res.json({ ok: true, username })
-  const expected = process.env.ADMIN_TOKEN
-  if (expected && token === expected) return res.json({ ok: true, username: 'admin' })
-  if (!expected) return res.status(500).json({ detail: 'ADMIN_TOKEN belum dikonfigurasi' })
-  return res.status(401).json({ detail: 'Token salah' })
+  try {
+    const token = req.body?.token
+    let username = null
+    if (isDbEnabled()) username = await verifyTokenAsync(token)
+    else username = verifyToken(token)
+    if (username) return res.json({ ok: true, username })
+    const expected = process.env.ADMIN_TOKEN
+    if (expected && token === expected) return res.json({ ok: true, username: 'admin' })
+    if (!expected) return res.status(500).json({ detail: 'ADMIN_TOKEN belum dikonfigurasi' })
+    return res.status(401).json({ detail: 'Token salah' })
+  } catch (e) {
+    console.error('Admin verify error:', e)
+    res.status(500).json({ detail: 'Gagal memverifikasi token' })
+  }
 })
 
 // baru: login akun
 r.post('/login', async (req, res) => {
-  const { username, password } = req.body
-  if (!username || !password) return res.status(422).json({ detail: 'username & password required' })
-  const ok = await verifyPassword(username.trim(), password)
-  if (!ok) return res.status(401).json({ detail: 'Username atau password salah' })
-  const token = await issueToken(username.trim())
-  res.json({ ok: true, token, username: username.trim() })
+  try {
+    const { username, password } = req.body ?? {}
+    if (!username || !password) return res.status(422).json({ detail: 'username & password required' })
+    const ok = await verifyPassword(username.trim(), password)
+    if (!ok) return res.status(401).json({ detail: 'Username atau password salah' })
+    const token = await issueToken(username.trim())
+    res.json({ ok: true, token, username: username.trim() })
+  } catch (e) {
+    console.error('Admin login error:', e)
+    res.status(500).json({ detail: 'Gagal memproses login' })
+  }
 })
 
 r.post('/logout', async (req, res) => {
