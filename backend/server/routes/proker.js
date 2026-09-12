@@ -7,6 +7,7 @@ import { getAll, getById, addProker, deleteProker, updateProker, addPhotos, remo
 import { verifyToken, verifyTokenAsync } from '../utils/auth.js'
 import { isDbEnabled } from '../utils/pg.js'
 import { auditAdmin, auditTech, auditTechThrottled } from '../utils/audit.js'
+import { isCloudinaryEnabled, uploadBuffer, destroyByUrl, destroyPublicId } from '../utils/cloudinary.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const isServerless = Boolean(
@@ -28,13 +29,18 @@ try {
   } catch (err) {}
 }
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadsDir),
-  filename: (req, file, cb) => {
-    const ext = extname(file.originalname) || '.jpg'
-    cb(null, `${req.params.id}-${Date.now()}${ext}`)
-  }
-})
+// Cloudinary aktif -> file ditampung di memori lalu diupload permanen.
+// Nonaktif -> perilaku lama (disk lokal; ephemeral di serverless Vercel).
+const useCloudinary = isCloudinaryEnabled()
+const storage = useCloudinary
+  ? multer.memoryStorage()
+  : multer.diskStorage({
+      destination: (req, file, cb) => cb(null, uploadsDir),
+      filename: (req, file, cb) => {
+        const ext = extname(file.originalname) || '.jpg'
+        cb(null, `${req.params.id}-${Date.now()}${ext}`)
+      },
+    })
 const upload = multer({
   storage,
   limits: { fileSize: 5 * 1024 * 1024 },
@@ -129,13 +135,30 @@ r.delete('/:id', requireAdmin, async (req, res) => {
 })
 
 r.post('/:id/photos', requireAdmin, upload.array('photos', 3), async (req, res) => {
+  const uploadedCloud = []
+  const uploadedFiles = []
   try {
-    const urls = (req.files || []).map(f => `/uploads/${f.filename}`)
+    let urls
+    if (useCloudinary) {
+      urls = []
+      for (const f of (req.files || [])) {
+        // eslint-disable-next-line no-await-in-loop
+        const { url, publicId } = await uploadBuffer(f.buffer, f.originalname)
+        uploadedCloud.push(publicId)
+        urls.push(url)
+      }
+    } else {
+      uploadedFiles.push(...(req.files || []).map(f => f.filename))
+      urls = (req.files || []).map(f => `/uploads/${f.filename}`)
+    }
     const p = await addPhotos(req.params.id, urls)
     await auditAdmin('Foto proker ditambah', req.admin?.username || 'admin', { id: p.id, jumlah: urls.length })
     res.json({ ok: true, proker: p })
   } catch (e) {
-    for (const f of (req.files || [])) { try { unlinkSync(join(uploadsDir, f.filename)) } catch {} }
+    // best-effort rollback: hapus file/upload yang sudah terlanjur masuk
+    for (const filename of uploadedFiles) { try { unlinkSync(join(uploadsDir, filename)) } catch {} }
+    for (const publicId of uploadedCloud) { try { await destroyPublicId(publicId) } catch {} }
+    for (const f of (req.files || [])) { try { if (f.filename) unlinkSync(join(uploadsDir, f.filename)) } catch {} }
     if (e.code === 'INVALID_PROKER_PAYLOAD') return res.status(400).json({ error: 'Payload tidak valid' })
     if (e.message?.includes('tidak ditemukan')) return res.status(404).json({ detail: e.message })
     if (e.message?.includes('Maksimal')) return res.status(400).json({ detail: e.message })
@@ -152,8 +175,12 @@ r.delete('/:id/photos/:idx', requireAdmin, async (req, res) => {
     const p = await removePhoto(req.params.id, idx)
     await auditAdmin('Foto proker dihapus', req.admin?.username || 'admin', { id: p.id, index: idx })
     if (url) {
-      const fname = url.split('/').pop()
-      try { unlinkSync(join(uploadsDir, fname)) } catch {}
+      if (/^https?:\/\//i.test(url)) {
+        await destroyByUrl(url) // permanen di Cloudinary; gagal pun cukup lepas dari array
+      } else {
+        const fname = url.split('/').pop()
+        try { unlinkSync(join(uploadsDir, fname)) } catch {}
+      }
     }
     res.json({ ok: true, proker: p })
   } catch (e) {
