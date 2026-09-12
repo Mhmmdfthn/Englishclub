@@ -42,3 +42,20 @@ export function withWIB(rows) {
   if (!Array.isArray(rows)) return rows
   return rows.map(enrichWIB)
 }
+
+// Dinding waktu WIB ber-offset eksplisit untuk sel Google Sheets (artefak
+// yang dibaca manusia): "2026-09-12T16:57:46+07:00". Input naive dibaca UTC.
+export function wibWallISO(iso) {
+  const s = String(iso ?? '')
+  const zoned = /[Zz]|[+-]\d{2}:?\d{2}$/.test(s) ? s : `${s}Z`
+  const d = new Date(zoned)
+  if (Number.isNaN(d.getTime())) return s
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jakarta',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+  }).formatToParts(d)
+  const get = (t) => parts.find((p) => p.type === t)?.value
+  return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}:${get('second')}+07:00`
+}

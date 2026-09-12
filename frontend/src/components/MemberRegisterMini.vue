@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { api } from '../api.js'
-import { formatWIB } from '../utils/time.js'
+import { formatWIB, parseAsUTC } from '../utils/time.js'
 
 const emit = defineEmits(['back'])
 
@@ -26,7 +26,8 @@ function validate() {
 
 function formatTime(iso) {
   try {
-    const d = new Date(iso)
+    const d = parseAsUTC(iso)
+    if (!d) return ''
     const diff = Date.now() - d.getTime()
     const m = Math.floor(diff / 60000)
     if (m < 1) return 'baru saja'

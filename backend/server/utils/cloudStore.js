@@ -1,6 +1,6 @@
 import { kv } from '@vercel/kv'
 import { google } from 'googleapis'
-import { withWIB } from './time.js'
+import { withWIB, wibWallISO } from './time.js'
 
 const KV_KEYS = { scores: 'leaderboard_list', stories: 'stories_list', proker: 'prokers', members: 'members_list', failedMembers: 'failed_members_queue' }
 const LEGACY_KV_KEYS = { scores: 'leaderboard', stories: 'stories', members: 'members' }
@@ -139,7 +139,8 @@ async function appendToSheets(row) {
     spreadsheetId: process.env.GOOGLE_SHEETS_ID,
     range: sheetRange(),
     valueInputOption: 'USER_ENTERED',
-    requestBody: { values: [[row.timestamp, row.nama, row.no_hp, row.jurusan]] },
+    // Kolom timestamp Sheet ditulis WIB (artefak baca manusia); row kanonis tetap UTC.
+    requestBody: { values: [[wibWallISO(row.timestamp), row.nama, row.no_hp, row.jurusan]] },
   })
 }
 

@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../api.js'
-import { displayTime, todayWIB } from '../utils/time.js'
+import { displayTime, todayWIB, wibDay } from '../utils/time.js'
 
 const props = defineProps({ isModal: Boolean })
 const emit = defineEmits(['back'])
@@ -182,7 +182,7 @@ const filtered = computed(() => {
 const stats = computed(() => ({
   total: members.value.length,
   byJurusan: [...new Set(members.value.map(m=>m.jurusan))].length,
-  today: members.value.filter(m => (m.timestamp || '').startsWith(todayWIB())).length
+  today: members.value.filter(m => wibDay(m.timestamp) === todayWIB()).length
 }))
 
 onMounted(async () => {

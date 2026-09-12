@@ -18,18 +18,29 @@ const wibDayFormatter = new Intl.DateTimeFormat('en-CA', {
   day: '2-digit',
 })
 
-export function formatWIB(iso) {
-  if (!iso) return '-'
-  if (iso instanceof Date) {
-    if (Number.isNaN(iso.getTime())) return '-'
-    return `${wibFormatter.format(iso)} WIB`
-  }
-  // String naive "YYYY-MM-DDTHH:mm:ss" (hasil toISOString().slice(0,19)) dibaca sebagai UTC.
-  const s = String(iso)
+// Parse stamp waktu server: string naive "YYYY-MM-DDTHH:mm:ss" (hasil
+// toISOString().slice(0,19)) dibaca sebagai UTC; yang berzona dibiarkan.
+// Satu-satunya fungsi parse yang boleh dipakai untuk waktu dari server.
+export function parseAsUTC(iso) {
+  if (!iso) return null
+  if (iso instanceof Date) return Number.isNaN(iso.getTime()) ? null : iso
+  const s = String(iso).trim().replace(' ', 'T')
   const zoned = /[Zz]|[+-]\d{2}:?\d{2}$/.test(s) ? s : `${s}Z`
   const d = new Date(zoned)
-  if (Number.isNaN(d.getTime())) return '-'
+  return Number.isNaN(d.getTime()) ? null : d
+}
+
+export function formatWIB(iso) {
+  const d = parseAsUTC(iso)
+  if (!d) return '-'
   return `${wibFormatter.format(d)} WIB`
+}
+
+// Tanggal (YYYY-MM-DD) sebuah stamp server menurut WIB — untuk filter "hari ini".
+export function wibDay(iso) {
+  const d = parseAsUTC(iso)
+  if (!d) return ''
+  return wibDayFormatter.format(d)
 }
 
 // Tanggal hari ini (YYYY-MM-DD) menurut WIB — untuk filter "hari ini".
