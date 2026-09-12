@@ -273,7 +273,7 @@ function areAdjacent(a, b) {
   <transition name="loading-fade">
     <div v-if="loading" class="loading-screen" @pointerdown="beginSwipe" @pointermove="moveSwipe" @pointerup="finishSwipe" @pointercancel="finishSwipe">
       <div class="loading-content" :style="{ transform: `translateY(${-swipeProgress * 120}px)` }">
-        <img class="loading-logo" src="/EC logo no bg.png" alt="Logo English Club UPB" />
+        <img class="loading-logo" src="/logo-ec.png" alt="Logo English Club UPB" />
         <div class="loading-text">
           <p class="loading-kicker">ENGLISH CLUB UPB</p>
           <Transition name="greeting-fade" mode="out-in">
