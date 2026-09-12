@@ -1,5 +1,6 @@
 import { isDbEnabled, getDb } from './pg.js'
 import { cloudAddScore, cloudAddStory, cloudLatestStories, cloudTopScores, isKvEnabled } from './cloudStore.js'
+import { withWIB } from './time.js'
 
 let memoryScores = []
 let memoryStories = []
@@ -26,9 +27,9 @@ export const db = {
     if (isDbEnabled()) {
       const pool = getDb()
       const { rows } = await pool.query('SELECT name, score, words, created_at FROM scores ORDER BY score DESC, created_at ASC LIMIT $1', [limit])
-      return rows
+      return withWIB(rows)
     }
-    return [...memoryScores].sort((a, b) => b.score - a.score || new Date(a.created_at) - new Date(b.created_at)).slice(0, limit)
+    return withWIB([...memoryScores].sort((a, b) => b.score - a.score || new Date(a.created_at) - new Date(b.created_at)).slice(0, limit))
   },
   getStories() {
     return memoryStories
@@ -48,9 +49,9 @@ export const db = {
     if (isKvEnabled()) return cloudLatestStories(limit)
     if (isDbEnabled()) {
       const pool = getDb()
-      const { rows } = await pool.query('SELECT name, batch, comment FROM stories ORDER BY id DESC LIMIT $1', [limit])
-      return rows
+      const { rows } = await pool.query('SELECT name, batch, comment, created_at FROM stories ORDER BY id DESC LIMIT $1', [limit])
+      return withWIB(rows)
     }
-    return [...memoryStories].reverse().slice(0, limit).map(r => ({ name: r.name, batch: r.batch, comment: r.comment }))
+    return withWIB([...memoryStories].reverse().slice(0, limit).map(r => ({ name: r.name, batch: r.batch, comment: r.comment, created_at: r.created_at })))
   },
 }

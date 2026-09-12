@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../api.js'
+import { displayTime, todayWIB } from '../utils/time.js'
 
 const props = defineProps({ isModal: Boolean })
 const emit = defineEmits(['back'])
@@ -181,7 +182,7 @@ const filtered = computed(() => {
 const stats = computed(() => ({
   total: members.value.length,
   byJurusan: [...new Set(members.value.map(m=>m.jurusan))].length,
-  today: members.value.filter(m=> m.timestamp?.startsWith(new Date().toISOString().slice(0,10))).length
+  today: members.value.filter(m => (m.timestamp || '').startsWith(todayWIB())).length
 }))
 
 onMounted(async () => {
@@ -272,7 +273,7 @@ onMounted(async () => {
                     <td><div class="name-cell"><span class="avatar">{{ m.nama.charAt(0).toUpperCase() }}</span><b>{{ m.nama }}</b></div></td>
                     <td><span class="jurusan-badge">{{ m.jurusan }}</span></td>
                     <td class="tiny">{{ m.no_hp }}</td>
-                    <td class="tiny muted">{{ m.timestamp?.slice(0,16).replace('T',' ') }}</td>
+                    <td class="tiny muted">{{ displayTime(m) }}</td>
                   </tr>
                   <tr v-if="!filtered.length"><td colspan="5" class="empty">Belum ada data / tidak ada hasil filter</td></tr>
                 </tbody>
@@ -287,7 +288,7 @@ onMounted(async () => {
                 <b class="member-name">{{ m.nama }}</b>
                 <span class="jurusan-badge sm">{{ m.jurusan }}</span>
               </div>
-              <span class="tiny muted">{{ m.timestamp?.slice(0,16).replace('T',' ') }}</span>
+              <span class="tiny muted">{{ displayTime(m) }}</span>
             </article>
             <p v-if="!filtered.length" class="empty">Belum ada data</p>
           </div>

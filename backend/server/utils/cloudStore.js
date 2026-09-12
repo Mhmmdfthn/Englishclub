@@ -1,5 +1,6 @@
 import { kv } from '@vercel/kv'
 import { google } from 'googleapis'
+import { withWIB } from './time.js'
 
 const KV_KEYS = { scores: 'leaderboard_list', stories: 'stories_list', proker: 'prokers', members: 'members_list', failedMembers: 'failed_members_queue' }
 const LEGACY_KV_KEYS = { scores: 'leaderboard', stories: 'stories', members: 'members' }
@@ -79,14 +80,14 @@ export async function cloudAddMember(row) {
 
 export async function cloudAllMembers(limit = 1000) {
   const rows = await readKvList(KV_KEYS.members, LEGACY_KV_KEYS.members)
-  return [...rows].reverse().slice(0, limit)
+  return withWIB([...rows].reverse().slice(0, limit))
 }
 
 export async function cloudTopScores(limit = 10) {
   const rows = await readKvList(KV_KEYS.scores, LEGACY_KV_KEYS.scores)
-  return rows
+  return withWIB(rows
     .sort((a, b) => b.score - a.score || new Date(a.created_at) - new Date(b.created_at))
-    .slice(0, limit)
+    .slice(0, limit))
 }
 
 export async function cloudAddScore(name, score, words) {
@@ -98,7 +99,7 @@ export async function cloudAddScore(name, score, words) {
 
 export async function cloudLatestStories(limit = 100) {
   const rows = await readKvList(KV_KEYS.stories, LEGACY_KV_KEYS.stories)
-  return [...rows].reverse().slice(0, limit).map(({ name, batch, comment }) => ({ name, batch, comment }))
+  return withWIB([...rows].reverse().slice(0, limit).map(({ name, batch, comment, created_at }) => ({ name, batch, comment, created_at })))
 }
 
 export async function cloudAddStory(name, batch, comment) {

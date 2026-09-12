@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { db } from '../utils/db.js'
+import { auditAdmin, auditTech } from '../utils/audit.js'
 
 const r = Router()
 
@@ -19,9 +20,11 @@ r.post('/', async (req, res) => {
   const b = (batch || 'Anggota EC UPB').toString().slice(0, 30)
   try {
     const story = await db.addStory(name.trim(), b.trim() || 'Anggota EC UPB', comment.trim())
+    auditAdmin('Story baru', name.trim(), { batch: story.batch })
     res.json({ story })
   } catch (e) {
     console.error('Stories POST error:', e)
+    auditTech('POST /api/stories', 503, e.message)
     res.status(503).json({ error: 'Database sibuk, silakan coba lagi' })
   }
 })

@@ -1,5 +1,6 @@
 import { isDbEnabled, getDb } from './pg.js'
 import { addMemberToSheets, cloudMembers, isSheetsEnabled, cloudAddMember, cloudAllMembers, isKvEnabled } from './cloudStore.js'
+import { withWIB } from './time.js'
 
 const ALLOWED_JURUSAN = new Set(['Ilmu Komputer','Manajemen','Akuntansi','Bisnis Digital','Sains Data','Agribisnis','Lainnya'])
 let memoryMembers = []
@@ -40,18 +41,18 @@ export async function addMember(nama, no_hp, jurusan) {
 
 export async function allMembers(limit = 100) {
   if (isKvEnabled()) return cloudAllMembers(limit)
-  if (isSheetsEnabled()) return cloudMembers(limit)
+  if (isSheetsEnabled()) return withWIB(await cloudMembers(limit))
   if (isDbEnabled()) {
     const pool = getDb()
     const { rows } = await pool.query('SELECT timestamp, nama, no_hp, jurusan FROM members ORDER BY id DESC LIMIT $1', [limit])
-    return rows.map(r => ({ ...r, timestamp: new Date(r.timestamp).toISOString().slice(0, 19) }))
+    return withWIB(rows.map(r => ({ ...r, timestamp: new Date(r.timestamp).toISOString().slice(0, 19) })))
   }
-  return [...memoryMembers].reverse().slice(0, limit)
+  return withWIB([...memoryMembers].reverse().slice(0, limit))
 }
 
 export async function highlight(limit = 30) {
   const rows = await allMembers(limit)
-  return rows.map(r => ({ nama: r.nama, jurusan: r.jurusan, timestamp: r.timestamp }))
+  return rows.map(r => ({ nama: r.nama, jurusan: r.jurusan, timestamp: r.timestamp, timestamp_wib: r.timestamp_wib }))
 }
 
 export function csvFilePath() {

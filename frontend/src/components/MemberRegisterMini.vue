@@ -1,6 +1,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { api } from '../api.js'
+import { formatWIB } from '../utils/time.js'
 
 const emit = defineEmits(['back'])
 
@@ -32,7 +33,7 @@ function formatTime(iso) {
     if (m < 60) return `${m} menit lalu`
     const h = Math.floor(m / 60)
     if (h < 24) return `${h} jam lalu`
-    return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })
+    return formatWIB(iso)
   } catch { return '' }
 }
 
