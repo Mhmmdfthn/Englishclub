@@ -23,11 +23,11 @@ r.post('/', async (req, res) => {
   if (score > MAX_SCORE || words > MAX_WORDS) return res.status(400).json({ detail: 'score di luar batas permainan' })
   try {
     const rank = await db.addScore(name.trim(), score, words)
-    auditAdmin('Skor baru', name.trim(), { score, words, rank })
+    await auditAdmin('Skor baru', name.trim(), { score, words, rank })
     res.json({ rank })
   } catch (e) {
     console.error('Leaderboard POST error:', e)
-    auditTech('POST /api/leaderboard', 503, e.message)
+    await auditTech('POST /api/leaderboard', 503, e.message)
     res.status(503).json({ error: 'Database sibuk, silakan coba lagi' })
   }
 })

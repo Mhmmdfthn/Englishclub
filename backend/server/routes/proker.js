@@ -83,11 +83,11 @@ r.get('/:id', async (req, res) => {
 r.post('/', requireAdmin, async (req, res) => {
   try {
     const proker = await addProker(req.body)
-    auditAdmin('Proker ditambah', req.admin?.username || 'admin', { id: proker.id, judul: proker.title })
+    await auditAdmin('Proker ditambah', req.admin?.username || 'admin', { id: proker.id, judul: proker.title })
     res.status(201).json({ ok: true, proker })
   } catch (e) {
     if (e.code === 'INVALID_PROKER_PAYLOAD') {
-      auditTechThrottled('proker-payload', 60000, 'POST /api/proker', 400, e.message)
+      await auditTechThrottled('proker-payload', 60000, 'POST /api/proker', 400, e.message)
       return res.status(400).json({ error: 'Payload tidak valid' })
     }
     if (e.message?.includes('wajib') || e.message?.includes('karakter') || e.message?.includes('valid')) {
@@ -103,7 +103,7 @@ r.put('/:id', requireAdmin, async (req, res) => {
   if (!Object.keys(req.body).length) return res.status(422).json({ detail: 'data proker wajib' })
   try {
     const p = await updateProker(req.params.id, req.body)
-    auditAdmin('Proker diubah', req.admin?.username || 'admin', { id: p.id, judul: p.title })
+    await auditAdmin('Proker diubah', req.admin?.username || 'admin', { id: p.id, judul: p.title })
     res.json({ ok: true, proker: p })
   } catch (e) {
     if (e.code === 'INVALID_PROKER_PAYLOAD') return res.status(400).json({ error: 'Payload tidak valid' })
@@ -119,7 +119,7 @@ r.put('/:id', requireAdmin, async (req, res) => {
 r.delete('/:id', requireAdmin, async (req, res) => {
   try {
     await deleteProker(req.params.id)
-    auditAdmin('Proker dihapus', req.admin?.username || 'admin', { id: req.params.id })
+    await auditAdmin('Proker dihapus', req.admin?.username || 'admin', { id: req.params.id })
     res.json({ ok: true })
   } catch (e) {
     if (e.message?.includes('tidak ditemukan')) return res.status(404).json({ detail: e.message })
@@ -132,7 +132,7 @@ r.post('/:id/photos', requireAdmin, upload.array('photos', 3), async (req, res) 
   try {
     const urls = (req.files || []).map(f => `/uploads/${f.filename}`)
     const p = await addPhotos(req.params.id, urls)
-    auditAdmin('Foto proker ditambah', req.admin?.username || 'admin', { id: p.id, jumlah: urls.length })
+    await auditAdmin('Foto proker ditambah', req.admin?.username || 'admin', { id: p.id, jumlah: urls.length })
     res.json({ ok: true, proker: p })
   } catch (e) {
     for (const f of (req.files || [])) { try { unlinkSync(join(uploadsDir, f.filename)) } catch {} }
@@ -150,7 +150,7 @@ r.delete('/:id/photos/:idx', requireAdmin, async (req, res) => {
     const before = await getById(req.params.id)
     const url = before?.photos?.[idx]
     const p = await removePhoto(req.params.id, idx)
-    auditAdmin('Foto proker dihapus', req.admin?.username || 'admin', { id: p.id, index: idx })
+    await auditAdmin('Foto proker dihapus', req.admin?.username || 'admin', { id: p.id, index: idx })
     if (url) {
       const fname = url.split('/').pop()
       try { unlinkSync(join(uploadsDir, fname)) } catch {}

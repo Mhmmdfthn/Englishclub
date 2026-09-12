@@ -15,7 +15,7 @@ function webhookFor(kind) {
 function post(url, payload) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
-  fetch(url, {
+  return fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -27,9 +27,9 @@ function post(url, payload) {
 
 function send(kind, { title, color, fields }) {
   const url = webhookFor(kind)
-  if (!url) return // audit nonaktif: no-op, bukan error
+  if (!url) return Promise.resolve() // audit nonaktif: no-op, bukan error
   const prefix = kind === 'tech' && !process.env.DISCORD_TECH_WEBHOOK_URL ? '[TEKNIS] ' : ''
-  post(url, {
+  return post(url, {
     embeds: [{
       title: prefix + title,
       color,
@@ -44,9 +44,11 @@ function send(kind, { title, color, fields }) {
 }
 
 // Aksi admin + aksi publik penting. detail: objek datar tanpa secret.
+// Mengembalikan promise: WAJIB di-await oleh rute agar pengiriman selesai
+// dalam siklus request (serverless Vercel membekukan fungsi setelah respon).
 export function auditAdmin(aksi, aktor, detail = {}) {
   try {
-    send('admin', {
+    return send('admin', {
       title: aksi,
       color: COLORS.ok,
       fields: [
@@ -56,6 +58,7 @@ export function auditAdmin(aksi, aktor, detail = {}) {
     })
   } catch (e) {
     console.error('auditAdmin gagal:', e.message)
+    return Promise.resolve()
   }
 }
 
@@ -63,13 +66,14 @@ export function auditAdmin(aksi, aktor, detail = {}) {
 export function auditTech(route, status, pesan) {
   try {
     const color = status >= 500 ? COLORS.error : COLORS.warn
-    send('tech', {
+    return send('tech', {
       title: `Error ${status} — ${route}`,
       color,
       fields: [['Route', route], ['Status', status], ['Pesan', String(pesan).slice(0, 500)]],
     })
   } catch (e) {
     console.error('auditTech gagal:', e.message)
+    return Promise.resolve()
   }
 }
 
@@ -77,7 +81,7 @@ export function auditTech(route, status, pesan) {
 const lastSent = new Map()
 export function auditTechThrottled(key, intervalMs, route, status, pesan) {
   const now = Date.now()
-  if (lastSent.get(key) && now - lastSent.get(key) < intervalMs) return
+  if (lastSent.get(key) && now - lastSent.get(key) < intervalMs) return Promise.resolve()
   lastSent.set(key, now)
-  auditTech(route, status, pesan)
+  return auditTech(route, status, pesan)
 }

@@ -43,14 +43,14 @@ r.post('/', async (req, res) => {
   if (!jurusan || !ALLOWED.has(jurusan)) return res.status(422).json({ detail: 'Jurusan harus salah satu: ' + [...ALLOWED].join(', ') })
   try {
     const row = await addMember(nama.trim(), hp, jurusan.trim())
-    auditAdmin('Pendaftaran baru', 'publik', { nama: row.nama, jurusan: row.jurusan })
+    await auditAdmin('Pendaftaran baru', 'publik', { nama: row.nama, jurusan: row.jurusan })
     res.status(row.queued ? 202 : 200).json({ ok: true, queued: row.queued, member: row })
   } catch (e) {
     if (e.message && e.message.startsWith('Jurusan tidak valid')) {
       return res.status(422).json({ detail: e.message })
     }
     console.error('Members POST error:', e)
-    auditTech('POST /api/members', 503, e.message)
+    await auditTech('POST /api/members', 503, e.message)
     res.status(503).json({ error: 'Database sibuk, silakan coba lagi' })
   }
 })
@@ -69,7 +69,7 @@ r.get('/sync', async (req, res) => {
 // admin export — generate CSV from the configured member source
 r.get('/export', requireAdmin, async (req, res) => {
   const rows = await allMembers(10000)
-  auditAdmin('Export CSV pendaftar', req.admin?.username || 'admin', { jumlah: rows.length })
+  await auditAdmin('Export CSV pendaftar', req.admin?.username || 'admin', { jumlah: rows.length })
   const header = 'timestamp,nama,no_hp,jurusan\n'
   const csv = header + rows.map(row => `${row.timestamp},${row.nama},${row.no_hp},${row.jurusan}`).join('\n')
   res.header('Content-Type', 'text/csv')
