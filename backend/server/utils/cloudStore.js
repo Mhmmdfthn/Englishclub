@@ -1,7 +1,8 @@
 import { kv } from '@vercel/kv'
 import { google } from 'googleapis'
 
-const KV_KEYS = { scores: 'leaderboard', stories: 'stories', proker: 'prokers', members: 'members', failedMembers: 'failed_members_queue' }
+const KV_KEYS = { scores: 'leaderboard_list', stories: 'stories_list', proker: 'prokers', members: 'members_list', failedMembers: 'failed_members_queue' }
+const LEGACY_KV_KEYS = { scores: 'leaderboard', stories: 'stories', members: 'members' }
 const CACHE_TTL = 2 * 60 * 1000
 let membersCache = { expiresAt: 0, rows: null }
 let sheetsClient = null
@@ -35,40 +36,40 @@ function sheetRange() {
 }
 
 async function appendKvList(key, item) {
+  await kv.rpush(key, item)
+}
+
+function parseKvItem(item) {
+  if (typeof item !== 'string') return item
+  try { return JSON.parse(item) } catch { return item }
+}
+
+async function readKvList(key, legacyKey) {
+  let list
   try {
-    await kv.rpush(key, item)
+    list = await kv.lrange(key, 0, -1)
   } catch (err) {
     if (String(err?.message || err).includes('WRONGTYPE')) {
-      // Legacy string/array key exists from previous kv.set. Delete it so that Redis List is clean.
-      await kv.del(key)
-      await kv.rpush(key, item)
+      throw new Error(`KV key "${key}" memegang tipe yang salah (bukan List). Hapus key tersebut di dashboard Upstash sebelum memakai operasi atomic, sesuai PRD sinkronisasi.`)
+    }
+    throw err
+  }
+  const rows = Array.isArray(list) ? list.map(parseKvItem) : []
+  if (!legacyKey) return rows
+
+  let legacy = null
+  try {
+    legacy = await kv.get(legacyKey)
+  } catch (err) {
+    if (String(err?.message || err).includes('WRONGTYPE')) {
+      // Key legacy pernah ditulis sebagai List oleh versi sebelumnya: baca sebagai List.
+      const legacyList = await kv.lrange(legacyKey, 0, -1)
+      legacy = Array.isArray(legacyList) ? legacyList.map(parseKvItem) : []
     } else {
       throw err
     }
   }
-}
-
-async function readKvList(key) {
-  try {
-    const list = await kv.lrange(key, 0, -1)
-    if (Array.isArray(list)) {
-      return list.map(item => {
-        if (typeof item === 'string') {
-          try { return JSON.parse(item) } catch { return item }
-        }
-        return item
-      })
-    }
-    return []
-  } catch (err) {
-    if (String(err?.message || err).includes('WRONGTYPE')) {
-      try {
-        const legacy = await kv.get(key)
-        return Array.isArray(legacy) ? legacy : []
-      } catch {}
-    }
-    throw err
-  }
+  return [...(Array.isArray(legacy) ? legacy : []), ...rows]
 }
 
 export async function cloudAddMember(row) {
@@ -77,12 +78,12 @@ export async function cloudAddMember(row) {
 }
 
 export async function cloudAllMembers(limit = 1000) {
-  const rows = await readKvList(KV_KEYS.members)
+  const rows = await readKvList(KV_KEYS.members, LEGACY_KV_KEYS.members)
   return [...rows].reverse().slice(0, limit)
 }
 
 export async function cloudTopScores(limit = 10) {
-  const rows = await readKvList(KV_KEYS.scores)
+  const rows = await readKvList(KV_KEYS.scores, LEGACY_KV_KEYS.scores)
   return rows
     .sort((a, b) => b.score - a.score || new Date(a.created_at) - new Date(b.created_at))
     .slice(0, limit)
@@ -91,12 +92,12 @@ export async function cloudTopScores(limit = 10) {
 export async function cloudAddScore(name, score, words) {
   const row = { name: name.slice(0, 20), score, words, created_at: new Date().toISOString() }
   await appendKvList(KV_KEYS.scores, row)
-  const rows = await readKvList(KV_KEYS.scores)
+  const rows = await readKvList(KV_KEYS.scores, LEGACY_KV_KEYS.scores)
   return rows.filter((item) => item.score > score).length + 1
 }
 
 export async function cloudLatestStories(limit = 100) {
-  const rows = await readKvList(KV_KEYS.stories)
+  const rows = await readKvList(KV_KEYS.stories, LEGACY_KV_KEYS.stories)
   return [...rows].reverse().slice(0, limit).map(({ name, batch, comment }) => ({ name, batch, comment }))
 }
 

@@ -65,10 +65,12 @@ Englishclub/
 
 Set env berikut di Vercel untuk mengaktifkan hybrid storage:
 
-- `KV_REST_API_URL` dan `KV_REST_API_TOKEN` untuk leaderboard/stories.
+- `KV_REST_API_URL` dan `KV_REST_API_TOKEN` untuk pendaftaran, leaderboard, dan stories. Penulisan publik memakai Redis List atomic pada key `members_list`, `leaderboard_list`, dan `stories_list`.
 - `GOOGLE_CLIENT_EMAIL`, `GOOGLE_PRIVATE_KEY`, `GOOGLE_SHEETS_ID`, dan opsional `GOOGLE_SHEETS_RANGE` untuk members.
 
 Sheet harus memiliki header `timestamp,nama,no_hp,jurusan`. Pembacaan members di-cache dua menit. Jika append ke Sheets gagal, payload disimpan di KV pada key `failed_members_queue` dan dicoba ulang ketika ada pendaftaran berikutnya.
+
+Key lama `members`, `leaderboard`, dan `stories` tidak dihapus otomatis. Saat migrasi, data array lama tetap dibaca sebagai legacy, sedangkan data baru masuk ke key List baru. Setelah data legacy diverifikasi dan tidak lagi diperlukan, key lama dapat dihapus dari dashboard Upstash.
 
 Tanpa env tersebut, development lokal tetap memakai PostgreSQL jika `DATABASE_URL` tersedia, lalu fallback JSON/CSV.
 
@@ -77,7 +79,7 @@ Tanpa env tersebut, development lokal tetap memakai PostgreSQL jika `DATABASE_UR
 **1. Siapkan env & install**
 
 ```powershell
-Copy-Item backend/.env.example backend/.env  # ADMIN_TOKEN=ec2026onlyblue
+Copy-Item backend/.env.example backend/.env  # ganti ADMIN_TOKEN dengan token lokal
 
 npm install --prefix backend
 npm install --prefix frontend
