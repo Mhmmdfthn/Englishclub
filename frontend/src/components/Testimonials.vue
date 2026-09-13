@@ -5,9 +5,19 @@ const props = defineProps({
   entries: { type: Array, required: true },
 })
 
-// Organize testimonials into 3 columns
+const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1024)
+
+// Organize testimonials into 3 columns for desktop, 1 column (max 4 items) for mobile
 const testimonialColumns = computed(() => {
   const items = props.entries || []
+  
+  // For mobile: single column with max 4 items + scroll animation
+  if (windowWidth.value < 768) {
+    const mobileItems = items.slice(0, 4)
+    return [[...mobileItems]]
+  }
+  
+  // For desktop: 3 columns for parallax effect
   const firstColumn = items.slice(0, Math.ceil(items.length / 3))
   const secondColumn = items.slice(Math.ceil(items.length / 3), Math.ceil(items.length * 2 / 3))
   const thirdColumn = items.slice(Math.ceil(items.length * 2 / 3))
@@ -15,6 +25,12 @@ const testimonialColumns = computed(() => {
 })
 
 const durations = [15, 19, 17]
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('resize', () => {
+    windowWidth.value = window.innerWidth
+  })
+}
 </script>
 
 <template>
@@ -41,10 +57,10 @@ const durations = [15, 19, 17]
         :key="idx"
         class="testimonials-column"
         :class="{ 'hidden-on-mobile': idx > 0 }"
-        :style="{ '--duration': durations[idx] + 's' }"
+        :style="{ '--duration': windowWidth < 768 ? '24s' : durations[idx] + 's' }"
       >
         <ul class="testimonials-list">
-          <template v-for="iteration in 2" :key="iteration">
+          <template v-for="iteration in (windowWidth < 768 ? 2 : 2)" :key="iteration">
             <li
               v-for="(item, i) in column"
               :key="`${iteration}-${i}`"
@@ -141,6 +157,23 @@ const durations = [15, 19, 17]
   display: none;
 }
 
+@media (max-width: 767px) {
+  .testimonials-container {
+    flex-direction: column;
+    gap: 0;
+    max-height: 500px;
+    overflow: hidden;
+  }
+
+  .testimonials-column {
+    width: 100%;
+  }
+
+  .hidden-on-mobile {
+    display: block !important;
+  }
+}
+
 @media (min-width: 768px) {
   .hidden-on-mobile:nth-child(2) {
     display: block;
@@ -164,6 +197,21 @@ const durations = [15, 19, 17]
 }
 
 @keyframes scroll {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(-50%);
+  }
+}
+
+@media (max-width: 767px) {
+  .testimonials-list {
+    animation: scroll-mobile var(--duration, 23s) linear infinite;
+  }
+}
+
+@keyframes scroll-mobile {
   0% {
     transform: translateY(0);
   }
@@ -260,16 +308,17 @@ const durations = [15, 19, 17]
   }
 
   .testimonials-container {
-    max-height: 500px;
+    max-height: 440px;
+    flex-direction: column;
   }
 
   .testimonials-column {
-    width: 256px;
+    width: 100%;
   }
 
   .testimonial-card {
     padding: 20px;
-    min-width: 256px;
+    min-width: 100%;
   }
 
   .testimonial-text {
