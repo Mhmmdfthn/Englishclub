@@ -57,7 +57,7 @@ if (typeof window !== 'undefined') {
         :key="idx"
         class="testimonials-column"
         :class="{ 'hidden-on-mobile': idx > 0 }"
-        :style="{ '--duration': windowWidth < 768 ? '24s' : durations[idx] + 's' }"
+        :style="{ '--duration': windowWidth < 768 ? '26s' : durations[idx] + 's' }"
       >
         <ul class="testimonials-list">
           <template v-for="iteration in (windowWidth < 768 ? 2 : 2)" :key="iteration">
@@ -207,7 +207,7 @@ if (typeof window !== 'undefined') {
 
 @media (max-width: 767px) {
   .testimonials-list {
-    animation: scroll-mobile var(--duration, 23s) linear infinite;
+    animation: scroll-mobile var(--duration, 26s) linear infinite;
   }
 }
 
