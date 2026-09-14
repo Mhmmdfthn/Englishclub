@@ -1,5 +1,5 @@
 ﻿<script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { Instagram, Send } from 'lucide-vue-next'
 import { api } from '../api.js'
 import Testimonials from './Testimonials.vue'
@@ -15,6 +15,12 @@ const storySubmitting = ref(false)
 const batchOptions = ['2026 / Ilmu Komputer', '2026 / Manajemen', '2026 / Akuntansi', '2026 / Bisnis Digital', '2026 / Sains Data', '2026 / Agribisnis']
 
 const proker = ref([])
+const activeFilter = ref('all')
+const filteredProker = computed(() => {
+  if (activeFilter.value === 'all') return proker.value
+  if (activeFilter.value === 'upcoming') return proker.value.filter(p => p.status !== 'completed')
+  return proker.value.filter(p => p.status === 'completed')
+})
 const selectedProker = ref(null)
 function openProker(p) { selectedProker.value = p; document.body.style.overflow = 'hidden' }
 function closeProker() { selectedProker.value = null; document.body.style.overflow = '' }
@@ -118,7 +124,7 @@ function goRegister() {
     <div id="program" class="overview-heading"><div><span class="section-badge">PROGRAM</span><h2>Apa yang Kami Lakukan?</h2></div><p>Latihan bahasa Inggris, kegiatan rutin, dan agenda kampus untuk anggota.</p></div>
     <div class="overview-grid vision-mission-grid"><article class="overview-card"><div class="ov-icon">01</div><h3>Visi</h3><ul><li>Membuat latihan bahasa Inggris mudah diikuti mahasiswa.</li><li>Membantu anggota lebih percaya diri saat berbicara di kelas dan tempat kerja.</li></ul></article><article class="overview-card"><div class="ov-icon">02</div><h3>Misi</h3><ul><li>Mengadakan latihan speaking dan listening secara rutin.</li><li>Membuka kesempatan untuk praktik public speaking.</li><li>Mengadakan kegiatan dan kompetisi berbahasa Inggris.</li><li>Mendukung anggota mengikuti kegiatan akademik dan organisasi.</li></ul></article></div>
 
-    <div class="program-section"><div class="program-header"><div><h2>Program Kerja</h2><p>Temukan kegiatan untuk belajar, bermain, dan berkembang bersama English Club.</p></div><div class="program-filters"><button class="filter-btn active">Semua</button><button class="filter-btn">Mendatang</button><button class="filter-btn">Selesai</button></div></div><div class="program-grid"><article v-for="p in proker" :key="p.id" class="program-card clickable" role="button" tabindex="0" @click="openProker(p)" @keydown.enter="openProker(p)"><div class="program-thumb"><img :src="p.imageUrl || p.photos?.[0] || '/Logo_ec.jpg'" :alt="p.title" loading="lazy" /><div class="program-status" :class="`status-${p.status || 'upcoming'}`">{{ p.status === 'completed' ? 'Selesai' : p.status === 'ongoing' ? 'Migguan' : 'Akan datang' }}</div></div><div class="program-card-content"><h3>{{ p.title }}</h3><p>{{ p.description || p.caption }}</p><div class="program-meta"><span v-if="p.date" class="meta-item">📅 {{ p.date }}</span><span class="meta-item"><span class="material-symbols-outlined" style="font-size:16px;vertical-align:middle;margin-right:4px;">location_on</span>Universitas Putra Bangsa</span></div><a href="#" class="program-detail-link">Lihat detail →</a></div></article></div></div>
+    <div class="program-section"><div class="program-header"><div><h2>Program Kerja</h2><p>Temukan kegiatan untuk belajar, bermain, dan berkembang bersama English Club.</p></div><div class="program-filters"><button class="filter-btn" :class="{ active: activeFilter === 'all' }" @click="activeFilter = 'all'">Semua</button><button class="filter-btn" :class="{ active: activeFilter === 'upcoming' }" @click="activeFilter = 'upcoming'">Mendatang</button><button class="filter-btn" :class="{ active: activeFilter === 'completed' }" @click="activeFilter = 'completed'">Selesai</button></div></div><div class="program-grid"><article v-for="p in filteredProker" :key="p.id" class="program-card clickable" role="button" tabindex="0" @click="openProker(p)" @keydown.enter="openProker(p)"><div class="program-thumb"><img :src="p.imageUrl || p.photos?.[0] || '/Logo_ec.jpg'" :alt="p.title" loading="lazy" /><div class="program-status" :class="`status-${p.status || 'upcoming'}`">{{ p.status === 'completed' ? 'Selesai' : p.status === 'ongoing' ? 'Migguan' : 'Akan datang' }}</div></div><div class="program-card-content"><h3>{{ p.title }}</h3><p>{{ p.description || p.caption }}</p><div class="program-meta"><span v-if="p.date" class="meta-item">📅 {{ p.date }}</span><span class="meta-item"><span class="material-symbols-outlined" style="font-size:16px;vertical-align:middle;margin-right:4px;">location_on</span>Universitas Putra Bangsa</span></div><a href="#" class="program-detail-link">Lihat detail →</a></div></article></div></div>
     <ProgramModal :program="selectedProker" :open="!!selectedProker" @close="closeProker" />
 
   <div class="teaser-card"><div class="teaser-mark">5x5</div><div class="teaser-copy"><span class="teaser-kicker">GAME ENGLISH CLUB</span><h2>Main <span>Word Hunt</span></h2><p>Susun kata dari huruf yang berdekatan. Kumpulkan poin dalam 60 detik.</p></div><div class="teaser-actions"><button class="btn" type="button" @click="goPlay">Mulai</button><button class="btn ghost" type="button" @click="goBoard">Papan Skor</button></div></div>
