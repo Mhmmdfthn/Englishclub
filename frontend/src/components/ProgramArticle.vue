@@ -225,4 +225,7 @@ watch(() => route.params.id, (id) => { if (id) load(id) })
 .thumb.active { opacity: 1; box-shadow: 3px 3px 0 var(--vibrant-yellow); }
 .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .article-back { margin-top: 6px; }
+@media (max-width: 680px) {
+  .article-meta { gap: 8px; margin-bottom: 14px; }
+}
 </style>
