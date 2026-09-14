@@ -3,7 +3,6 @@ import { computed, onMounted, ref } from 'vue'
 import { Instagram, Send } from 'lucide-vue-next'
 import { api } from '../api.js'
 import Testimonials from './Testimonials.vue'
-import ProgramModal from './ProgramModal.vue'
 
 const emit = defineEmits(['goPlay', 'goBoard', 'goRegister', 'openAdmin', 'goArticle'])
 const storyName = ref('')
@@ -21,15 +20,12 @@ const filteredProker = computed(() => {
   if (activeFilter.value === 'upcoming') return proker.value.filter(p => p.status !== 'completed')
   return proker.value.filter(p => p.status === 'completed')
 })
-const selectedProker = ref(null)
-function openProker(p) { selectedProker.value = p; document.body.style.overflow = 'hidden' }
-function closeProker() { selectedProker.value = null; document.body.style.overflow = '' }
-
 const PROKER_PAGE = 6
 const showAll = ref(false)
 const hasMoreProker = computed(() => filteredProker.value.length > PROKER_PAGE)
 const displayedProker = computed(() => showAll.value ? filteredProker.value : filteredProker.value.slice(0, PROKER_PAGE))
 function toggleShowAll() { showAll.value = !showAll.value }
+function textOnly(html) { return (html || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() }
 
 const mobileOpen = ref(false)
 function toggleMobile() { mobileOpen.value = !mobileOpen.value }
@@ -130,8 +126,7 @@ function goRegister() {
     <div id="program" class="overview-heading"><div><span class="section-badge">PROGRAM</span><h2>Apa yang Kami Lakukan?</h2></div><p>Latihan bahasa Inggris, kegiatan rutin, dan agenda kampus untuk anggota.</p></div>
     <div class="overview-grid vision-mission-grid"><article class="overview-card"><div class="ov-icon">01</div><h3>Visi</h3><ul><li>Membuat latihan bahasa Inggris mudah diikuti mahasiswa.</li><li>Membantu anggota lebih percaya diri saat berbicara di kelas dan tempat kerja.</li></ul></article><article class="overview-card"><div class="ov-icon">02</div><h3>Misi</h3><ul><li>Mengadakan latihan speaking dan listening secara rutin.</li><li>Membuka kesempatan untuk praktik public speaking.</li><li>Mengadakan kegiatan dan kompetisi berbahasa Inggris.</li><li>Mendukung anggota mengikuti kegiatan akademik dan organisasi.</li></ul></article></div>
 
-    <div class="program-section"><div class="program-header"><div><h2>Program Kerja</h2><p>Temukan kegiatan untuk belajar, bermain, dan berkembang bersama English Club.</p></div><div class="program-filters"><button class="filter-btn" :class="{ active: activeFilter === 'all' }" @click="activeFilter = 'all'">Semua</button><button class="filter-btn" :class="{ active: activeFilter === 'upcoming' }" @click="activeFilter = 'upcoming'">Mendatang</button><button class="filter-btn" :class="{ active: activeFilter === 'completed' }" @click="activeFilter = 'completed'">Selesai</button></div></div><div class="program-grid"><article v-for="p in displayedProker" :key="p.id" class="program-card clickable" role="button" tabindex="0" @click="openProker(p)" @keydown.enter="openProker(p)"><div class="program-thumb"><img :src="p.imageUrl || p.photos?.[0] || '/Logo_ec.jpg'" :alt="p.title" loading="lazy" /><div class="program-status" :class="`status-${p.status || 'upcoming'}`">{{ p.status === 'completed' ? 'Selesai' : p.status === 'ongoing' ? 'Migguan' : 'Akan datang' }}</div></div><div class="program-card-content"><h3>{{ p.title }}</h3><p>{{ p.description || p.caption }}</p><div class="program-meta"><span v-if="p.date" class="meta-item">📅 {{ p.date }}</span><span class="meta-item"><span class="material-symbols-outlined" style="font-size:16px;vertical-align:middle;margin-right:4px;">location_on</span>Universitas Putra Bangsa</span></div><a href="#" class="program-detail-link" @click.stop.prevent="emit('goArticle', p)">Lihat detail →</a></div></article></div><div v-if="hasMoreProker" class="program-more"><button class="filter-btn" type="button" @click="toggleShowAll">{{ showAll ? 'Lihat lebih sedikit ▲' : 'Lihat semua ▼' }}</button></div></div>
-    <ProgramModal :program="selectedProker" :open="!!selectedProker" @close="closeProker" />
+    <div class="program-section"><div class="program-header"><div><h2>Program Kerja</h2><p>Temukan kegiatan untuk belajar, bermain, dan berkembang bersama English Club.</p></div><div class="program-filters"><button class="filter-btn" :class="{ active: activeFilter === 'all' }" @click="activeFilter = 'all'">Semua</button><button class="filter-btn" :class="{ active: activeFilter === 'upcoming' }" @click="activeFilter = 'upcoming'">Mendatang</button><button class="filter-btn" :class="{ active: activeFilter === 'completed' }" @click="activeFilter = 'completed'">Selesai</button></div></div><div class="program-grid"><article v-for="p in displayedProker" :key="p.id" class="program-card clickable" role="button" tabindex="0" @click="emit('goArticle', p)" @keydown.enter="emit('goArticle', p)"><div class="program-thumb"><img :src="p.imageUrl || p.photos?.[0] || '/Logo_ec.jpg'" :alt="p.title" loading="lazy" /><div class="program-status" :class="`status-${p.status || 'upcoming'}`">{{ p.status === 'completed' ? 'Selesai' : p.status === 'ongoing' ? 'Migguan' : 'Akan datang' }}</div></div><div class="program-card-content"><h3>{{ p.title }}</h3><p>{{ textOnly(p.description || p.caption).slice(0, 160) }}</p><div class="program-meta"><span v-if="p.date" class="meta-item"><span class="material-symbols-outlined" style="font-size:15px;vertical-align:middle;margin-right:2px;">calendar_month</span>{{ p.date }}</span><span class="meta-item"><span class="material-symbols-outlined" style="font-size:15px;vertical-align:middle;margin-right:4px;">location_on</span>Universitas Putra Bangsa</span></div><a href="#" class="program-detail-link" @click.stop.prevent="emit('goArticle', p)">Lihat detail →</a></div></article></div><div v-if="hasMoreProker" class="program-more"><button class="filter-btn" type="button" @click="toggleShowAll">{{ showAll ? 'Lihat lebih sedikit ▲' : 'Lihat semua ▼' }}</button></div></div>
 
   <div class="teaser-card"><div class="teaser-mark">5x5</div><div class="teaser-copy"><span class="teaser-kicker">GAME ENGLISH CLUB</span><h2>Main <span>Word Hunt</span></h2><p>Susun kata dari huruf yang berdekatan. Kumpulkan poin dalam 60 detik.</p></div><div class="teaser-actions"><button class="btn" type="button" @click="goPlay">Mulai</button><button class="btn ghost" type="button" @click="goBoard">Papan Skor</button></div></div>
 
@@ -277,8 +272,8 @@ function goRegister() {
 .program-status { padding:5px 9px; border:1px solid currentColor; font-size:11px; font-weight:800; }
 .program-card .tiny { font-size:12px; }
 .program-detail-link { margin-top:auto; width:100%; padding-top:12px; border-top:2px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; font-size:14px; font-weight:800; letter-spacing:.02em; color:var(--royal-blue); }
-.status-upcoming { color:#8a5a00; background:#fff4c2; }
+.status-upcoming { color:#1e40af; background:#dbeafe; }
 .status-ongoing { color:#075985; background:#dff4ff; }
-.status-completed { color:#166534; background:#dcfce7; }
+.status-completed { color:#fff; background:#166534; }
 
 </style>

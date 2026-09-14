@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../api.js'
 import { displayTime, todayWIB, wibDay } from '../utils/time.js'
+import RichTextEditor from './RichTextEditor.vue'
 
 const props = defineProps({ isModal: Boolean })
 const emit = defineEmits(['back'])
@@ -12,6 +13,8 @@ function goBack() {
   if (props.isModal) emit('back')
   else router.push('/')
 }
+function textOnly(html) { return (html || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() }
+const MAX_DESC = 1000
 const username = ref('')
 const password = ref('')
 const authed = ref(false)
@@ -122,7 +125,9 @@ async function saveProker(p) {
     return
   }
   if (draft.title.trim().length < 3 || draft.title.trim().length > 80) { error.value = 'Judul 3-80 karakter'; return }
-  if (draft.description.trim().length < 5 || draft.description.length > 1000) { error.value = 'Deskripsi 5-1000 karakter'; return }
+  const rawLen = (draft.description || '').trim().length
+  if (textOnly(draft.description).length < 5) { error.value = 'Deskripsi wajib diisi'; return }
+  if (rawLen > MAX_DESC) { error.value = `Deskripsi maksimal ${MAX_DESC} karakter (termasuk markup)`; return }
   try {
     await api.updateProker(p.id, { ...draft, title: draft.title.trim(), description: draft.description.trim() }, t)
     await loadProker()
@@ -132,7 +137,8 @@ async function saveProker(p) {
 
 async function createProker() {
   const draft = newProker.value
-  if (draft.title.trim().length < 3 || draft.description.trim().length < 5) { error.value = 'Judul dan deskripsi wajib diisi'; return }
+  const descLen = textOnly(draft.description).length
+  if (draft.title.trim().length < 3 || descLen < 5) { error.value = 'Judul dan deskripsi wajib diisi'; return }
   try {
     await api.addProker({ ...draft, title: draft.title.trim(), description: draft.description.trim() }, localStorage.getItem('admin_token') || '')
     newProker.value = { title: '', description: '', imageUrl: '', date: '', status: 'upcoming' }
@@ -304,7 +310,7 @@ onMounted(async () => {
           <form class="proker-create" @submit.prevent="createProker">
             <strong>Tambah Proker</strong>
             <input v-model="newProker.title" class="field" maxlength="80" placeholder="Judul" required />
-            <textarea v-model="newProker.description" class="field textarea" maxlength="1000" rows="2" placeholder="Deskripsi" required></textarea>
+            <RichTextEditor v-model="newProker.description" :max-length="MAX_DESC" placeholder="Deskripsi proker..." />
             <input v-model="newProker.imageUrl" class="field" type="url" placeholder="URL gambar Cloudinary (opsional)" />
             <div class="proker-form-row"><input v-model="newProker.date" class="field" type="date" /><select v-model="newProker.status" class="field"><option value="upcoming">Akan datang</option><option value="ongoing">Sedang berlangsung</option><option value="completed">Selesai</option></select><button class="btn sm" type="submit">Tambah</button></div>
           </form>
@@ -327,12 +333,11 @@ onMounted(async () => {
                   <span>{{ galleryUploading[p.id] ? '...' : '+' }}</span>
                 </label>
               </div>
-              <label class="field-label">Caption</label>
-              <textarea v-model="prokerDraft[p.id].description" class="field textarea" rows="3" maxlength="1000" placeholder="Deskripsi..."></textarea>
+              <label class="field-label">Deskripsi</label>
+              <RichTextEditor v-model="prokerDraft[p.id].description" :max-length="MAX_DESC" placeholder="Deskripsi proker..." />
               <input v-model="prokerDraft[p.id].imageUrl" class="field" type="url" placeholder="URL gambar Cloudinary" />
               <div class="proker-form-row"><input v-model="prokerDraft[p.id].date" class="field" type="date" /><select v-model="prokerDraft[p.id].status" class="field"><option value="upcoming">Akan datang</option><option value="ongoing">Sedang berlangsung</option><option value="completed">Selesai</option></select></div>
               <div class="card-actions">
-                <span class="tiny muted">{{ (prokerDraft[p.id]?.description||'').length }}/1000</span>
                 <div><button class="btn sm" @click="saveProker(p)">Simpan</button><button class="btn sm danger" @click="removeProker(p)">Hapus</button></div>
               </div>
             </article>

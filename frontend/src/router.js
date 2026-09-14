@@ -3,8 +3,9 @@ import LandingView from './components/LandingView.vue'
 import PlayFormView from './components/PlayFormView.vue'
 import LeaderboardPage from './components/LeaderboardPage.vue'
 import MemberRegisterMini from './components/MemberRegisterMini.vue'
-import AdminView from './components/AdminView.vue'
 import ProgramArticle from './components/ProgramArticle.vue'
+
+const AdminView = () => import('./components/AdminView.vue')
 
 function adminGuard() {
   // auth handled inside AdminView via /api/admin/verify (server-side)
@@ -22,7 +23,10 @@ const router = createRouter({
     { path: '/ec-admin-2026', name: 'admin', component: AdminView, beforeEnter: adminGuard, meta: { hidden: true } },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
-  scrollBehavior() { return { top: 0 } },
+  scrollBehavior(to) {
+    if (to.hash) return { el: to.hash, behavior: 'smooth' }
+    return { top: 0 }
+  },
 })
 
 export default router

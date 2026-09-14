@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from './api.js'
 import { loadDictionary } from './dictionary.js'
@@ -11,9 +11,10 @@ import LandingView from './components/LandingView.vue'
 import PlayFormView from './components/PlayFormView.vue'
 import LeaderboardPage from './components/LeaderboardPage.vue'
 import MemberRegisterMini from './components/MemberRegisterMini.vue'
-import AdminView from './components/AdminView.vue'
 import ProgramArticle from './components/ProgramArticle.vue'
 import FoundWords from './components/FoundWords.vue'
+
+const AdminView = defineAsyncComponent(() => import('./components/AdminView.vue'))
 
 const route = useRoute()
 const router = useRouter()
@@ -317,7 +318,7 @@ function areAdjacent(a, b) {
   <router-view v-if="isHiddenAdminRoute" />
   <template v-else>
     <LandingView v-if="screen === 'landing'" @goPlay="navigate('form')" @goBoard="navigate('board')" @goRegister="navigate('register')" @openAdmin="openAdminModal" @goArticle="openArticle" />
-    <ProgramArticle v-else-if="screen === 'article'" @back="goLanding" />
+    <ProgramArticle v-else-if="screen === 'article'" />
     <PlayFormView v-else-if="screen === 'form'" :best="bestScore" :error="boardError || dictionaryError" :retriable="connectError" :dictionary-ready="dictionaryReady" @play="startGame" @back="goLanding" />
     <LeaderboardPage v-else-if="screen === 'board'" @back="goLanding" />
     <MemberRegisterMini v-else-if="screen === 'register'" @back="goLanding" />
