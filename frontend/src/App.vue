@@ -12,6 +12,7 @@ import PlayFormView from './components/PlayFormView.vue'
 import LeaderboardPage from './components/LeaderboardPage.vue'
 import MemberRegisterMini from './components/MemberRegisterMini.vue'
 import AdminView from './components/AdminView.vue'
+import ProgramArticle from './components/ProgramArticle.vue'
 import FoundWords from './components/FoundWords.vue'
 
 const route = useRoute()
@@ -28,6 +29,10 @@ const screenToRoute = { landing: '/', register: '/daftar', board: '/board', form
 
 function syncScreenFromRoute() {
   if (isHiddenAdminRoute.value) return
+  if (route.path.startsWith('/program/')) {
+    screen.value = 'article'
+    return
+  }
   const mapped = routeToScreen[route.path]
   if (mapped && mapped !== screen.value && screen.value !== 'play' && screen.value !== 'over') {
     screen.value = mapped
@@ -40,6 +45,9 @@ function navigate(screenName) {
   screen.value = screenName
   const path = screenToRoute[screenName]
   if (path && route.path !== path) router.push(path)
+}
+function openArticle(p) {
+  router.push('/program/' + p.id)
 }
 const greetingIndex = ref(0)
 const greetings = ['Hello!', 'Welcome!', 'Good to see you!', 'Learn with us!']
@@ -308,7 +316,8 @@ function areAdjacent(a, b) {
 
   <router-view v-if="isHiddenAdminRoute" />
   <template v-else>
-    <LandingView v-if="screen === 'landing'" @goPlay="navigate('form')" @goBoard="navigate('board')" @goRegister="navigate('register')" @openAdmin="openAdminModal" />
+    <LandingView v-if="screen === 'landing'" @goPlay="navigate('form')" @goBoard="navigate('board')" @goRegister="navigate('register')" @openAdmin="openAdminModal" @goArticle="openArticle" />
+    <ProgramArticle v-else-if="screen === 'article'" @back="goLanding" />
     <PlayFormView v-else-if="screen === 'form'" :best="bestScore" :error="boardError || dictionaryError" :retriable="connectError" :dictionary-ready="dictionaryReady" @play="startGame" @back="goLanding" />
     <LeaderboardPage v-else-if="screen === 'board'" @back="goLanding" />
     <MemberRegisterMini v-else-if="screen === 'register'" @back="goLanding" />

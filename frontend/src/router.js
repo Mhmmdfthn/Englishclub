@@ -4,6 +4,7 @@ import PlayFormView from './components/PlayFormView.vue'
 import LeaderboardPage from './components/LeaderboardPage.vue'
 import MemberRegisterMini from './components/MemberRegisterMini.vue'
 import AdminView from './components/AdminView.vue'
+import ProgramArticle from './components/ProgramArticle.vue'
 
 function adminGuard() {
   // auth handled inside AdminView via /api/admin/verify (server-side)
@@ -17,6 +18,7 @@ const router = createRouter({
     { path: '/main', name: 'play-form', component: PlayFormView },
     { path: '/board', name: 'board', component: LeaderboardPage },
     { path: '/daftar', name: 'register', component: MemberRegisterMini },
+    { path: '/program/:id', name: 'program-article', component: ProgramArticle },
     { path: '/ec-admin-2026', name: 'admin', component: AdminView, beforeEnter: adminGuard, meta: { hidden: true } },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
