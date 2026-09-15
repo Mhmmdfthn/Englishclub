@@ -117,7 +117,7 @@ watch(currentPhoto, () => { imageLoading.value = true })
 
         <div class="article-hero">
           <div v-if="imageLoading" class="article-cover-skeleton" aria-hidden="true"></div>
-          <img :src="photos[currentPhoto]" :alt="program.title" class="article-cover" :class="{ 'img-loaded': !imageLoading }" width="1000" height="563" loading="eager" @load="onImageLoad" @error="onImageError" @click="openLightbox" />
+          <img :src="photos[currentPhoto]" :alt="program.title" class="article-cover" :class="{ 'img-loaded': !imageLoading }" width="820" height="461" loading="eager" @load="onImageLoad" @error="onImageError" @click="openLightbox" />
           <div v-if="photos.length > 1" class="article-gallery-nav">
             <button class="gallery-btn" type="button" @click="prev" aria-label="Foto sebelumnya">‹</button>
             <span class="gallery-count">{{ currentPhoto + 1 }} / {{ photos.length }}</span>
@@ -250,7 +250,7 @@ watch(currentPhoto, () => { imageLoading.value = true })
 
 .article-body-wrap {
   width: 100%;
-  max-width: 1000px;
+  max-width: 820px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -310,7 +310,7 @@ watch(currentPhoto, () => { imageLoading.value = true })
 .article-hero {
   position: relative;
   width: 100%;
-  max-width: 1000px;
+  max-width: 820px;
   aspect-ratio: 16 / 9;
   margin-bottom: 28px;
   overflow: hidden;
@@ -361,10 +361,9 @@ watch(currentPhoto, () => { imageLoading.value = true })
 }
 .gallery-btn:hover { background: #fff; transform: scale(1.06); }
 .gallery-count { padding: 4px 10px; background: rgba(29, 43, 58, 0.72); color: #fff; font-size: 11px; font-weight: 800; border-radius: 999px; }
-.article-body { text-align: left; }
+.article-body { width: 100%; text-align: left; }
 .article-desc {
   margin: 0;
-  max-width: 68ch;
   font-size: clamp(16px, 2vw, 18px);
   line-height: 1.8;
   color: var(--ink);
