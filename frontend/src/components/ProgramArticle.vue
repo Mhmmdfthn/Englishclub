@@ -220,7 +220,7 @@ watch(currentPhoto, () => { imageLoading.value = true })
   padding: 0;
   color: var(--ink);
   background: #fff;
-  border: 2px solid var(--ink);
+  border: 1px solid var(--ink);
   cursor: pointer;
 }
 .nav-close .material-symbols-outlined { font-size: 24px; }
@@ -234,7 +234,7 @@ watch(currentPhoto, () => { imageLoading.value = true })
   height: 44px;
   padding: 8px;
   background: #fff;
-  border: 2px solid var(--ink);
+  border: none;
   cursor: pointer;
 }
 .ham-line { display: block; width: 100%; height: 3px; background: var(--ink); transition: transform 0.2s ease, opacity 0.2s ease; }
