@@ -20,6 +20,22 @@ const password = ref('')
 const authed = ref(false)
 const authedUser = ref('')
 const error = ref('')
+const success = ref('')
+const confirmState = ref(null)
+let successTimer = null
+function showSuccess(msg) {
+  success.value = msg
+  clearTimeout(successTimer)
+  successTimer = setTimeout(() => { success.value = '' }, 3500)
+}
+function handleError(e, fallback) {
+  if (e?.status === 401) {
+    error.value = 'Sesi habis. Login lagi.'
+    logout()
+    return
+  }
+  error.value = e?.message || fallback
+}
 const members = ref([])
 const loading = ref(false)
 const filter = ref('')
@@ -113,7 +129,7 @@ async function loadProker() {
       titleDraft.value[p.id] = p.title
       prokerDraft.value[p.id] = { title: p.title, description: p.description || p.caption || '', imageUrl: p.imageUrl || p.photos?.[0] || '', date: p.date || '', status: p.status || 'upcoming' }
     })
-  } catch (e) { error.value = 'Proker belum dapat dimuat.' }
+  } catch (e) { handleError(e, 'Proker belum dapat dimuat.') }
   finally { prokerLoading.value = false }
 }
 
@@ -132,7 +148,8 @@ async function saveProker(p) {
     await api.updateProker(p.id, { ...draft, title: draft.title.trim(), description: draft.description.trim() }, t)
     await loadProker()
     error.value = ''
-  } catch (e) { error.value = e?.message || 'Proker belum tersimpan.' }
+    showSuccess('Proker berhasil disimpan.')
+  } catch (e) { handleError(e, 'Proker belum tersimpan.') }
 }
 
 async function createProker() {
@@ -144,14 +161,28 @@ async function createProker() {
     newProker.value = { title: '', description: '', imageUrl: '', date: '', status: 'upcoming' }
     await loadProker()
     error.value = ''
-  } catch (e) { error.value = e?.message || 'Proker belum ditambahkan.' }
+    showSuccess('Proker berhasil ditambahkan.')
+  } catch (e) { handleError(e, 'Proker belum ditambahkan.') }
 }
 
-async function removeProker(p) {
+function confirmDeleteProker(p) { confirmState.value = { type: 'proker', id: p.id } }
+function confirmDeletePhoto(p, idx) { confirmState.value = { type: 'photo', id: p.id, idx } }
+function cancelConfirm() { confirmState.value = null }
+async function doConfirmedDelete() {
+  const c = confirmState.value
+  if (!c) return
+  confirmState.value = null
+  const t = localStorage.getItem('admin_token') || ''
   try {
-    await api.deleteProker(p.id, localStorage.getItem('admin_token') || '')
+    if (c.type === 'proker') {
+      await api.deleteProker(c.id, t)
+    } else {
+      const res = await fetch(`/api/proker/${c.id}/photos/${c.idx}`, { method: 'DELETE', headers: { Authorization: `Bearer ${t}`, 'x-admin-token': t } })
+      if (!res.ok) { const j = await res.json().catch(()=>({})); throw Object.assign(new Error(j.detail || `HTTP ${res.status}`), { status: res.status }) }
+    }
     await loadProker()
-  } catch (e) { error.value = e?.message || 'Proker belum dihapus.' }
+    showSuccess(c.type === 'proker' ? 'Proker berhasil dihapus.' : 'Foto berhasil dihapus.')
+  } catch (e) { handleError(e, 'Belum dapat dihapus.') }
 }
 
 async function uploadGallery(p, event) {
@@ -166,17 +197,8 @@ async function uploadGallery(p, event) {
     const res = await fetch(`/api/proker/${p.id}/photos`, { method:'POST', headers: { Authorization: `Bearer ${t}`, 'x-admin-token': t }, body: fd })
     if (!res.ok) { const j = await res.json().catch(()=>({})); throw new Error(j.detail || `HTTP ${res.status}`) }
     await loadProker()
-  } catch (e) { error.value = e?.message || 'Foto belum diunggah.' }
+  } catch (e) { handleError(e, 'Foto belum diunggah.') }
   finally { galleryUploading.value[p.id] = false; event.target.value = '' }
-}
-
-async function deletePhoto(p, idx) {
-  const t = localStorage.getItem('admin_token') || ''
-  try {
-    const res = await fetch(`/api/proker/${p.id}/photos/${idx}`, { method:'DELETE', headers: { Authorization: `Bearer ${t}`, 'x-admin-token': t } })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    await loadProker()
-  } catch (e) { error.value = 'Foto belum dihapus.' }
 }
 
 const filtered = computed(() => {
@@ -303,18 +325,27 @@ onMounted(async () => {
         <!-- Proker -->
         <div v-else>
           <div class="toolbar">
-            <h2 style="font-size:18px; font-weight:900;">Kelola Proker</h2>
+            <h2 class="tab-title">Kelola Proker</h2>
             <span class="tiny muted">Data tersimpan di KV saat env cloud aktif</span>
           </div>
           <p v-if="error" class="error">{{ error }}</p>
+          <p v-if="success" class="success">{{ success }}</p>
           <form class="proker-create" @submit.prevent="createProker">
-            <strong>Tambah Proker</strong>
-            <input v-model="newProker.title" class="field" maxlength="80" placeholder="Judul" required />
-            <RichTextEditor v-model="newProker.description" :max-length="MAX_DESC" placeholder="Deskripsi proker..." />
-            <input v-model="newProker.imageUrl" class="field" type="url" placeholder="URL gambar Cloudinary (opsional)" />
-            <div class="proker-form-row"><input v-model="newProker.date" class="field" type="date" /><select v-model="newProker.status" class="field"><option value="upcoming">Akan datang</option><option value="ongoing">Sedang berlangsung</option><option value="completed">Selesai</option></select><button class="btn sm" type="submit">Tambah</button></div>
+            <strong class="form-heading">Tambah Proker</strong>
+            <label class="field-label">Judul</label>
+            <input v-model="newProker.title" class="field" maxlength="80" placeholder="Contoh: English Debate Competition" required />
+            <label class="field-label">Deskripsi</label>
+            <RichTextEditor v-model="newProker.description" :max-length="MAX_DESC" placeholder="Deskripsi kegiatan..." />
+            <label class="field-label">URL Gambar Cover (opsional)</label>
+            <input v-model="newProker.imageUrl" class="field" type="url" placeholder="https://res.cloudinary.com/..." />
+            <div class="proker-form-row">
+              <div class="form-field"><label class="field-label">Tanggal</label><input v-model="newProker.date" class="field" type="date" /></div>
+              <div class="form-field"><label class="field-label">Status</label><select v-model="newProker.status" class="field"><option value="upcoming">Akan datang</option><option value="ongoing">Sedang berlangsung</option><option value="completed">Selesai</option></select></div>
+            </div>
+            <button class="btn create-submit" type="submit">+ Tambah Proker</button>
           </form>
-          <div v-if="prokerLoading" class="tiny muted">Memuat proker...</div>
+          <div v-if="prokerLoading" class="proker-state">Memuat proker...</div>
+          <div v-else-if="!proker.length" class="proker-state">Belum ada proker. Tambahkan lewat form di atas.</div>
           <div class="proker-grid">
             <article v-for="p in proker" :key="p.id" class="proker-card">
               <div class="proker-card-head">
@@ -322,11 +353,12 @@ onMounted(async () => {
                 <span class="order-badge">#{{ p.order }}</span>
               </div>
               <label class="field-label">Judul</label>
-              <input v-model="prokerDraft[p.id].title" class="field sm" maxlength="80" placeholder="Judul proker..." />
+              <input v-model="prokerDraft[p.id].title" class="field" maxlength="80" placeholder="Judul proker..." />
+              <label class="field-label">Foto Kegiatan</label>
               <div class="gallery">
                 <div v-for="(ph,idx) in p.photos" :key="idx" class="gallery-item">
                   <img :src="ph" :alt="p.title" />
-                  <button class="del" @click="deletePhoto(p, idx)" title="Hapus">×</button>
+                  <button class="del" @click="confirmDeletePhoto(p, idx)" title="Hapus foto">×</button>
                 </div>
                 <label v-if="(p.photos?.length||0) < 3" class="gallery-add">
                   <input type="file" accept="image/*" multiple @change="uploadGallery(p, $event)" :disabled="galleryUploading[p.id]" hidden />
@@ -335,16 +367,33 @@ onMounted(async () => {
               </div>
               <label class="field-label">Deskripsi</label>
               <RichTextEditor v-model="prokerDraft[p.id].description" :max-length="MAX_DESC" placeholder="Deskripsi proker..." />
-              <input v-model="prokerDraft[p.id].imageUrl" class="field" type="url" placeholder="URL gambar Cloudinary" />
-              <div class="proker-form-row"><input v-model="prokerDraft[p.id].date" class="field" type="date" /><select v-model="prokerDraft[p.id].status" class="field"><option value="upcoming">Akan datang</option><option value="ongoing">Sedang berlangsung</option><option value="completed">Selesai</option></select></div>
+              <label class="field-label">URL Gambar Cover (opsional)</label>
+              <input v-model="prokerDraft[p.id].imageUrl" class="field" type="url" placeholder="https://res.cloudinary.com/..." />
+              <div class="proker-form-row">
+                <div class="form-field"><label class="field-label">Tanggal</label><input v-model="prokerDraft[p.id].date" class="field" type="date" /></div>
+                <div class="form-field"><label class="field-label">Status</label><select v-model="prokerDraft[p.id].status" class="field"><option value="upcoming">Akan datang</option><option value="ongoing">Sedang berlangsung</option><option value="completed">Selesai</option></select></div>
+              </div>
               <div class="card-actions">
-                <div><button class="btn sm" @click="saveProker(p)">Simpan</button><button class="btn sm danger" @click="removeProker(p)">Hapus</button></div>
+                <div class="action-group"><button class="btn sm" @click="saveProker(p)">Simpan</button><button class="btn sm danger" @click="confirmDeleteProker(p)">Hapus</button></div>
               </div>
             </article>
           </div>
         </div>
       </main>
     </div>
+
+    <Transition name="confirm-fade">
+      <div v-if="confirmState" class="confirm-overlay" role="dialog" aria-modal="true" aria-label="Konfirmasi hapus" @click.self="cancelConfirm">
+        <div class="confirm-card">
+          <strong>{{ confirmState.type === 'proker' ? 'Hapus proker ini?' : 'Hapus foto ini?' }}</strong>
+          <p>{{ confirmState.type === 'proker' ? 'Proker akan dihapus permanen dari daftar.' : 'Foto akan dihapus dari galeri proker.' }}</p>
+          <div class="confirm-actions">
+            <button class="btn sm ghost" type="button" @click="cancelConfirm">Batal</button>
+            <button class="btn sm danger" type="button" @click="doConfirmedDelete">Ya, hapus</button>
+          </div>
+        </div>
+      </div>
+    </Transition>
   </section>
 </template>
 
@@ -401,43 +450,81 @@ onMounted(async () => {
 .empty { text-align: center; padding: 18px; color: var(--text-muted); }
 .members-cards { display: none; }
 .proker-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
-.proker-create { display: grid; gap: 10px; margin: 14px 0 18px; padding: 16px; background: #fff; border: 3px solid var(--dark-navy); box-shadow: 5px 5px 0 var(--dark-navy); }
-.proker-form-row { display: flex; align-items: center; gap: 10px; }
-.proker-form-row .field { flex: 1; min-width: 0; }
-.danger { margin-left: 8px; color: #fff; background: #b42318; }
-.proker-card { padding: 16px; background: #fff; border: 3px solid var(--dark-navy); box-shadow: 6px 6px 0 var(--dark-navy); }
-.gallery { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.proker-create { display: grid; gap: 4px; margin: 14px 0 18px; padding: 16px; background: #fff; border: 3px solid var(--dark-navy); box-shadow: 6px 6px 0 var(--dark-navy); }
+.form-heading { font-size: 18px; font-weight: 900; margin-bottom: 6px; }
+.tab-title { font-size: 18px; font-weight: 900; margin: 0; }
+.proker-form-row { display: flex; align-items: stretch; gap: 10px; }
+.form-field { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
+.proker-form-row .field, .form-field .field { width: 100%; flex: 1; min-width: 0; }
+.proker-form-row .field { text-align: left; }
+.create-submit { width: 100%; justify-content: center; min-height: 44px; padding: 11px 14px; font-size: 13px; margin-top: 6px; }
+.success { margin: 0 0 14px; padding: 8px 12px; background: #ecfdf5; border: 1px solid #86efac; font-size: 13px; font-weight: 700; color: #166534; text-align: center; }
+.proker-state { margin: 10px 0 16px; padding: 22px; background: #fff; border: 2px solid var(--dark-navy); font-size: 13px; font-weight: 700; text-align: center; color: var(--text-muted); }
+.proker-card-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.id-badge { padding: 3px 8px; background: var(--royal-blue); color: #fff; font-size: 11px; font-weight: 800; }
+.order-badge { padding: 3px 8px; background: var(--vibrant-yellow); border: 1px solid var(--dark-navy); font-size: 11px; font-weight: 800; }
+.danger { color: #fff; background: #b42318; }
+.proker-card { display: flex; flex-direction: column; gap: 4px; padding: 16px; background: #fff; border: 3px solid var(--dark-navy); box-shadow: 6px 6px 0 var(--dark-navy); }
+.gallery { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0; }
 .gallery-item { position: relative; width: 80px; height: 80px; border: 2px solid var(--dark-navy); overflow: hidden; }
 .gallery-item img { width: 100%; height: 100%; object-fit: cover; }
 .gallery-item .del { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; display: grid; place-items: center; background: #fff; border: 1px solid var(--dark-navy); font-weight: 900; cursor: pointer; }
 .gallery-add { width: 80px; height: 80px; display: grid; place-items: center; border: 2px dashed var(--dark-navy); background: #f8fafc; font-size: 22px; font-weight: 900; cursor: pointer; position: relative; }
 .gallery-add input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .field.textarea { resize: vertical; min-height: 72px; }
-.card-actions { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+.card-actions { display: flex; align-items: center; justify-content: flex-end; margin-top: 6px; }
+.action-group { display: flex; gap: 8px; }
+.confirm-overlay { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: rgba(13,20,28,0.55); backdrop-filter: blur(4px); padding: 20px; }
+.confirm-card { width: min(100%, 380px); padding: 22px; background: #fff; border: 3px solid var(--dark-navy); box-shadow: 6px 6px 0 var(--dark-navy); }
+.confirm-card strong { font-size: 17px; font-weight: 900; }
+.confirm-card p { margin: 8px 0 18px; font-size: 13.5px; color: var(--text-muted); }
+.confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.confirm-fade-enter-active, .confirm-fade-leave-active { transition: opacity 0.18s ease; }
+.confirm-fade-enter-from, .confirm-fade-leave-to { opacity: 0; }
 @media (max-width: 860px) {
   .dashboard { grid-template-columns: 1fr; }
-  .sidebar { flex-direction: row; overflow: auto; border-right: none; border-bottom: 3px solid var(--dark-navy); gap: 8px; padding: 10px; -webkit-overflow-scrolling: touch; }
-  .side-item { flex: 0 0 auto; min-width: 130px; white-space: nowrap; }
+  .sidebar { flex-direction: row; overflow-x: auto; overflow-y: hidden; border-right: none; border-bottom: 3px solid var(--dark-navy); gap: 8px; padding: 10px 12px; background: #fff; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .sidebar::-webkit-scrollbar { display: none; }
+  .side-item { flex: 0 0 auto; min-width: 132px; min-height: 46px; white-space: nowrap; padding: 10px 14px; justify-content: center; }
+  .side-item.logout { margin-top: 0; flex: 0 0 auto; }
   .side-spacer { display: none; }
-  .stats-row { grid-template-columns: 1fr; }
-  .proker-grid { grid-template-columns: 1fr; }
-  .proker-form-row { flex-direction: column; align-items: stretch; }
+  .stats-row { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .stat-card { padding: 14px; }
+  .stat-value { font-size: 22px; }
+  .proker-grid { grid-template-columns: 1fr; gap: 12px; }
+  .proker-form-row { flex-direction: column; align-items: stretch; gap: 0; }
+  .proker-create { gap: 2px; }
 }
 @media (max-width: 680px) {
   .admin-shell { overflow-x: hidden; }
-  .admin-topbar { flex-wrap: wrap; gap: 8px; padding: 8px 12px; }
-  .topbar-left { flex: 1; min-width: 0; }
+  .admin-topbar { gap: 6px; padding: 8px 12px; }
+  .topbar-left { flex: 1; min-width: 0; gap: 8px; }
   .topbar-title { font-size: 12px; }
-  .page-back { padding: 7px 10px; font-size: 11px; }
-  .main { padding: 14px 12px; }
-  .toolbar { flex-direction: column; align-items: stretch; }
+  .user-chip { max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; }
+  .page-back { padding: 8px 10px; font-size: 11px; min-height: 40px; flex-shrink: 0; }
+  .main { padding: 14px 12px 40px; }
+  .stats-row { grid-template-columns: 1fr; gap: 10px; }
+  .stat-card { padding: 14px; }
+  .stat-value { font-size: 22px; }
+  .toolbar { flex-direction: column; align-items: stretch; gap: 8px; }
   .search-wrap { min-width: 100%; width: 100%; }
+  .toolbar .btn { width: 100%; min-height: 44px; font-size: 13px; }
   .table-card { display: none; }
   .members-cards { display: grid; gap: 10px; margin-top: 12px; }
-  .member-card { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; background: #fff; border: 2px solid var(--dark-navy); box-shadow: 3px 3px 0 var(--dark-navy); }
+  .member-card { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; min-height: 54px; background: #fff; border: 2px solid var(--dark-navy); box-shadow: 3px 3px 0 var(--dark-navy); }
   .member-top { display: flex; align-items: center; gap: 10px; min-width: 0; }
   .member-name { font-size: 14px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
-  .proker-card { padding: 12px; box-shadow: 4px 4px 0 var(--dark-navy); }
+  .proker-card { padding: 14px; box-shadow: 4px 4px 0 var(--dark-navy); }
+  .proker-create { padding: 14px; box-shadow: 4px 4px 0 var(--dark-navy); }
+  .form-heading { font-size: 16px; }
+  .gallery { gap: 10px; }
+  .gallery-item .del { width: 28px; height: 28px; font-size: 16px; top: 4px; right: 4px; }
+  .card-actions { justify-content: stretch; }
+  .action-group { width: 100%; gap: 10px; }
+  .action-group .btn { flex: 1; justify-content: center; min-height: 44px; }
+  .btn.sm { min-height: 44px; padding: 10px 14px; font-size: 13px; }
+  .confirm-card { padding: 18px 16px; }
+  .confirm-actions .btn { min-height: 44px; }
   .login-card { padding: 20px 16px; box-shadow: 6px 6px 0 var(--dark-navy); }
 }
 </style>
