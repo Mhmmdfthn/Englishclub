@@ -47,6 +47,8 @@ const captionDraft = ref({})
 const titleDraft = ref({})
 const prokerDraft = ref({})
 const galleryUploading = ref({})
+const galleryAdding = ref({})
+const galleryUrl = ref({})
 const newProker = ref({ title: '', description: '', imageUrl: '', date: '', status: 'upcoming' })
 const newCover = ref(null)
 const mediaDraft = ref({})
@@ -134,6 +136,7 @@ async function loadProker() {
       titleDraft.value[p.id] = p.title
       prokerDraft.value[p.id] = { title: p.title, description: p.description || p.caption || '', imageUrl: p.imageUrl || p.photos?.[0] || '', date: p.date || '', status: p.status || 'upcoming' }
       mediaDraft.value[p.id] = null
+      galleryUrl.value[p.id] = ''
     })
   } catch (e) { handleError(e, 'Proker belum dapat dimuat.') }
   finally { prokerLoading.value = false }
@@ -240,6 +243,20 @@ async function uploadGallery(p, event) {
     await loadProker()
   } catch (e) { handleError(e, 'Foto belum diunggah.') }
   finally { galleryUploading.value[p.id] = false; event.target.value = '' }
+}
+
+async function addGalleryUrl(p) {
+  const u = (galleryUrl.value[p.id] || '').trim()
+  if (!u) return
+  const t = localStorage.getItem('admin_token') || ''
+  galleryAdding.value[p.id] = true
+  try {
+    const res = await fetch(`/api/proker/${p.id}/photos`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t}`, 'x-admin-token': t }, body: JSON.stringify({ url: u }) })
+    if (!res.ok) { const j = await res.json().catch(()=>({})); throw new Error(j.detail || `HTTP ${res.status}`) }
+    galleryUrl.value[p.id] = ''
+    await loadProker()
+  } catch (e) { handleError(e, 'Foto belum ditambahkan.') }
+  finally { galleryAdding.value[p.id] = false }
 }
 
 const filtered = computed(() => {
@@ -406,6 +423,10 @@ onMounted(async () => {
                   <span>{{ galleryUploading[p.id] ? '...' : '+' }}</span>
                 </label>
               </div>
+              <div v-if="(p.photos?.length||0) < 3" class="gallery-url">
+                <input v-model="galleryUrl[p.id]" class="field" type="url" placeholder="Atau tempel URL foto (.jpg/.png)..." :disabled="galleryAdding[p.id]" @keyup.enter="addGalleryUrl(p)" />
+                <button class="btn sm" :disabled="galleryAdding[p.id] || !galleryUrl[p.id].trim()" @click="addGalleryUrl(p)">{{ galleryAdding[p.id] ? '...' : 'Tambah URL' }}</button>
+              </div>
               <label class="field-label">Deskripsi</label>
               <RichTextEditor v-model="prokerDraft[p.id].description" :max-length="MAX_DESC" placeholder="Deskripsi proker..." />
               <label class="field-label">Gambar Cover (opsional)</label>
@@ -507,6 +528,9 @@ onMounted(async () => {
 .danger { color: #fff; background: #b42318; }
 .proker-card { display: flex; flex-direction: column; gap: 4px; padding: 16px; background: #fff; border: 3px solid var(--dark-navy); box-shadow: 6px 6px 0 var(--dark-navy); }
 .gallery { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0; }
+.gallery-url { display: flex; gap: 8px; align-items: stretch; margin: 2px 0 6px; }
+.gallery-url .field { flex: 1; min-width: 0; padding: 9px 12px; font-size: 13px; }
+.gallery-url .btn { flex: 0 0 auto; padding: 9px 12px; font-size: 12px; white-space: nowrap; }
 .gallery-item { position: relative; width: 80px; height: 80px; border: 2px solid var(--dark-navy); overflow: hidden; }
 .gallery-item img { width: 100%; height: 100%; object-fit: cover; }
 .gallery-item .del { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; display: grid; place-items: center; background: #fff; border: 1px solid var(--dark-navy); font-weight: 900; cursor: pointer; }
@@ -559,6 +583,8 @@ onMounted(async () => {
   .proker-create { padding: 14px; box-shadow: 4px 4px 0 var(--dark-navy); }
   .form-heading { font-size: 16px; }
   .gallery { gap: 10px; }
+  .gallery-url { flex-direction: column; gap: 8px; }
+  .gallery-url .btn { width: 100%; justify-content: center; min-height: 44px; }
   .gallery-item .del { width: 28px; height: 28px; font-size: 16px; top: 4px; right: 4px; }
   .card-actions { justify-content: stretch; }
   .action-group { width: 100%; gap: 10px; }

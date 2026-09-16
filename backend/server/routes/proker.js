@@ -238,18 +238,26 @@ r.post('/:id/photos', requireAdmin, upload.array('photos', 3), async (req, res) 
   const uploadedCloud = []
   const uploadedFiles = []
   try {
+    const files = req.files || []
     let urls
-    if (useCloudinary) {
-      urls = []
-      for (const f of (req.files || [])) {
-        // eslint-disable-next-line no-await-in-loop
-        const { url, publicId } = await uploadBuffer(f.buffer, f.originalname)
-        uploadedCloud.push(publicId)
-        urls.push(url)
+    if (files.length) {
+      if (useCloudinary) {
+        urls = []
+        for (const f of files) {
+          // eslint-disable-next-line no-await-in-loop
+          const { url, publicId } = await uploadBuffer(f.buffer, f.originalname)
+          uploadedCloud.push(publicId)
+          urls.push(url)
+        }
+      } else {
+        uploadedFiles.push(...files.map(f => f.filename))
+        urls = files.map(f => `/uploads/${f.filename}`)
       }
     } else {
-      uploadedFiles.push(...(req.files || []).map(f => f.filename))
-      urls = (req.files || []).map(f => `/uploads/${f.filename}`)
+      // foto lewat URL eksternal (direct image link) — divalidasi dulu
+      const u = String(req.body?.url || '').trim()
+      if (!u) return res.status(422).json({ detail: 'Pilih file atau isi URL gambar' })
+      urls = [await validateExternalImage(u)]
     }
     const p = await addPhotos(req.params.id, urls)
     await auditAdmin('Foto proker ditambah', req.admin?.username || 'admin', { id: p.id, jumlah: urls.length })
@@ -262,6 +270,9 @@ r.post('/:id/photos', requireAdmin, upload.array('photos', 3), async (req, res) 
     if (e.code === 'INVALID_PROKER_PAYLOAD') return res.status(400).json({ error: 'Payload tidak valid' })
     if (e.message?.includes('tidak ditemukan')) return res.status(404).json({ detail: e.message })
     if (e.message?.includes('Maksimal')) return res.status(400).json({ detail: e.message })
+    if (e.message?.includes('URL') || e.message?.includes('gambar') || e.message?.includes('Pilih file')) {
+      return res.status(422).json({ detail: e.message })
+    }
     console.error('Proker photos POST error:', e)
     res.status(503).json({ error: 'Database sibuk, silakan coba lagi' })
   }
