@@ -1,5 +1,5 @@
 ﻿<script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { Instagram, Send } from 'lucide-vue-next'
 import { api } from '../api.js'
 import Testimonials from './Testimonials.vue'
@@ -17,6 +17,7 @@ const batchOptions = ['2026 / Ilmu Komputer', '2026 / Manajemen', '2026 / Akunta
 const showSpinner = ref(false)
 const lastStoryId = ref('')
 const lastStoryName = ref('')
+let pollTimer = null
 
 const proker = ref([])
 const activeFilter = ref('all')
@@ -62,7 +63,11 @@ function logoPressEnd() { clearTimeout(pressTimer) }
 onMounted(async () => {
   try { stories.value = (await api.stories()).stories } catch { storyError.value = 'Kesan belum dapat dimuat.' }
   try { proker.value = (await api.proker()).proker } catch {}
+  pollTimer = setInterval(async () => {
+    try { stories.value = (await api.stories()).stories } catch {}
+  }, 30000)
 })
+onUnmounted(() => { if (pollTimer) clearInterval(pollTimer) })
 
 async function submitStory() {
   const name = storyName.value.trim()
