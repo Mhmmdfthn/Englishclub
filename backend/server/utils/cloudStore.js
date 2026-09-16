@@ -51,7 +51,22 @@ async function readKvList(key, legacyKey) {
     list = await kv.lrange(key, 0, -1)
   } catch (err) {
     if (String(err?.message || err).includes('WRONGTYPE')) {
-      throw new Error(`KV key "${key}" memegang tipe yang salah (bukan List). Hapus key tersebut di dashboard Upstash sebelum memakai operasi atomic, sesuai PRD sinkronisasi.`)
+      console.warn(`KV key "${key}" has wrong type — attempting migration to List`)
+      const raw = await kv.get(key)
+      if (Array.isArray(raw)) {
+        await kv.del(key)
+        if (raw.length > 0) {
+          for (const item of raw) await kv.rpush(key, item)
+        }
+        list = raw
+      } else if (raw && typeof raw === 'object') {
+        await kv.del(key)
+        list = []
+      } else {
+        await kv.del(key)
+        list = []
+      }
+      return Array.isArray(list) ? list.map(parseKvItem) : []
     }
     throw err
   }
