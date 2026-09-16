@@ -127,6 +127,33 @@ onMounted(loadHighlight)
       </div>
     </div>
 
+    <!-- Benefit Section -->
+    <div class="benefit-section">
+      <h3 class="benefit-title">Benefit</h3>
+      <ul class="benefit-list">
+        <li class="benefit-item">
+          <span class="benefit-check">&#10003;</span>
+          Lingkungan praktik Bahasa Inggris yang aktif &amp; suportif
+        </li>
+        <li class="benefit-item">
+          <span class="benefit-check">&#10003;</span>
+          Relasi &amp; jaringan koneksi yang lebih luas
+        </li>
+        <li class="benefit-item">
+          <span class="benefit-check">&#10003;</span>
+          Wawasan &amp; pengalaman organisasi yang bermanfaat
+        </li>
+        <li class="benefit-item">
+          <span class="benefit-check">&#10003;</span>
+          Kesempatan mengikuti berbagai event &amp; program kerja seru
+        </li>
+        <li class="benefit-item">
+          <span class="benefit-check">&#10003;</span>
+          Pengembangan soft skills (Public Speaking, Leadership, &amp; Teamwork)
+        </li>
+      </ul>
+    </div>
+
     <!-- Highlight: siapa yang sudah daftar -->
     <div class="highlight-panel">
       <div class="highlight-head">
@@ -224,6 +251,11 @@ onMounted(loadHighlight)
 .field:focus { box-shadow: 4px 4px 0 var(--vibrant-yellow); border-color: var(--dark-navy); }
 .highlight-panel { position: relative; overflow: hidden; }
 .highlight-panel::after { content:''; position:absolute; inset:0; background: radial-gradient(ellipse 60% 40% at 95% 0%, rgba(255,230,0,0.06), transparent 60%); pointer-events:none; }
+.benefit-section { width:100%; margin-top:18px; padding:18px clamp(18px,3vw,28px); background:rgba(11,86,155,0.06); border:3px solid var(--royal-blue); box-shadow:7px 7px 0 var(--royal-blue); }
+.benefit-title { font-size:18px; font-weight:900; color:var(--royal-blue); text-align:center; margin:0 0 14px; }
+.benefit-list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:10px; }
+.benefit-item { display:flex; align-items:flex-start; gap:10px; font-size:14px; font-weight:600; color:var(--dark-navy); line-height:1.5; }
+.benefit-check { flex:0 0 auto; color:var(--royal-blue); font-weight:900; font-size:16px; margin-top:1px; }
 @media (max-width:760px){
   .form-page{ padding-left:14px; padding-right:14px; }
   .play-layout{ grid-template-columns:1fr; gap:18px; }

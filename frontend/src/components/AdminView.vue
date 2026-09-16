@@ -271,9 +271,9 @@ const stats = computed(() => ({
   today: members.value.filter(m => wibDay(m.timestamp) === todayWIB()).length
 }))
 
-const spinnerItems = ref([])
-const spinnerSegmentCount = ref(8)
+const spinnerPrizes = ref([])
 const spinnerNewItem = ref('')
+const spinnerNewCount = ref(1)
 const spinnerSaving = ref(false)
 const spinnerLoading = ref(false)
 
@@ -281,35 +281,32 @@ async function loadSpinner() {
   spinnerLoading.value = true
   try {
     const data = await api.spinner()
-    spinnerItems.value = data.items || []
-    spinnerSegmentCount.value = data.segmentCount || (data.items?.length || 4) * 2
-  } catch { spinnerItems.value = [] }
+    spinnerPrizes.value = data.prizes || []
+  } catch { spinnerPrizes.value = [] }
   finally { spinnerLoading.value = false }
 }
 
 function addSpinnerItem() {
   const v = spinnerNewItem.value.trim()
-  if (!v || spinnerItems.value.includes(v)) return
-  spinnerItems.value.push(v)
-  if (spinnerSegmentCount.value < spinnerItems.value.length) {
-    spinnerSegmentCount.value = spinnerItems.value.length
-  }
+  if (!v) return
+  if (spinnerPrizes.value.some(p => p.name === v)) return
+  spinnerPrizes.value.push({ name: v, count: Math.max(1, Math.min(Number(spinnerNewCount.value) || 1, 20)) })
   spinnerNewItem.value = ''
+  spinnerNewCount.value = 1
 }
 
 function removeSpinnerItem(i) {
-  spinnerItems.value.splice(i, 1)
-  if (spinnerSegmentCount.value < spinnerItems.value.length) {
-    spinnerSegmentCount.value = spinnerItems.value.length
-  }
+  spinnerPrizes.value.splice(i, 1)
 }
 
+const spinnerTotalSegments = computed(() => spinnerPrizes.value.reduce((sum, p) => sum + (p.count || 0), 0))
+
 async function saveSpinner() {
-  if (spinnerItems.value.length < 2 || spinnerSaving.value) return
+  if (spinnerPrizes.value.length < 2 || spinnerSaving.value) return
   spinnerSaving.value = true
   try {
     const t = localStorage.getItem('admin_token') || ''
-    await api.updateSpinner(spinnerItems.value, spinnerSegmentCount.value, t)
+    await api.updateSpinner(spinnerPrizes.value, t)
   } catch { /* silent */ }
   finally { spinnerSaving.value = false }
 }
@@ -497,29 +494,25 @@ onMounted(async () => {
             <div v-if="spinnerLoading" class="loading-row"><span class="loading-dot"></span> Memuat...</div>
             <template v-else>
               <div class="spinner-item-list">
-                <div v-for="(item, i) in spinnerItems" :key="i" class="spinner-item-row">
+                <div v-for="(prize, i) in spinnerPrizes" :key="i" class="spinner-item-row">
                   <span class="spinner-item-num">{{ i + 1 }}</span>
-                  <input v-model="spinnerItems[i]" class="spinner-item-input" maxlength="40" placeholder="Nama hadiah" />
+                  <input v-model="prize.name" class="spinner-item-input" maxlength="40" placeholder="Nama hadiah" />
+                  <div class="spinner-count-wrap">
+                    <label class="tiny muted">Porsi</label>
+                    <input type="number" v-model.number="prize.count" min="1" max="20" class="spinner-count-input" />
+                  </div>
                   <button class="btn-icon danger" @click="removeSpinnerItem(i)" title="Hapus item">&times;</button>
                 </div>
-                <p v-if="spinnerItems.length === 0" class="tiny muted">Belum ada item. Tambahkan minimal 2 item.</p>
+                <p v-if="spinnerPrizes.length === 0" class="tiny muted">Belum ada item. Tambahkan minimal 2 hadiah.</p>
               </div>
               <div class="spinner-add-row">
-                <input v-model="spinnerNewItem" class="field" placeholder="Nama hadiah (contoh: Stiker)" @keyup.enter="addSpinnerItem" />
+                <input v-model="spinnerNewItem" class="field spinner-add-name" placeholder="Nama hadiah" @keyup.enter="addSpinnerItem" />
+                <input type="number" v-model.number="spinnerNewCount" min="1" max="20" class="spinner-count-input" placeholder="Porsi" />
                 <button class="btn sm" @click="addSpinnerItem" :disabled="!spinnerNewItem.trim()">Tambah</button>
               </div>
-              <div class="spinner-config-row">
-                <label class="field-label">Jumlah Segmen Roda: <b>{{ spinnerSegmentCount }}</b></label>
-                <input type="range" v-model.number="spinnerSegmentCount" :min="Math.max(spinnerItems.length, 2)" max="16" step="1" class="spinner-slider" />
-                <div class="spinner-seg-hint">
-                  <span>{{ Math.max(spinnerItems.length, 2) }}</span>
-                  <span>16</span>
-                </div>
-                <p class="tiny muted" style="margin-top:4px;">{{ spinnerItems.length }} item hadiah → {{ spinnerSegmentCount }} segmen visual di roda.</p>
-              </div>
               <div class="spinner-save-row">
-                <span class="tiny muted">{{ spinnerItems.length }} item</span>
-                <button class="btn sm" @click="saveSpinner" :disabled="spinnerSaving || spinnerItems.length < 2">
+                <span class="tiny muted">{{ spinnerPrizes.length }} hadiah &middot; {{ spinnerTotalSegments }} blok roda</span>
+                <button class="btn sm" @click="saveSpinner" :disabled="spinnerSaving || spinnerPrizes.length < 2">
                   {{ spinnerSaving ? 'Menyimpan...' : 'Simpan' }}
                 </button>
               </div>
@@ -685,17 +678,14 @@ onMounted(async () => {
 .spinner-item-num { font-size: 12px; font-weight: 900; color: var(--royal-blue); min-width: 20px; }
 .spinner-item-input { flex: 1; border: 2px solid #e2e8f0; background: #fff; padding: 6px 8px; font: inherit; font-size: 14px; font-weight: 700; }
 .spinner-item-input:focus { outline: none; border-color: var(--royal-blue); box-shadow: 2px 2px 0 var(--vibrant-yellow); }
+.spinner-count-wrap { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 50px; }
+.spinner-count-input { width: 50px; padding: 6px 4px; border: 2px solid #e2e8f0; background: #fff; text-align: center; font: inherit; font-size: 14px; font-weight: 700; }
+.spinner-count-input:focus { outline: none; border-color: var(--royal-blue); box-shadow: 2px 2px 0 var(--vibrant-yellow); }
 .btn-icon { display: grid; place-items: center; width: 28px; height: 28px; border: 2px solid transparent; background: transparent; font-size: 18px; font-weight: 900; cursor: pointer; }
 .btn-icon.danger { color: #E74C3C; }
 .btn-icon.danger:hover { background: #fef2f2; border-color: #E74C3C; }
-.spinner-add-row { display: flex; gap: 8px; margin-bottom: 10px; }
-.spinner-add-row .field { flex: 1; }
-.spinner-config-row { margin-bottom: 10px; padding: 12px; background: #f8fafc; border: 2px solid #e2e8f0; }
-.spinner-config-row .field-label { display: block; margin-bottom: 6px; font-size: 12px; font-weight: 800; }
-.spinner-slider { width: 100%; height: 6px; appearance: none; background: #cbd5e1; border-radius: 3px; outline: none; cursor: pointer; }
-.spinner-slider::-webkit-slider-thumb { appearance: none; width: 20px; height: 20px; border-radius: 50%; background: var(--dark-navy); border: 3px solid var(--vibrant-yellow); cursor: pointer; }
-.spinner-slider::-moz-range-thumb { width: 20px; height: 20px; border-radius: 50%; background: var(--dark-navy); border: 3px solid var(--vibrant-yellow); cursor: pointer; }
-.spinner-seg-hint { display: flex; justify-content: space-between; font-size: 10px; font-weight: 800; color: #94a3b8; margin-top: 2px; }
+.spinner-add-row { display: flex; gap: 8px; margin-bottom: 10px; align-items: end; }
+.spinner-add-name { flex: 1; }
 .spinner-save-row { display: flex; justify-content: space-between; align-items: center; padding-top: 10px; border-top: 2px solid #e2e8f0; }
 .spinner-save-row .btn { min-width: 100px; }
 </style>

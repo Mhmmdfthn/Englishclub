@@ -8,8 +8,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['close'])
 
-const items = ref([])
-const segmentCount = ref(8)
+const prizes = ref([])
 const spinning = ref(false)
 const rotation = ref(0)
 const wonPrize = ref('')
@@ -18,20 +17,17 @@ const loading = ref(true)
 
 const SPIN_DURATION = 4000
 
-const wheelItems = computed(() => {
-  const list = items.value
-  if (list.length === 0) return []
-  const target = segmentCount.value || list.length * 2
+const wheelSegments = computed(() => {
   const result = []
-  let i = 0
-  while (result.length < target) {
-    result.push(list[i % list.length])
-    i++
+  for (const p of prizes.value) {
+    for (let i = 0; i < (p.count || 1); i++) {
+      result.push(p.name)
+    }
   }
   return result
 })
 
-const segmentAngle = computed(() => 360 / wheelItems.value.length)
+const segmentAngle = computed(() => 360 / wheelSegments.value.length)
 
 const COLORS = ['#0B569E', '#FFD700', '#128C7E', '#E74C3C', '#8E44AD', '#2ECC71', '#F39C12', '#3498DB']
 
@@ -66,18 +62,18 @@ function textTransform(angle, index) {
 }
 
 async function spin() {
-  if (spinning.value || wheelItems.value.length === 0) return
+  if (spinning.value || wheelSegments.value.length === 0) return
   spinning.value = true
   showResult.value = false
   wonPrize.value = ''
-  const winIndex = Math.floor(Math.random() * wheelItems.value.length)
-  const anglePerSegment = 360 / wheelItems.value.length
+  const winIndex = Math.floor(Math.random() * wheelSegments.value.length)
+  const anglePerSegment = 360 / wheelSegments.value.length
   const fullSpins = 5 + Math.floor(Math.random() * 3)
   const targetAngle = 360 - (winIndex * anglePerSegment + anglePerSegment / 2)
   rotation.value += fullSpins * 360 + targetAngle
   await new Promise(resolve => setTimeout(resolve, SPIN_DURATION + 100))
   spinning.value = false
-  wonPrize.value = wheelItems.value[winIndex]
+  wonPrize.value = wheelSegments.value[winIndex]
   showResult.value = true
   try {
     await api.claimPrize(props.storyId, wonPrize.value)
@@ -92,9 +88,8 @@ function closeResult() {
 onMounted(async () => {
   try {
     const data = await api.spinner()
-    items.value = data.items || []
-    segmentCount.value = data.segmentCount || (data.items?.length || 4) * 2
-  } catch { items.value = [] }
+    prizes.value = data.prizes || []
+  } catch { prizes.value = [] }
   finally { loading.value = false }
 })
 </script>
@@ -106,15 +101,15 @@ onMounted(async () => {
 
       <div v-if="loading" class="spinner-loading">Memuat hadiah...</div>
 
-      <template v-else-if="wheelItems.length > 0 && !showResult">
+      <template v-else-if="wheelSegments.length > 0 && !showResult">
         <div class="spinner-header">
-          <h3>🎯 Lucky Spinner</h3>
+          <h3>Lucky Spinner</h3>
           <p>Selamat datang, <b>{{ storyName }}</b>! Putar roda untuk mendapatkan hadiah.</p>
         </div>
         <div class="spinner-wheel-wrap">
           <div class="spinner-pointer"></div>
           <svg class="spinner-wheel" :style="wheelStyle" viewBox="0 0 300 300">
-            <g v-for="(item, i) in wheelItems" :key="i">
+            <g v-for="(item, i) in wheelSegments" :key="i">
               <path :d="segmentPath(segmentAngle, i)" :fill="segmentColor(i)" stroke="#fff" stroke-width="2" />
               <text :transform="textTransform(segmentAngle, i)" text-anchor="middle" dominant-baseline="middle" fill="#fff" font-size="13" font-weight="800">{{ item }}</text>
             </g>

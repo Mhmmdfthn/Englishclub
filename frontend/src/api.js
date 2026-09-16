@@ -130,11 +130,11 @@ export const api = {
       body: buildForm(data, file),
     }, 30000),
   spinner: () => req('/api/spinner'),
-  updateSpinner: (items, segmentCount, token) =>
+  updateSpinner: (prizes, token) =>
     req('/api/spinner', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ items, segmentCount }),
+      body: JSON.stringify({ prizes }),
     }, 10000),
   claimPrize: (storyId, prize_won) =>
     req(`/api/stories/${storyId}/prize`, {
