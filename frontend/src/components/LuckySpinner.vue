@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { api } from '../api.js'
 
 const props = defineProps({
@@ -9,24 +9,26 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 const items = ref([])
+const segmentCount = ref(8)
 const spinning = ref(false)
 const rotation = ref(0)
 const wonPrize = ref('')
 const showResult = ref(false)
 const loading = ref(true)
 
-const MIN_ITEMS = 4
 const SPIN_DURATION = 4000
 
 const wheelItems = computed(() => {
   const list = items.value
   if (list.length === 0) return []
-  if (list.length >= MIN_ITEMS) return list
-  const extended = []
-  while (extended.length < MIN_ITEMS) {
-    for (const item of list) { if (extended.length >= MIN_ITEMS) break; extended.push(item) }
+  const target = segmentCount.value || list.length * 2
+  const result = []
+  let i = 0
+  while (result.length < target) {
+    result.push(list[i % list.length])
+    i++
   }
-  return extended
+  return result
 })
 
 const segmentAngle = computed(() => 360 / wheelItems.value.length)
@@ -91,6 +93,7 @@ onMounted(async () => {
   try {
     const data = await api.spinner()
     items.value = data.items || []
+    segmentCount.value = data.segmentCount || (data.items?.length || 4) * 2
   } catch { items.value = [] }
   finally { loading.value = false }
 })

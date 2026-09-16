@@ -272,6 +272,7 @@ const stats = computed(() => ({
 }))
 
 const spinnerItems = ref([])
+const spinnerSegmentCount = ref(8)
 const spinnerNewItem = ref('')
 const spinnerSaving = ref(false)
 const spinnerLoading = ref(false)
@@ -281,6 +282,7 @@ async function loadSpinner() {
   try {
     const data = await api.spinner()
     spinnerItems.value = data.items || []
+    spinnerSegmentCount.value = data.segmentCount || (data.items?.length || 4) * 2
   } catch { spinnerItems.value = [] }
   finally { spinnerLoading.value = false }
 }
@@ -289,11 +291,17 @@ function addSpinnerItem() {
   const v = spinnerNewItem.value.trim()
   if (!v || spinnerItems.value.includes(v)) return
   spinnerItems.value.push(v)
+  if (spinnerSegmentCount.value < spinnerItems.value.length) {
+    spinnerSegmentCount.value = spinnerItems.value.length
+  }
   spinnerNewItem.value = ''
 }
 
 function removeSpinnerItem(i) {
   spinnerItems.value.splice(i, 1)
+  if (spinnerSegmentCount.value < spinnerItems.value.length) {
+    spinnerSegmentCount.value = spinnerItems.value.length
+  }
 }
 
 async function saveSpinner() {
@@ -301,7 +309,7 @@ async function saveSpinner() {
   spinnerSaving.value = true
   try {
     const t = localStorage.getItem('admin_token') || ''
-    await api.updateSpinner(spinnerItems.value, t)
+    await api.updateSpinner(spinnerItems.value, spinnerSegmentCount.value, t)
   } catch { /* silent */ }
   finally { spinnerSaving.value = false }
 }
@@ -500,6 +508,15 @@ onMounted(async () => {
                 <input v-model="spinnerNewItem" class="field" placeholder="Nama hadiah (contoh: Stiker)" @keyup.enter="addSpinnerItem" />
                 <button class="btn sm" @click="addSpinnerItem" :disabled="!spinnerNewItem.trim()">Tambah</button>
               </div>
+              <div class="spinner-config-row">
+                <label class="field-label">Jumlah Segmen Roda: <b>{{ spinnerSegmentCount }}</b></label>
+                <input type="range" v-model.number="spinnerSegmentCount" :min="Math.max(spinnerItems.length, 2)" max="16" step="1" class="spinner-slider" />
+                <div class="spinner-seg-hint">
+                  <span>{{ Math.max(spinnerItems.length, 2) }}</span>
+                  <span>16</span>
+                </div>
+                <p class="tiny muted" style="margin-top:4px;">{{ spinnerItems.length }} item hadiah → {{ spinnerSegmentCount }} segmen visual di roda.</p>
+              </div>
               <div class="spinner-save-row">
                 <span class="tiny muted">{{ spinnerItems.length }} item</span>
                 <button class="btn sm" @click="saveSpinner" :disabled="spinnerSaving || spinnerItems.length < 2">
@@ -672,6 +689,12 @@ onMounted(async () => {
 .btn-icon.danger:hover { background: #fef2f2; border-color: #E74C3C; }
 .spinner-add-row { display: flex; gap: 8px; margin-bottom: 10px; }
 .spinner-add-row .field { flex: 1; }
+.spinner-config-row { margin-bottom: 10px; padding: 12px; background: #f8fafc; border: 2px solid #e2e8f0; }
+.spinner-config-row .field-label { display: block; margin-bottom: 6px; font-size: 12px; font-weight: 800; }
+.spinner-slider { width: 100%; height: 6px; appearance: none; background: #cbd5e1; border-radius: 3px; outline: none; cursor: pointer; }
+.spinner-slider::-webkit-slider-thumb { appearance: none; width: 20px; height: 20px; border-radius: 50%; background: var(--dark-navy); border: 3px solid var(--vibrant-yellow); cursor: pointer; }
+.spinner-slider::-moz-range-thumb { width: 20px; height: 20px; border-radius: 50%; background: var(--dark-navy); border: 3px solid var(--vibrant-yellow); cursor: pointer; }
+.spinner-seg-hint { display: flex; justify-content: space-between; font-size: 10px; font-weight: 800; color: #94a3b8; margin-top: 2px; }
 .spinner-save-row { display: flex; justify-content: space-between; align-items: center; padding-top: 10px; border-top: 2px solid #e2e8f0; }
 .spinner-save-row .btn { min-width: 100px; }
 </style>

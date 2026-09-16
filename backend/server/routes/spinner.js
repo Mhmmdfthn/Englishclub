@@ -6,6 +6,7 @@ import { auditAdmin } from '../utils/audit.js'
 
 const r = Router()
 const DEFAULT_ITEMS = ['Stiker', 'Permen', 'Gantungan Kunci', 'Pin']
+const DEFAULT_SEGMENT_COUNT = 8
 
 async function requireAdmin(req, res, next) {
   const bearer = (req.header('authorization') || '').replace(/^Bearer\s+/i, '')
@@ -20,27 +21,30 @@ async function requireAdmin(req, res, next) {
   return res.status(401).json({ detail: 'Unauthorized' })
 }
 
-async function getSpinnerItems() {
+async function getSpinnerConfig() {
   if (isKvEnabled()) {
     const { kv } = await import('@vercel/kv')
-    const items = await kv.get('config:spinner_items')
-    if (Array.isArray(items) && items.length > 0) return items
-    return DEFAULT_ITEMS
+    const raw = await kv.get('config:spinner_items')
+    if (Array.isArray(raw)) return { items: raw, segmentCount: DEFAULT_SEGMENT_COUNT }
+    if (raw && typeof raw === 'object' && Array.isArray(raw.items)) {
+      return { items: raw.items, segmentCount: raw.segmentCount || DEFAULT_SEGMENT_COUNT }
+    }
+    return { items: DEFAULT_ITEMS, segmentCount: DEFAULT_SEGMENT_COUNT }
   }
-  return DEFAULT_ITEMS
+  return { items: DEFAULT_ITEMS, segmentCount: DEFAULT_SEGMENT_COUNT }
 }
 
-async function saveSpinnerItems(items) {
+async function saveSpinnerConfig(items, segmentCount) {
   if (isKvEnabled()) {
     const { kv } = await import('@vercel/kv')
-    await kv.set('config:spinner_items', items)
+    await kv.set('config:spinner_items', { items, segmentCount })
   }
 }
 
 r.get('/', async (req, res) => {
   try {
-    const items = await getSpinnerItems()
-    res.json({ items })
+    const config = await getSpinnerConfig()
+    res.json(config)
   } catch (e) {
     console.error('Spinner GET error:', e)
     res.status(503).json({ error: 'Database sibuk, silakan coba lagi' })
@@ -49,13 +53,14 @@ r.get('/', async (req, res) => {
 
 r.put('/', requireAdmin, async (req, res) => {
   try {
-    const { items } = req.body
-    if (!Array.isArray(items) || items.length < 1) return res.status(422).json({ detail: 'items harus array minimal 1 item' })
+    const { items, segmentCount } = req.body
+    if (!Array.isArray(items) || items.length < 2) return res.status(422).json({ detail: 'items harus array minimal 2 item' })
     const cleaned = items.filter(i => typeof i === 'string' && i.trim()).map(i => i.trim().slice(0, 40))
-    if (cleaned.length === 0) return res.status(422).json({ detail: 'items tidak boleh kosong' })
-    await saveSpinnerItems(cleaned)
-    await auditAdmin('Spinner items diubah', req.admin?.username || 'admin', { jumlah: cleaned.length })
-    res.json({ ok: true, items: cleaned })
+    if (cleaned.length < 2) return res.status(422).json({ detail: 'items minimal 2 item tidak kosong' })
+    const sc = Math.max(cleaned.length, Math.min(Number(segmentCount) || cleaned.length * 2, 16))
+    await saveSpinnerConfig(cleaned, sc)
+    await auditAdmin('Spinner config diubah', req.admin?.username || 'admin', { items: cleaned.length, segmentCount: sc })
+    res.json({ ok: true, items: cleaned, segmentCount: sc })
   } catch (e) {
     console.error('Spinner PUT error:', e)
     res.status(503).json({ error: 'Database sibuk, silakan coba lagi' })
