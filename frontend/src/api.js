@@ -129,6 +129,18 @@ export const api = {
       headers: { Authorization: `Bearer ${token}` },
       body: buildForm(data, file),
     }, 30000),
+  spinner: () => req('/api/spinner'),
+  updateSpinner: (items, token) =>
+    req('/api/spinner', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ items }),
+    }, 10000),
+  claimPrize: (storyId, prize_won) =>
+    req(`/api/stories/${storyId}/prize`, {
+      method: 'PATCH',
+      body: JSON.stringify({ prize_won }),
+    }),
 }
 
 function buildForm(data, file) {

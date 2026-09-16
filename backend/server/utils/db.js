@@ -1,5 +1,5 @@
 import { isDbEnabled, getDb } from './pg.js'
-import { cloudAddScore, cloudAddStory, cloudLatestStories, cloudTopScores, isKvEnabled } from './cloudStore.js'
+import { cloudAddScore, cloudAddStory, cloudLatestStories, cloudTopScores, cloudUpdateStoryPrize, isKvEnabled } from './cloudStore.js'
 import { withWIB } from './time.js'
 
 let memoryScores = []
@@ -53,5 +53,17 @@ export const db = {
       return withWIB(rows)
     }
     return withWIB([...memoryStories].reverse().slice(0, limit).map(r => ({ name: r.name, batch: r.batch, comment: r.comment, created_at: r.created_at })))
+  },
+  async updateStoryPrize(id, prize_won) {
+    if (isKvEnabled()) return cloudUpdateStoryPrize(id, prize_won)
+    if (isDbEnabled()) {
+      const pool = getDb()
+      const { rows } = await pool.query('UPDATE stories SET prize_won=$1 WHERE name=$2 RETURNING name, batch, comment, prize_won, created_at', [prize_won, id])
+      return rows[0] || null
+    }
+    const idx = memoryStories.findIndex(r => r.name === id)
+    if (idx === -1) return null
+    memoryStories[idx].prize_won = prize_won
+    return { name: memoryStories[idx].name, batch: memoryStories[idx].batch, comment: memoryStories[idx].comment, prize_won, created_at: memoryStories[idx].created_at }
   },
 }

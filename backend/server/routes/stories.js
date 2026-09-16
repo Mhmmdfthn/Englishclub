@@ -29,4 +29,17 @@ r.post('/', async (req, res) => {
   }
 })
 
+r.patch('/:id/prize', async (req, res) => {
+  try {
+    const { prize_won } = req.body
+    if (!prize_won || typeof prize_won !== 'string') return res.status(422).json({ detail: 'prize_won wajib diisi' })
+    const updated = await db.updateStoryPrize(req.params.id, prize_won.trim().slice(0, 40))
+    if (!updated) return res.status(404).json({ detail: 'Story tidak ditemukan' })
+    res.json({ ok: true, story: updated })
+  } catch (e) {
+    console.error('Stories PATCH error:', e)
+    res.status(503).json({ error: 'Database sibuk, silakan coba lagi' })
+  }
+})
+
 export default r

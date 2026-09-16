@@ -27,6 +27,7 @@ import stories from './routes/stories.js'
 import members from './routes/members.js'
 import admin from './routes/admin.js'
 import proker from './routes/proker.js'
+import spinner from './routes/spinner.js'
 
 app.use('/api/ping', ping)
 app.use('/api/game', game)
@@ -35,6 +36,7 @@ app.use('/api/stories', stories)
 app.use('/api/members', members)
 app.use('/api/admin', admin)
 app.use('/api/proker', proker)
+app.use('/api/spinner', spinner)
 
 // serve uploads for gallery (Vercel: /tmp writable only)
 import { existsSync as existsUpload } from 'fs'

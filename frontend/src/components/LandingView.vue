@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { Instagram, Send } from 'lucide-vue-next'
 import { api } from '../api.js'
 import Testimonials from './Testimonials.vue'
+import LuckySpinner from './LuckySpinner.vue'
 
 const emit = defineEmits(['goPlay', 'goBoard', 'goRegister', 'openAdmin', 'goArticle'])
 const storyName = ref('')
@@ -12,6 +13,10 @@ const stories = ref([])
 const storyError = ref('')
 const storySubmitting = ref(false)
 const batchOptions = ['2026 / Ilmu Komputer', '2026 / Manajemen', '2026 / Akuntansi', '2026 / Bisnis Digital', '2026 / Sains Data', '2026 / Agribisnis']
+
+const showSpinner = ref(false)
+const lastStoryId = ref('')
+const lastStoryName = ref('')
 
 const proker = ref([])
 const activeFilter = ref('all')
@@ -68,6 +73,9 @@ async function submitStory() {
   try {
     const response = await api.addStory(name, storyBatch.value || 'Pengunjung Stand', comment)
     stories.value.unshift(response.story)
+    lastStoryId.value = response.story.name
+    lastStoryName.value = name
+    showSpinner.value = true
     storyName.value = ''
     storyBatch.value = ''
     storyComment.value = ''
@@ -153,6 +161,8 @@ function goRegister() {
 
     <footer class="site-footer"><div><b>English Club UPB</b><span>Universitas Putra Bangsa Kebumen</span></div><div class="social-links"><a href="https://www.instagram.com/ukmenglishclub_upb/" target="_blank" rel="noreferrer" aria-label="Instagram English Club UPB" title="Instagram"><Instagram :size="21" :stroke-width="2.2" aria-hidden="true" /></a><a href="https://www.tiktok.com/@englishclub.upb_ofc" target="_blank" rel="noreferrer" aria-label="TikTok English Club UPB" title="TikTok"><svg class="tiktok-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.95-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.5.18-1.9 1.12-3.72 2.57-4.96 1.55-1.34 3.74-1.93 5.78-1.56.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.6.24 1.65 1.82 3.05 3.5 3.01 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.88.06-3.76.07-5.64.01-4.24-.01-8.47.02-12.7z" fill="currentColor" /></svg></a></div><p>© 2026 English Club, Universitas Putra Bangsa Kebumen</p></footer>
   </section>
+
+  <LuckySpinner v-if="showSpinner" :story-id="lastStoryId" :story-name="lastStoryName" @close="showSpinner = false" />
 </template>
 
 <style scoped>

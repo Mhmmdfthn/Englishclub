@@ -108,6 +108,17 @@ export async function cloudAddStory(name, batch, comment) {
   return row
 }
 
+export async function cloudUpdateStoryPrize(id, prize_won) {
+  if (!isKvEnabled()) return null
+  const { kv } = await import('@vercel/kv')
+  const rows = await readKvList(KV_KEYS.stories, LEGACY_KV_KEYS.stories)
+  const idx = rows.findIndex(r => r.name === id)
+  if (idx === -1) return null
+  rows[idx] = { ...rows[idx], prize_won }
+  await kv.set(KV_KEYS.stories, rows)
+  return { name: rows[idx].name, batch: rows[idx].batch, comment: rows[idx].comment, prize_won, created_at: rows[idx].created_at }
+}
+
 export async function cloudGetProker() {
   try {
     const prokers = await kv.get(KV_KEYS.proker)

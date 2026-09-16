@@ -271,6 +271,41 @@ const stats = computed(() => ({
   today: members.value.filter(m => wibDay(m.timestamp) === todayWIB()).length
 }))
 
+const spinnerItems = ref([])
+const spinnerNewItem = ref('')
+const spinnerSaving = ref(false)
+const spinnerLoading = ref(false)
+
+async function loadSpinner() {
+  spinnerLoading.value = true
+  try {
+    const data = await api.spinner()
+    spinnerItems.value = data.items || []
+  } catch { spinnerItems.value = [] }
+  finally { spinnerLoading.value = false }
+}
+
+function addSpinnerItem() {
+  const v = spinnerNewItem.value.trim()
+  if (!v || spinnerItems.value.includes(v)) return
+  spinnerItems.value.push(v)
+  spinnerNewItem.value = ''
+}
+
+function removeSpinnerItem(i) {
+  spinnerItems.value.splice(i, 1)
+}
+
+async function saveSpinner() {
+  if (spinnerItems.value.length < 2 || spinnerSaving.value) return
+  spinnerSaving.value = true
+  try {
+    const t = localStorage.getItem('admin_token') || ''
+    await api.updateSpinner(spinnerItems.value, t)
+  } catch { /* silent */ }
+  finally { spinnerSaving.value = false }
+}
+
 onMounted(async () => {
   await checkAuth()
   if (authed.value) { await Promise.all([fetchMembers(), loadProker()]) }
@@ -317,6 +352,10 @@ onMounted(async () => {
         <button class="side-item" :class="{active: activeTab==='proker'}" @click="activeTab='proker'">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
           <span>Proker</span><b class="count">{{ proker.length }}</b>
+        </button>
+        <button class="side-item" :class="{active: activeTab==='spinner'}" @click="activeTab='spinner'; loadSpinner()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+          <span>Spinner</span>
         </button>
         <div class="side-spacer"></div>
         <button class="side-item logout" @click="logout">
@@ -439,6 +478,35 @@ onMounted(async () => {
                 <div class="action-group"><button class="btn sm" @click="saveProker(p)" :disabled="savingProker[p.id]">{{ savingProker[p.id] ? 'Menyimpan...' : 'Simpan' }}</button><button class="btn sm danger" @click="confirmDeleteProker(p)">Hapus</button></div>
               </div>
             </article>
+          </div>
+        </div>
+
+        <!-- Spinner -->
+        <div v-if="activeTab==='spinner'">
+          <h2 class="section-title">Lucky Spinner</h2>
+          <p class="tiny muted" style="margin-bottom:16px;">Kelola item hadiah roda keberuntungan untuk pengunjung stand.</p>
+          <div class="spinner-admin-card">
+            <div v-if="spinnerLoading" class="loading-row"><span class="loading-dot"></span> Memuat...</div>
+            <template v-else>
+              <div class="spinner-item-list">
+                <div v-for="(item, i) in spinnerItems" :key="i" class="spinner-item-row">
+                  <span class="spinner-item-num">{{ i + 1 }}</span>
+                  <span class="spinner-item-text">{{ item }}</span>
+                  <button class="btn-icon danger" @click="removeSpinnerItem(i)" title="Hapus item">&times;</button>
+                </div>
+                <p v-if="spinnerItems.length === 0" class="tiny muted">Belum ada item. Tambahkan minimal 2 item.</p>
+              </div>
+              <div class="spinner-add-row">
+                <input v-model="spinnerNewItem" class="field" placeholder="Nama hadiah (contoh: Stiker)" @keyup.enter="addSpinnerItem" />
+                <button class="btn sm" @click="addSpinnerItem" :disabled="!spinnerNewItem.trim()">Tambah</button>
+              </div>
+              <div class="spinner-save-row">
+                <span class="tiny muted">{{ spinnerItems.length }} item</span>
+                <button class="btn sm" @click="saveSpinner" :disabled="spinnerSaving || spinnerItems.length < 2">
+                  {{ spinnerSaving ? 'Menyimpan...' : 'Simpan' }}
+                </button>
+              </div>
+            </template>
           </div>
         </div>
       </main>
@@ -594,4 +662,16 @@ onMounted(async () => {
   .confirm-actions .btn { min-height: 44px; }
   .login-card { padding: 20px 16px; box-shadow: 6px 6px 0 var(--dark-navy); }
 }
+.spinner-admin-card { background: #fff; border: 3px solid var(--dark-navy); box-shadow: 6px 6px 0 var(--dark-navy); padding: 20px; }
+.spinner-item-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.spinner-item-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: #f8fafc; border: 2px solid #e2e8f0; }
+.spinner-item-num { font-size: 12px; font-weight: 900; color: var(--royal-blue); min-width: 20px; }
+.spinner-item-text { flex: 1; font-size: 14px; font-weight: 700; }
+.btn-icon { display: grid; place-items: center; width: 28px; height: 28px; border: 2px solid transparent; background: transparent; font-size: 18px; font-weight: 900; cursor: pointer; }
+.btn-icon.danger { color: #E74C3C; }
+.btn-icon.danger:hover { background: #fef2f2; border-color: #E74C3C; }
+.spinner-add-row { display: flex; gap: 8px; margin-bottom: 10px; }
+.spinner-add-row .field { flex: 1; }
+.spinner-save-row { display: flex; justify-content: space-between; align-items: center; padding-top: 10px; border-top: 2px solid #e2e8f0; }
+.spinner-save-row .btn { min-width: 100px; }
 </style>
