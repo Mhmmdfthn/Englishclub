@@ -79,3 +79,30 @@ export async function destroyByUrl(url) {
     return false
   }
 }
+
+const IMAGE_EXT_RE = /\.(jpe?g|png|gif|webp|avif|bmp|svg)$/i
+
+// Validasi URL gambar eksternal (direct link): skema http/https, ekstensi
+// gambar, lalu HEAD request memastikan Content-Type image/*. Throws Error
+// deskriptif agar ditolak backend; valid -> kembalikan URL ternormalisasi.
+export async function validateExternalImage(url) {
+  const raw = String(url || '').trim()
+  if (!raw) throw new Error('URL gambar wajib diisi')
+  if (raw.length > 2048) throw new Error('URL gambar terlalu panjang')
+  let parsed
+  try { parsed = new URL(raw) } catch { throw new Error('URL gambar tidak valid') }
+  if (!/^https?:$/.test(parsed.protocol)) throw new Error('URL gambar wajib direct link http/https')
+  if (!IMAGE_EXT_RE.test(parsed.pathname)) {
+    throw new Error('URL harus berakhiran .jpg/.jpeg/.png/.gif/.webp (Direct Image Link)')
+  }
+  let res
+  try {
+    res = await fetch(raw, { method: 'HEAD', redirect: 'follow' })
+  } catch {
+    throw new Error('URL gambar tidak dapat diakses')
+  }
+  if (!res.ok) throw new Error(`URL gambar tidak dapat diakses (status ${res.status})`)
+  const ct = (res.headers.get('content-type') || '').toLowerCase()
+  if (!ct.startsWith('image/')) throw new Error('URL bukan gambar langsung (Content-Type bukan image)')
+  return raw
+}

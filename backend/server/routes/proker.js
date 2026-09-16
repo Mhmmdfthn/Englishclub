@@ -2,12 +2,12 @@ import { Router } from 'express'
 import multer from 'multer'
 import { join, dirname, extname } from 'path'
 import { fileURLToPath } from 'url'
-import { existsSync, mkdirSync, unlinkSync } from 'fs'
+import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'fs'
 import { getAll, getById, addProker, deleteProker, updateProker, addPhotos, removePhoto } from '../utils/prokerStore.js'
 import { verifyToken, verifyTokenAsync } from '../utils/auth.js'
 import { isDbEnabled } from '../utils/pg.js'
 import { auditAdmin, auditTech, auditTechThrottled } from '../utils/audit.js'
-import { isCloudinaryEnabled, uploadBuffer, destroyByUrl, destroyPublicId } from '../utils/cloudinary.js'
+import { isCloudinaryEnabled, uploadBuffer, destroyByUrl, destroyPublicId, extractPublicId, validateExternalImage } from '../utils/cloudinary.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const isServerless = Boolean(
@@ -50,6 +50,35 @@ const upload = multer({
   }
 })
 
+// Cover image selalu ditampung in-memory (dipakai create & edit), lalu
+// di-upload ke Cloudinary atau ditulis ke disk bila Cloudinary nonaktif.
+const coverUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith('image/')) return cb(new Error('Hanya file gambar'))
+    cb(null, true)
+  }
+})
+
+// Simpan satu file cover; kembalikan { imageUrl, imagePublicId }.
+async function saveCoverFile(file) {
+  if (useCloudinary) {
+    const { url, publicId } = await uploadBuffer(file.buffer, file.originalname)
+    return { imageUrl: url, imagePublicId: publicId }
+  }
+  const ext = extname(file.originalname) || '.jpg'
+  const fname = `cover-${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`
+  writeFileSync(join(uploadsDir, fname), file.buffer)
+  return { imageUrl: `/uploads/${fname}`, imagePublicId: '' }
+}
+
+// public_id asal yang layak di-destroy KETIKA media diganti/dihapus.
+function coverPublicId(proker) {
+  if (!proker) return ''
+  return proker.imagePublicId || extractPublicId(proker.imageUrl || '')
+}
+
 async function requireAdmin(req, res, next) {
   const bearer = (req.header('authorization') || '').replace(/^Bearer\s+/i, '')
   const legacy = req.header('x-admin-token')
@@ -86,17 +115,32 @@ r.get('/:id', async (req, res) => {
   }
 })
 
-r.post('/', requireAdmin, async (req, res) => {
+r.post('/', requireAdmin, coverUpload.single('image'), async (req, res) => {
+  let uploadedNew = null
   try {
-    const proker = await addProker(req.body)
+    const payload = { ...(req.body || {}) }
+    if (req.file) {
+      const up = await saveCoverFile(req.file)
+      uploadedNew = up.imagePublicId
+      payload.imageUrl = up.imageUrl
+      payload.imagePublicId = up.imagePublicId
+    } else if (typeof payload.imageUrl === 'string' && payload.imageUrl.trim()) {
+      payload.imageUrl = await validateExternalImage(payload.imageUrl.trim())
+      payload.imagePublicId = ''
+    } else {
+      payload.imagePublicId = '' // client tidak boleh mengatur sendiri
+    }
+    const proker = await addProker(payload)
     await auditAdmin('Proker ditambah', req.admin?.username || 'admin', { id: proker.id, judul: proker.title })
     res.status(201).json({ ok: true, proker })
   } catch (e) {
+    if (uploadedNew) { try { await destroyPublicId(uploadedNew) } catch {} }
     if (e.code === 'INVALID_PROKER_PAYLOAD') {
       await auditTechThrottled('proker-payload', 60000, 'POST /api/proker', 400, e.message)
       return res.status(400).json({ error: 'Payload tidak valid' })
     }
-    if (e.message?.includes('wajib') || e.message?.includes('karakter') || e.message?.includes('valid')) {
+    if (e.message?.includes('wajib') || e.message?.includes('karakter') || e.message?.includes('valid') ||
+        e.message?.includes('URL') || e.message?.includes('gambar') || e.message?.includes('Gagal')) {
       return res.status(422).json({ detail: e.message })
     }
     console.error('Proker POST error:', e)
@@ -104,17 +148,67 @@ r.post('/', requireAdmin, async (req, res) => {
   }
 })
 
-// admin — bisa ganti judul dan/atau caption
-r.put('/:id', requireAdmin, async (req, res) => {
-  if (!Object.keys(req.body).length) return res.status(422).json({ detail: 'data proker wajib' })
+// admin — bisa ganti judul, caption, dan/atau gambar cover (file atau URL eksternal)
+r.put('/:id', requireAdmin, coverUpload.single('image'), async (req, res) => {
+  const body = req.body || {}
+  if (!Object.keys(body).length && !req.file) return res.status(422).json({ detail: 'data proker wajib' })
+  let uploadedNew = null
   try {
-    const p = await updateProker(req.params.id, req.body)
+    const old = await getById(req.params.id)
+    if (!old) return res.status(404).json({ detail: 'Proker tidak ditemukan' })
+    const payload = { ...body }
+    const oldCover = old.imageUrl || ''
+    let mediaChanged = false
+    let newPublicId = ''
+
+    if (req.file) {
+      // 1) file baru -> upload dulu, tandai media berubah
+      const up = await saveCoverFile(req.file)
+      uploadedNew = up.imagePublicId
+      payload.imageUrl = up.imageUrl
+      newPublicId = up.imagePublicId
+      mediaChanged = true
+    } else if (typeof payload.imageUrl === 'string') {
+      const url = payload.imageUrl.trim()
+      if (url === '') {
+        // 2) hapus cover, hanya jika saat ini ada gambar
+        if (oldCover) { payload.imageUrl = ''; mediaChanged = true }
+        else delete payload.imageUrl
+      } else if (url !== oldCover) {
+        // 3) cover diganti -> validasi URL eksternal dahulu
+        payload.imageUrl = await validateExternalImage(url)
+        mediaChanged = true
+        newPublicId = ''
+      } else {
+        delete payload.imageUrl // tidak berubah -> biarkan yang lama
+      }
+    }
+
+    // destroy gambar lama SEBELUM simpan; gagal -> batalkan seluruh proses (abort, HTTP 500)
+    const oldPublicId = coverPublicId(old)
+    if (mediaChanged && oldPublicId && isCloudinaryEnabled()) {
+      const destroyed = await destroyPublicId(oldPublicId)
+      if (!destroyed) {
+        if (uploadedNew) { try { await destroyPublicId(uploadedNew) } catch {} }
+        return res.status(500).json({ detail: 'Gagal menghapus gambar lama' })
+      }
+    }
+
+    if (!mediaChanged) delete payload.imagePublicId // client tidak boleh mengatur sendiri
+    if (mediaChanged) {
+      payload.imageUrl = payload.imageUrl ?? ''
+      payload.imagePublicId = newPublicId
+    }
+
+    const p = await updateProker(req.params.id, payload)
     await auditAdmin('Proker diubah', req.admin?.username || 'admin', { id: p.id, judul: p.title })
     res.json({ ok: true, proker: p })
   } catch (e) {
+    if (uploadedNew) { try { await destroyPublicId(uploadedNew) } catch {} }
     if (e.code === 'INVALID_PROKER_PAYLOAD') return res.status(400).json({ error: 'Payload tidak valid' })
     if (e.message?.includes('tidak ditemukan')) return res.status(404).json({ detail: e.message })
-    if (e.message?.includes('wajib') || e.message?.includes('karakter') || e.message?.includes('valid')) {
+    if (e.message?.includes('wajib') || e.message?.includes('karakter') || e.message?.includes('valid') ||
+        e.message?.includes('URL') || e.message?.includes('gambar')) {
       return res.status(422).json({ detail: e.message })
     }
     console.error('Proker PUT error:', e)
@@ -124,7 +218,13 @@ r.put('/:id', requireAdmin, async (req, res) => {
 
 r.delete('/:id', requireAdmin, async (req, res) => {
   try {
+    const old = await getById(req.params.id)
     await deleteProker(req.params.id)
+    // hapus gambar cover Cloudinary (best-effort; record sudah terhapus)
+    const oldPublicId = coverPublicId(old)
+    if (oldPublicId && isCloudinaryEnabled()) {
+      await destroyPublicId(oldPublicId)
+    }
     await auditAdmin('Proker dihapus', req.admin?.username || 'admin', { id: req.params.id })
     res.json({ ok: true })
   } catch (e) {

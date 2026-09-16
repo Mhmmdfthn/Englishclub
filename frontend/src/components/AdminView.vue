@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { api } from '../api.js'
 import { displayTime, todayWIB, wibDay } from '../utils/time.js'
 import RichTextEditor from './RichTextEditor.vue'
+import ProkerMediaInput from './ProkerMediaInput.vue'
 
 const props = defineProps({ isModal: Boolean })
 const emit = defineEmits(['back'])
@@ -47,6 +48,10 @@ const titleDraft = ref({})
 const prokerDraft = ref({})
 const galleryUploading = ref({})
 const newProker = ref({ title: '', description: '', imageUrl: '', date: '', status: 'upcoming' })
+const newCover = ref(null)
+const mediaDraft = ref({})
+const creating = ref(false)
+const savingProker = ref({})
 
 async function checkAuth() {
   const t = localStorage.getItem('admin_token') || ''
@@ -128,9 +133,19 @@ async function loadProker() {
       captionDraft.value[p.id] = p.description || p.caption || ''
       titleDraft.value[p.id] = p.title
       prokerDraft.value[p.id] = { title: p.title, description: p.description || p.caption || '', imageUrl: p.imageUrl || p.photos?.[0] || '', date: p.date || '', status: p.status || 'upcoming' }
+      mediaDraft.value[p.id] = null
     })
   } catch (e) { handleError(e, 'Proker belum dapat dimuat.') }
   finally { prokerLoading.value = false }
+}
+
+function prokerFields(draft) {
+  return {
+    title: draft.title.trim(),
+    description: draft.description.trim(),
+    date: draft.date || '',
+    status: draft.status || 'upcoming',
+  }
 }
 
 async function saveProker(p) {
@@ -144,25 +159,51 @@ async function saveProker(p) {
   const rawLen = (draft.description || '').trim().length
   if (textOnly(draft.description).length < 5) { error.value = 'Deskripsi wajib diisi'; return }
   if (rawLen > MAX_DESC) { error.value = `Deskripsi maksimal ${MAX_DESC} karakter (termasuk markup)`; return }
+  const media = mediaDraft.value[p.id]
+  const fields = prokerFields(draft)
+  savingProker.value[p.id] = true
   try {
-    await api.updateProker(p.id, { ...draft, title: draft.title.trim(), description: draft.description.trim() }, t)
+    if (media instanceof File) {
+      await api.updateProkerMedia(p.id, fields, media, t)
+    } else if (typeof media === 'string') {
+      await api.updateProker(p.id, { ...fields, imageUrl: media }, t)
+    } else {
+      await api.updateProker(p.id, fields, t)
+    }
     await loadProker()
     error.value = ''
     showSuccess('Proker berhasil disimpan.')
   } catch (e) { handleError(e, 'Proker belum tersimpan.') }
+  finally { savingProker.value[p.id] = false }
 }
 
 async function createProker() {
   const draft = newProker.value
   const descLen = textOnly(draft.description).length
   if (draft.title.trim().length < 3 || descLen < 5) { error.value = 'Judul dan deskripsi wajib diisi'; return }
+  const fields = {
+    title: draft.title.trim(),
+    description: draft.description.trim(),
+    date: draft.date || '',
+    status: draft.status || 'upcoming',
+  }
+  const media = newCover.value
+  creating.value = true
   try {
-    await api.addProker({ ...draft, title: draft.title.trim(), description: draft.description.trim() }, localStorage.getItem('admin_token') || '')
+    if (media instanceof File) {
+      await api.addProkerMedia(fields, media, localStorage.getItem('admin_token') || '')
+    } else if (typeof media === 'string' && media.trim()) {
+      await api.addProker({ ...fields, imageUrl: media.trim() }, localStorage.getItem('admin_token') || '')
+    } else {
+      await api.addProker(fields, localStorage.getItem('admin_token') || '')
+    }
     newProker.value = { title: '', description: '', imageUrl: '', date: '', status: 'upcoming' }
+    newCover.value = null
     await loadProker()
     error.value = ''
     showSuccess('Proker berhasil ditambahkan.')
   } catch (e) { handleError(e, 'Proker belum ditambahkan.') }
+  finally { creating.value = false }
 }
 
 function confirmDeleteProker(p) { confirmState.value = { type: 'proker', id: p.id } }
@@ -336,13 +377,13 @@ onMounted(async () => {
             <input v-model="newProker.title" class="field" maxlength="80" placeholder="Contoh: English Debate Competition" required />
             <label class="field-label">Deskripsi</label>
             <RichTextEditor v-model="newProker.description" :max-length="MAX_DESC" placeholder="Deskripsi kegiatan..." />
-            <label class="field-label">URL Gambar Cover (opsional)</label>
-            <input v-model="newProker.imageUrl" class="field" type="url" placeholder="https://res.cloudinary.com/..." />
+            <label class="field-label">Gambar Cover (opsional)</label>
+            <ProkerMediaInput v-model="newCover" :initial="''" :disabled="creating" />
             <div class="proker-form-row">
               <div class="form-field"><label class="field-label">Tanggal</label><input v-model="newProker.date" class="field" type="date" /></div>
               <div class="form-field"><label class="field-label">Status</label><select v-model="newProker.status" class="field"><option value="upcoming">Akan datang</option><option value="ongoing">Sedang berlangsung</option><option value="completed">Selesai</option></select></div>
             </div>
-            <button class="btn create-submit" type="submit">+ Tambah Proker</button>
+            <button class="btn create-submit" type="submit" :disabled="creating">{{ creating ? 'Menyimpan...' : '+ Tambah Proker' }}</button>
           </form>
           <div v-if="prokerLoading" class="proker-state">Memuat proker...</div>
           <div v-else-if="!proker.length" class="proker-state">Belum ada proker. Tambahkan lewat form di atas.</div>
@@ -367,14 +408,14 @@ onMounted(async () => {
               </div>
               <label class="field-label">Deskripsi</label>
               <RichTextEditor v-model="prokerDraft[p.id].description" :max-length="MAX_DESC" placeholder="Deskripsi proker..." />
-              <label class="field-label">URL Gambar Cover (opsional)</label>
-              <input v-model="prokerDraft[p.id].imageUrl" class="field" type="url" placeholder="https://res.cloudinary.com/..." />
+              <label class="field-label">Gambar Cover (opsional)</label>
+              <ProkerMediaInput v-model="mediaDraft[p.id]" :initial="p.imageUrl" :disabled="savingProker[p.id]" />
               <div class="proker-form-row">
                 <div class="form-field"><label class="field-label">Tanggal</label><input v-model="prokerDraft[p.id].date" class="field" type="date" /></div>
                 <div class="form-field"><label class="field-label">Status</label><select v-model="prokerDraft[p.id].status" class="field"><option value="upcoming">Akan datang</option><option value="ongoing">Sedang berlangsung</option><option value="completed">Selesai</option></select></div>
               </div>
               <div class="card-actions">
-                <div class="action-group"><button class="btn sm" @click="saveProker(p)">Simpan</button><button class="btn sm danger" @click="confirmDeleteProker(p)">Hapus</button></div>
+                <div class="action-group"><button class="btn sm" @click="saveProker(p)" :disabled="savingProker[p.id]">{{ savingProker[p.id] ? 'Menyimpan...' : 'Simpan' }}</button><button class="btn sm danger" @click="confirmDeleteProker(p)">Hapus</button></div>
               </div>
             </article>
           </div>

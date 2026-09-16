@@ -17,6 +17,7 @@ function normalize(item, index = 0) {
     title: item.title || 'Proker',
     description: item.description ?? item.caption ?? '',
     imageUrl: item.imageUrl ?? item.photos?.[0] ?? '',
+    imagePublicId: item.imagePublicId || '',
     date: item.date || '',
     status: STATUSES.has(item.status) ? item.status : 'upcoming',
     order: item.order ?? index + 1,
@@ -86,9 +87,10 @@ export async function deleteProker(id) {
   const rows = await getAll()
   const next = rows.filter(p => p.id !== id)
   if (next.length === rows.length) throw new Error('Proker tidak ditemukan')
+  const removed = rows.find(p => p.id === id)
   next.forEach((p, i) => { p.order = i + 1 })
   await saveProkers(next)
-  return true
+  return removed
 }
 
 export async function updateProker(id, data) {
@@ -140,6 +142,7 @@ export async function updateProker(id, data) {
   }
   if (rest.description !== undefined) memoryProker[i].description = rest.description.trim()
   if (rest.imageUrl !== undefined) memoryProker[i].imageUrl = rest.imageUrl.trim()
+  if (rest.imagePublicId !== undefined) memoryProker[i].imagePublicId = rest.imagePublicId || ''
   if (rest.date !== undefined) memoryProker[i].date = rest.date
   if (rest.status !== undefined) memoryProker[i].status = rest.status
   memoryProker[i] = normalize(memoryProker[i])

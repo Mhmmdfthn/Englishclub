@@ -1,6 +1,7 @@
 import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
+import multer from 'multer'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 
@@ -77,5 +78,14 @@ const PORT = process.env.PORT || 3001
 if (!process.env.VERCEL && process.env.NODE_ENV !== 'test') {
   app.listen(PORT, () => console.log(`Backup custom Vue+Express listening on ${PORT}`))
 }
+
+// jangan pernah bocorkan stack trace; bungkus error middleware (multer dsb.) jadi JSON
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err)
+  if (err?.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ detail: 'Ukuran file maksimal 5MB' })
+  if (err?.message?.includes('Hanya file gambar')) return res.status(400).json({ detail: 'Hanya file gambar' })
+  if (err instanceof multer.MulterError) return res.status(400).json({ detail: err.message })
+  res.status(500).json({ error: 'Server error' })
+})
 
 export default app

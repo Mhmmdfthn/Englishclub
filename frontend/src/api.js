@@ -4,7 +4,7 @@ async function req(url, options, timeout = 8000) {
   let res
   try {
     res = await fetch(url, {
-      headers: { 'Content-Type': 'application/json' },
+      headers: options?.body instanceof FormData ? {} : { 'Content-Type': 'application/json' },
       signal: controller.signal,
       ...options,
     })
@@ -99,7 +99,7 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify(data),
-    }),
+    }, 20000),
   deleteProker: (id, token) =>
     req(`/api/proker/${id}`, {
       method: 'DELETE',
@@ -116,5 +116,24 @@ export const api = {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify(data),
-    }),
+    }, 20000),
+  addProkerMedia: (data, file, token) =>
+    req('/api/proker', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: buildForm(data, file),
+    }, 30000),
+  updateProkerMedia: (id, data, file, token) =>
+    req(`/api/proker/${id}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${token}` },
+      body: buildForm(data, file),
+    }, 30000),
+}
+
+function buildForm(data, file) {
+  const fd = new FormData()
+  for (const [k, v] of Object.entries(data)) fd.append(k, v ?? '')
+  if (file) fd.append('image', file)
+  return fd
 }
