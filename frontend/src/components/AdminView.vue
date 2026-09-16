@@ -499,7 +499,7 @@ onMounted(async () => {
               <div class="spinner-item-list">
                 <div v-for="(item, i) in spinnerItems" :key="i" class="spinner-item-row">
                   <span class="spinner-item-num">{{ i + 1 }}</span>
-                  <span class="spinner-item-text">{{ item }}</span>
+                  <input v-model="spinnerItems[i]" class="spinner-item-input" maxlength="40" placeholder="Nama hadiah" />
                   <button class="btn-icon danger" @click="removeSpinnerItem(i)" title="Hapus item">&times;</button>
                 </div>
                 <p v-if="spinnerItems.length === 0" class="tiny muted">Belum ada item. Tambahkan minimal 2 item.</p>
@@ -683,7 +683,8 @@ onMounted(async () => {
 .spinner-item-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
 .spinner-item-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: #f8fafc; border: 2px solid #e2e8f0; }
 .spinner-item-num { font-size: 12px; font-weight: 900; color: var(--royal-blue); min-width: 20px; }
-.spinner-item-text { flex: 1; font-size: 14px; font-weight: 700; }
+.spinner-item-input { flex: 1; border: 2px solid #e2e8f0; background: #fff; padding: 6px 8px; font: inherit; font-size: 14px; font-weight: 700; }
+.spinner-item-input:focus { outline: none; border-color: var(--royal-blue); box-shadow: 2px 2px 0 var(--vibrant-yellow); }
 .btn-icon { display: grid; place-items: center; width: 28px; height: 28px; border: 2px solid transparent; background: transparent; font-size: 18px; font-weight: 900; cursor: pointer; }
 .btn-icon.danger { color: #E74C3C; }
 .btn-icon.danger:hover { background: #fef2f2; border-color: #E74C3C; }
