@@ -106,6 +106,7 @@ function goRegister() {
     <div class="landing-hero">
       <nav class="landing-nav" aria-label="Navigasi utama">
         <a class="nav-brand" href="#top" aria-label="Kembali ke bagian atas" @click="handleLogoClick" @pointerdown="logoPressStart" @pointerup="logoPressEnd" @pointerleave="logoPressEnd"><img src="/Logo_ec.jpg" alt="Logo English Club UPB" /></a>
+        <div class="nav-marquee" aria-hidden="true"><span class="nav-marquee-inner">English Club 2026 - Universitas Putra Bangsa</span></div>
         <a href="#profil" class="nav-link" @click="closeMobile">Profil</a>
         <a href="#program" class="nav-link" @click="closeMobile">Program</a>
         <a href="#cerita" class="nav-link" @click="closeMobile">Kesan Pengunjung</a>
@@ -141,7 +142,7 @@ function goRegister() {
     </div>
 
     <div id="profil" class="section-title"><span class="section-badge">TENTANG KAMI</span><h2>Profil UKM</h2><p>Bagian dari <b>BEM — Departemen Keilmuan</b> Universitas Putra Bangsa Kebumen.</p></div>
-    <div class="card about-card"><div class="about-grid"><div class="about-text"><h3>Siapa Kami?</h3><p><b>English Club UPB</b> adalah UKM di bawah <b>BEM Departemen Keilmuan</b>. Kegiatan kami berfokus pada latihan bahasa Inggris dan kegiatan kampus.</p><p>Terbuka untuk mahasiswa yang ingin berlatih speaking, listening, dan public speaking.</p><ul class="check-list"><li>Bagian dari BEM — Departemen Keilmuan</li><li>Terbuka untuk semua prodi</li></ul></div><div class="about-visual"><div class="mini-stats"><div class="mini-stat"><b>2019</b><span>Berdiri</span></div><div class="mini-stat"><b>150+</b><span>Alumni</span></div><div class="mini-stat"><b>4</b><span>Divisi</span></div></div><div class="quote-box">From Kebumen to the World, Speak Confidently, Lead Globally.</div></div></div></div>
+    <div class="card about-card"><div class="about-grid"><div class="about-text"><h3>Siapa Kami?</h3><p><b>English Club UPB</b> adalah UKM di bawah <b>BEM Departemen Keilmuan</b>. Kegiatan kami berfokus pada latihan bahasa Inggris dan kegiatan kampus.</p><p>Terbuka untuk mahasiswa yang ingin berlatih speaking, listening, dan public speaking.</p><ul class="check-list"><li>Bagian dari BEM — Departemen Keilmuan</li><li>Terbuka untuk semua prodi</li></ul></div><div class="about-visual"><div class="mini-stats"><div class="mini-stat"><b>2019</b><span>Berdiri</span></div><div class="mini-stat"><b>150+</b><span>Alumni</span></div><div class="mini-stat"><b>4</b><span>Divisi</span></div></div><div class="quote-box">Learn the Words, Speak to the World, Shine Your Way.</div></div></div></div>
 
     <div id="program" class="overview-heading"><div><span class="section-badge">PROGRAM</span><h2>Apa yang Kami Lakukan?</h2></div><p>Latihan bahasa Inggris, kegiatan rutin, dan agenda kampus untuk anggota.</p></div>
     <div class="overview-grid vision-mission-grid"><article class="overview-card"><div class="ov-icon">01</div><h3>Visi</h3><ul><li>Membuat latihan bahasa Inggris mudah diikuti mahasiswa.</li><li>Membantu anggota lebih percaya diri saat berbicara di kelas dan tempat kerja.</li></ul></article><article class="overview-card"><div class="ov-icon">02</div><h3>Misi</h3><ul><li>Mengadakan latihan speaking dan listening secara rutin.</li><li>Membuka kesempatan untuk praktik public speaking.</li><li>Mengadakan kegiatan dan kompetisi berbahasa Inggris.</li><li>Mendukung anggota mengikuti kegiatan akademik dan organisasi.</li></ul></article></div>
@@ -150,12 +151,21 @@ function goRegister() {
 
   <div class="teaser-card"><div class="teaser-mark">5x5</div><div class="teaser-copy"><span class="teaser-kicker">GAME ENGLISH CLUB</span><h2>Main <span>Word Hunt</span></h2><p>Susun kata dari huruf yang berdekatan. Kumpulkan poin dalam 60 detik.</p></div><div class="teaser-actions"><button class="btn" type="button" @click="goPlay">Mulai</button><button class="btn ghost" type="button" @click="goBoard">Papan Skor</button></div></div>
 
-    <div class="join-cta">
-      <div class="join-cta-copy">
-        <span class="section-badge">JOIN EC</span>
-        <p>Berminat gabung EC? <strong>Ayo gabung.</strong></p>
+    <div class="join-section">
+      <div class="join-content">
+        <div class="join-text">
+          <span class="section-badge">JOIN EC</span>
+          <h2>Berminat gabung EC? <strong>Ayo gabung.</strong></h2>
+        </div>
+        <ul class="join-benefits">
+          <li><span class="join-check">&#10003;</span>Lingkungan praktik Bahasa Inggris yang aktif &amp; suportif</li>
+          <li><span class="join-check">&#10003;</span>Relasi &amp; jaringan koneksi yang lebih luas</li>
+          <li><span class="join-check">&#10003;</span>Wawasan &amp; pengalaman organisasi yang bermanfaat</li>
+          <li><span class="join-check">&#10003;</span>Kesempatan mengikuti berbagai event &amp; program kerja seru</li>
+          <li><span class="join-check">&#10003;</span>Pengembangan soft skills (Public Speaking, Leadership, &amp; Teamwork)</li>
+        </ul>
       </div>
-      <button class="btn hero-register" type="button" @click="goRegister">Gabung EC</button>
+      <button class="btn join-btn" type="button" @click="goRegister">Gabung EC</button>
     </div>
 
     <section id="cerita" class="story-section">
@@ -178,7 +188,11 @@ function goRegister() {
 .landing::before { content:''; position:fixed; inset:0; z-index:-1; background-color:var(--paper); background-image:radial-gradient(rgba(29,43,58,.13) 1px, transparent 1px); background-size:16px 16px; }
 .landing-hero { position:relative; display:flex; width:100%; align-items:flex-start; min-height:min(560px,68vh); padding:96px 0 56px; text-align:left; border-bottom:4px solid var(--ink); row-gap:18px; }
 .landing-nav { position:fixed; top:0; left:0; right:0; width:100%; margin:0; display:flex; align-items:center; gap:24px; min-height:64px; padding:10px max(14px, calc((100vw - 1100px) / 2)); background:var(--pure-white); border-bottom:3px solid var(--ink); box-shadow:0 4px 0 var(--lime); z-index:20; font-family:'Plus Jakarta Sans', sans-serif; }
-.nav-brand { display:flex; flex:0 0 auto; align-items:center; width:42px; height:42px; margin-right:6px; }.nav-brand img { display:block; width:36px; height:36px; object-fit:contain; mix-blend-mode:multiply; }.landing-nav > a { color:var(--ink); font-size:13px; font-weight:700; text-decoration:none; }.landing-nav > a:hover { color:var(--royal-blue); }.nav-actions { display:flex; align-items:center; gap:8px; margin-left:auto; }.nav-button { padding:9px 13px; color:var(--ink); background:transparent; border:2px solid var(--ink); font-family:'Plus Jakarta Sans', sans-serif; font-size:12px; font-weight:800; cursor:pointer; min-height:44px; }.nav-button:hover { transform:translateY(-1px); }.nav-play { color:var(--pure-white); background:var(--lime); box-shadow:3px 3px 0 var(--ink); }
+.nav-brand { display:flex; flex:0 0 auto; align-items:center; width:42px; height:42px; margin-right:6px; }.nav-brand img { display:block; width:36px; height:36px; object-fit:contain; mix-blend-mode:multiply; }
+.nav-marquee { flex:1; overflow:hidden; white-space:nowrap; mask-image:linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); -webkit-mask-image:linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); }
+.nav-marquee-inner { display:inline-block; font-size:13px; font-weight:900; letter-spacing:.06em; color:var(--royal-blue); animation:marquee-scroll 18s linear infinite; }
+@keyframes marquee-scroll { 0%{transform:translateX(100%)} 100%{transform:translateX(-100%)} }
+.landing-nav > a { color:var(--ink); font-size:13px; font-weight:700; text-decoration:none; }.landing-nav > a:hover { color:var(--royal-blue); }.nav-actions { display:flex; align-items:center; gap:8px; margin-left:auto; }.nav-button { padding:9px 13px; color:var(--ink); background:transparent; border:2px solid var(--ink); font-family:'Plus Jakarta Sans', sans-serif; font-size:12px; font-weight:800; cursor:pointer; min-height:44px; }.nav-button:hover { transform:translateY(-1px); }.nav-play { color:var(--pure-white); background:var(--lime); box-shadow:3px 3px 0 var(--ink); }
 .hamburger { display:none; flex-direction:column; justify-content:center; gap:5px; width:44px; height:44px; padding:8px; background:#fff; border:none; cursor:pointer; }
 .ham-line { display:block; width:100%; height:3px; background:var(--ink); transition: transform 0.2s ease, opacity 0.2s ease; }
 .mobile-drawer { position:fixed; inset:0; z-index:19; background:rgba(29,43,58,0.45); backdrop-filter:blur(4px); display:grid; place-items:start center; padding-top:72px; }
@@ -193,7 +207,18 @@ function goRegister() {
 .subtitle p { margin:0; color:var(--ink); font-size:clamp(18px,2vw,24px); line-height:1.45; font-weight:800; letter-spacing:-0.03em; }
 .subtitle .quote-author { display:block; margin-top:2px; color:var(--ink); font-size:12px; font-weight:800; letter-spacing:0.12em; text-transform:uppercase; }
 .subtitle .quote-meaning { display:block; margin-top:4px; color:var(--ink); font-size:clamp(13px,1.5vw,16px); line-height:1.55; font-weight:600; }
-.join-cta { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:18px; width:100%; margin-top:42px; padding:24px 28px; background:#F6F1E7; border:3px solid #132238; box-shadow:6px 6px 0 #214C7A; }.join-cta-copy { display:flex; flex-direction:column; align-items:flex-start; gap:10px; }.join-cta p { margin:0; color:#132238; font-size:clamp(18px,2vw,26px); font-weight:800; line-height:1.2; }.join-cta strong { color:#214C7A; }.hero-register { padding:14px 24px; border:3px solid #132238; border-radius:0; background:#F4C542; box-shadow:5px 5px 0 #132238; color:#132238; font-size:13px; font-weight:900; letter-spacing:.08em; text-transform:uppercase; }.hero-register:hover { transform:translate(-2px, -2px); box-shadow:7px 7px 0 #132238; }.hero-stats { display:flex; margin-top:36px; border:2px solid var(--ink); background:#fff; box-shadow:5px 5px 0 var(--ink); }.hero-stats span { min-width:116px; padding:10px 16px; border-right:2px solid var(--ink); font-size:10px; font-weight:800; }.hero-stats span:last-child { border-right:0; }.hero-stats b { display:block; font-size:24px; }
+.join-section { display:grid; grid-template-columns:1fr auto; gap:24px; align-items:center; width:100%; margin-top:42px; padding:28px 32px; background:#F6F1E7; border:3px solid #132238; box-shadow:6px 6px 0 #214C7A; position:relative; overflow:hidden; }
+.join-section::before { content:''; position:absolute; inset:0; background:linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent); transform:translateX(-100%); transition:transform 0.9s ease; }
+.join-section:hover::before { transform:translateX(100%); }
+.join-content { display:flex; flex-direction:column; gap:16px; }
+.join-text { display:flex; flex-direction:column; align-items:flex-start; gap:8px; }
+.join-text h2 { margin:0; color:#132238; font-size:clamp(20px,2.5vw,28px); font-weight:800; line-height:1.2; }
+.join-text strong { color:#214C7A; }
+.join-benefits { display:grid; grid-template-columns:repeat(2, 1fr); gap:8px 20px; list-style:none; margin:0; padding:0; }
+.join-benefits li { display:flex; align-items:flex-start; gap:8px; font-size:13px; font-weight:600; color:#132238; line-height:1.5; }
+.join-check { flex:0 0 auto; color:var(--royal-blue); font-weight:900; font-size:14px; margin-top:1px; }
+.join-btn { align-self:start; padding:14px 28px; border:3px solid #132238; border-radius:0; background:#F4C542; box-shadow:5px 5px 0 #132238; color:#132238; font-size:13px; font-weight:900; letter-spacing:.08em; text-transform:uppercase; white-space:nowrap; cursor:pointer; transition:transform 0.16s ease, box-shadow 0.16s ease; }
+.join-btn:hover { transform:translate(-2px, -2px); box-shadow:7px 7px 0 #132238; }.hero-stats { display:flex; margin-top:36px; border:2px solid var(--ink); background:#fff; box-shadow:5px 5px 0 var(--ink); }.hero-stats span { min-width:116px; padding:10px 16px; border-right:2px solid var(--ink); font-size:10px; font-weight:800; }.hero-stats span:last-child { border-right:0; }.hero-stats b { display:block; font-size:24px; }
 .section-title { width:100%; display:flex; flex-direction:column; align-items:flex-start; gap:8px; padding:64px 0 24px; text-align:left; }.section-badge { padding:6px 11px; color:var(--pure-white); background:var(--lime); border:2px solid var(--ink); box-shadow:3px 3px 0 var(--ink); font-size:10px; }.section-title h2,.overview-heading h2,.values-heading h2 { color:var(--ink); }.section-title p { max-width:680px; }.about-card { width:100%; padding:0; overflow:visible; background:#fff; border:3px solid var(--ink); border-radius:0; box-shadow:6px 6px 0 var(--ink); }.about-grid { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(300px,.85fr); }.about-text { padding:32px; }.about-text h3 { font-size:22px; }.about-text p,.check-list li { font-size:15px; line-height:1.6; }.check-list { padding-left:18px; }.about-visual { padding:28px; border-left:3px solid var(--ink); background:var(--paper); }.mini-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }.mini-stat { padding:12px 6px; text-align:center; border:2px solid var(--ink); background:#fff; }.mini-stat b,.mini-stat span { display:block; }.quote-box { margin-top:28px; padding:16px; background:var(--royal-blue); color:var(--pure-white); border:2px solid var(--ink); box-shadow:4px 4px 0 var(--ink); font-weight:700; text-align:center; }
 .teaser-card { width:100%; display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:20px; margin:64px 0 0; padding:32px; color:#fff; background:var(--ink); border:3px solid var(--ink); box-shadow:7px 7px 0 var(--green); }.teaser-mark { display:grid; place-items:center; width:76px; aspect-ratio:1; color:var(--vibrant-yellow); border:2px solid var(--vibrant-yellow); font-size:20px; font-weight:900; }.teaser-kicker,.teaser-copy h2 span { color:var(--vibrant-yellow); }.teaser-copy h2 { color:#fff; }.teaser-copy p { max-width:480px; font-size:13.5px; line-height:1.5; }.teaser-actions { display:flex; flex-direction:column; gap:8px; }.teaser-actions .btn { white-space:nowrap; padding:11px 18px; border:2px solid #fff; border-radius:0; box-shadow:3px 3px 0 #000; font-size:13px; }.teaser-actions .btn.ghost { background:transparent; color:#fff; border-color:#fff; box-shadow:3px 3px 0 rgba(0,0,0,0.6); }.teaser-actions .btn.ghost:hover { background:#fff; color:var(--dark-navy); border-color:#fff; }
 .overview-heading { width:100%; display:flex; align-items:end; justify-content:space-between; gap:28px; margin-top:64px; padding-bottom:20px; border-bottom:3px solid var(--ink); }.overview-heading p { max-width:340px; text-align:right; line-height:1.55; }.overview-grid { width:100%; display:grid; grid-template-columns:repeat(3,1fr); border-bottom:3px solid var(--ink); }.vision-mission-grid { width:100%; display:grid; grid-template-columns:repeat(2,1fr); border-bottom:3px solid var(--ink); gap:0; }.overview-card { min-height:240px; padding:24px; }.overview-card + .overview-card { border-left:2px solid var(--ink); }.ov-icon { display:grid; place-items:center; width:42px; height:42px; margin:12px 0; color:var(--pure-white); background:var(--lime); border:2px solid var(--ink); font-weight:900; }.overview-card p,.overview-card li { line-height:1.6; }.overview-card ul { padding-left:18px; }
@@ -242,9 +267,11 @@ function goRegister() {
   .teaser-copy h2 { font-size:22px; }
   .teaser-actions { width:100%; gap:8px; }
   .teaser-actions .btn { width:100%; min-height:48px; font-size:13px; }
-  .join-cta { display:flex; flex-direction:column; align-items:stretch; gap:12px; margin-top:28px; padding:18px 16px; }
-  .join-cta p { font-size:20px; text-align:center; }
-  .join-cta .hero-register { width:100%; min-height:48px; }
+  .join-section { grid-template-columns:1fr; gap:18px; margin-top:28px; padding:20px 16px; }
+  .join-text { align-items:center; text-align:center; }
+  .join-text h2 { font-size:22px; }
+  .join-benefits { grid-template-columns:1fr; }
+  .join-btn { width:100%; min-height:48px; justify-self:stretch; }
   .overview-heading { flex-direction:column; align-items:stretch; margin-top:32px; padding-bottom:14px; gap:12px; }
   .overview-heading p { text-align:left; max-width:100%; }
   .overview-card { min-height:auto; padding:20px 18px; border-left:none !important; }
@@ -282,9 +309,6 @@ function goRegister() {
 .about-card:hover, .overview-card:hover, .program-card:hover { transform: translateY(-2px); box-shadow: 8px 8px 0 var(--ink); }
 .teaser-card { position: relative; overflow: hidden; }
 .teaser-card::after { content:''; position:absolute; inset:0; background: radial-gradient(ellipse 70% 60% at 85% 15%, rgba(255,230,0,0.08), transparent 60%); pointer-events:none; }
-.join-cta { position:relative; overflow:hidden; }
-.join-cta::before { content:''; position:absolute; inset:0; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent); transform: translateX(-100%); transition: transform 0.9s ease; }
-.join-cta:hover::before { transform: translateX(100%); }
 .story-input:focus { box-shadow: 4px 4px 0 var(--lime); }
 .value-panel:hover { transform: translateY(-1px); }
 .story-submit { width:44px; min-width:44px; height:44px; padding:0; }
