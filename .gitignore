@@ -38,9 +38,20 @@ backend/server/data/stories.json
 backend/server/data/tokens.json
 backend/server/data/admins.json
 backend/server/data/proker.json
+# Runtime data generik (amnesti file JSON/CSV baru di folder data)
+backend/server/data/*.json
+backend/server/data/*.csv
 # **/valid_words.txt  # reallow semua valid_words.txt 358k untuk bundle Vercel + env tetap
 backend/server/data/uploads/
 *.db
+
+# Local runtime config (bisa berisi secrets) — pakai .env saja
+backend/global-config.json
+**/global-config.json
+
+# Skrip debug lokal sekali pakai
+__dbg*.mjs
+__dbg*.js
 
 # IDE & OS
 .vscode/

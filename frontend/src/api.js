@@ -141,6 +141,86 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify({ prize_won }),
     }),
+
+  memberRegister: (fullname, username, password) =>
+    req('/api/members-auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ fullname, username, password }),
+    }),
+
+  memberLogin: (username, password) =>
+    req('/api/members-auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ username, password }),
+    }),
+
+  memberMe: (token) =>
+    req('/api/members-auth/me', {
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    }),
+
+  whitelist: (token, q = '') =>
+    req(`/api/members-auth/whitelist${q ? `?q=${encodeURIComponent(q)}` : ''}`, {
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    }),
+
+  whitelistAdd: (names, token, group_name = '') =>
+    req('/api/members-auth/whitelist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ names, group_name }),
+    }),
+
+  whitelistUpdateGroup: (id, group_name, token) =>
+    req(`/api/members-auth/whitelist/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ group_name }),
+    }),
+
+  whitelistImport: (file, token) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    return req('/api/members-auth/whitelist/import', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: fd,
+    }, 30000)
+  },
+
+  whitelistTemplate: (token) =>
+    fetch('/api/members-auth/whitelist/template', {
+      headers: { Authorization: `Bearer ${token}` },
+    }).then(async (res) => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'template_whitelist_ec.csv'
+      a.click()
+      URL.revokeObjectURL(url)
+    }),
+
+  memberGroups: () => req('/api/members-auth/groups'),
+
+  whitelistDelete: (id, token) =>
+    req(`/api/members-auth/whitelist/${id}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    }),
+
+  memberAccounts: (token, q = '') =>
+    req(`/api/members-auth/accounts${q ? `?q=${encodeURIComponent(q)}` : ''}`, {
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    }),
+
+  memberResetPassword: (id, newPassword, token) =>
+    req(`/api/members-auth/accounts/${id}/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ newPassword }),
+    }),
 }
 
 function buildForm(data, file) {

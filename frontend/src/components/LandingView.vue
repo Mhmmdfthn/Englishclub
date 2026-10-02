@@ -5,7 +5,10 @@ import { api } from '../api.js'
 import Testimonials from './Testimonials.vue'
 import LuckySpinner from './LuckySpinner.vue'
 
-const emit = defineEmits(['goPlay', 'goBoard', 'goRegister', 'openAdmin', 'goArticle'])
+const emit = defineEmits(['goPlay', 'goBoard', 'goRegister', 'goLogin', 'goSignup', 'goDashboard', 'memberLogout', 'openAdmin', 'goArticle'])
+const props = defineProps({ memberName: { type: String, default: '' } })
+// Flag deploy (Vite, dibake saat build): false -> sembunyikan tombol auth (Vercel production)
+const MEMBER_AUTH_ON = import.meta.env.VITE_MEMBER_AUTH_ENABLED !== 'false'
 const storyName = ref('')
 const storyBatch = ref('')
 const storyComment = ref('')
@@ -111,7 +114,16 @@ function goRegister() {
         <a href="#program" class="nav-link" @click="closeMobile">Program</a>
         <a href="#cerita" class="nav-link" @click="closeMobile">Kesan Pengunjung</a>
         <div class="nav-actions">
-          <button class="nav-button nav-board" type="button" @click="goRegister">Daftar</button>
+          <!-- Tombol Daftar disembunyikan sementara -->
+          <button v-if="false" class="nav-button nav-board" type="button" @click="goRegister">Daftar</button>
+          <template v-if="memberName">
+            <button class="member-chip" type="button" :title="memberName" @click="emit('goDashboard')">Halo, {{ memberName }}</button>
+            <button class="nav-button" type="button" @click="emit('memberLogout')">Keluar</button>
+          </template>
+          <template v-else-if="MEMBER_AUTH_ON">
+            <button class="nav-button" type="button" @click="emit('goLogin')">Masuk</button>
+            <button class="nav-button nav-play" type="button" @click="emit('goSignup')">Buat Akun</button>
+          </template>
           <button class="nav-button nav-play" type="button" @click="goPlay">Main Word Hunt</button>
         </div>
         <button class="hamburger" type="button" aria-label="Buka menu" :aria-expanded="mobileOpen" @click="toggleMobile">
@@ -126,7 +138,15 @@ function goRegister() {
             <a href="#profil" @click="closeMobile">Profil</a>
             <a href="#program" @click="closeMobile">Program</a>
             <a href="#cerita" @click="closeMobile">Kesan Pengunjung</a>
-            <button class="btn" type="button" @click="closeMobile(); goRegister()">Daftar Anggota</button>
+            <!-- Tombol Daftar Anggota disembunyikan sementara -->
+            <button v-if="false" class="btn" type="button" @click="closeMobile(); goRegister()">Daftar Anggota</button>
+            <template v-if="memberName">
+              <button class="btn" type="button" @click="closeMobile(); emit('memberLogout')">Keluar ({{ memberName }})</button>
+            </template>
+            <template v-else-if="MEMBER_AUTH_ON">
+              <button class="btn" type="button" @click="closeMobile(); emit('goLogin')">Masuk Akun</button>
+              <button class="btn" type="button" @click="closeMobile(); emit('goSignup')">Buat Akun EC</button>
+            </template>
             <button class="btn primary" type="button" @click="closeMobile(); goPlay()">Main Word Hunt</button>
           </div>
         </div>
@@ -151,7 +171,8 @@ function goRegister() {
 
   <div class="teaser-card"><div class="teaser-mark">5x5</div><div class="teaser-copy"><span class="teaser-kicker">GAME ENGLISH CLUB</span><h2>Main <span>Word Hunt</span></h2><p>Susun kata dari huruf yang berdekatan. Kumpulkan poin dalam 60 detik.</p></div><div class="teaser-actions"><button class="btn" type="button" @click="goPlay">Mulai</button><button class="btn ghost" type="button" @click="goBoard">Papan Skor</button></div></div>
 
-    <div class="join-section">
+    <!-- JOIN EC disembunyikan sementara (v-if false agar mudah dikembalikan) -->
+    <div v-if="false" class="join-section">
       <div class="join-content">
         <div class="join-text">
           <span class="section-badge">JOIN EC</span>
@@ -193,6 +214,8 @@ function goRegister() {
 .nav-marquee-inner { display:inline-block; font-size:13px; font-weight:900; letter-spacing:.06em; color:var(--royal-blue); animation:marquee-scroll 18s linear infinite; }
 @keyframes marquee-scroll { 0%{transform:translateX(100%)} 100%{transform:translateX(-100%)} }
 .landing-nav > a { color:var(--ink); font-size:13px; font-weight:700; text-decoration:none; }.landing-nav > a:hover { color:var(--royal-blue); }.nav-actions { display:flex; align-items:center; gap:8px; margin-left:auto; }.nav-button { padding:9px 13px; color:var(--ink); background:transparent; border:2px solid var(--ink); font-family:'Plus Jakarta Sans', sans-serif; font-size:12px; font-weight:800; cursor:pointer; min-height:44px; }.nav-button:hover { transform:translateY(-1px); }.nav-play { color:var(--pure-white); background:var(--lime); box-shadow:3px 3px 0 var(--ink); }
+.member-chip { max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:9px 12px; font-size:12px; font-weight:800; color:var(--royal-blue); background:transparent; border:2px solid transparent; cursor:pointer; font-family:inherit; }
+.member-chip:hover { border-color:var(--royal-blue); }
 .hamburger { display:none; flex-direction:column; justify-content:center; gap:5px; width:44px; height:44px; padding:8px; background:#fff; border:none; cursor:pointer; }
 .ham-line { display:block; width:100%; height:3px; background:var(--ink); transition: transform 0.2s ease, opacity 0.2s ease; }
 .mobile-drawer { position:fixed; inset:0; z-index:19; background:rgba(29,43,58,0.45); backdrop-filter:blur(4px); display:grid; place-items:start center; padding-top:72px; }

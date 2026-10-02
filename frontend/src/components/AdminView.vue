@@ -81,7 +81,7 @@ async function login() {
     authedUser.value = r.username
     username.value = ''
     password.value = ''
-    await Promise.all([fetchMembers(), loadProker()])
+    await Promise.all([fetchMembers(), loadProker(), loadGroups(), fetchWhitelist(), fetchAccounts()])
   } catch (e) {
     error.value = e?.message?.includes('401') ? 'Username atau password salah.' : 'Login belum berhasil.'
   } finally { loading.value = false }
@@ -94,6 +94,8 @@ function logout() {
   authed.value = false
   members.value = []
   proker.value = []
+  whitelist.value = []
+  accounts.value = []
   error.value = ''
 }
 
@@ -311,9 +313,138 @@ async function saveSpinner() {
   finally { spinnerSaving.value = false }
 }
 
+// ---- Akun EC: whitelist + akun anggota ----
+const whitelist = ref([])
+const whitelistLoading = ref(false)
+const whitelistSearch = ref('')
+const whitelistBulk = ref('')
+const whitelistGroup = ref('')
+const whitelistAdding = ref(false)
+const groupOptions = ref(['Zeus', 'Athena', 'Hades', 'Apollo', 'Hermes'])
+const importFile = ref(null)
+const importing = ref(false)
+const importResult = ref(null)
+const accounts = ref([])
+const accountsLoading = ref(false)
+const accountsSearch = ref('')
+const resetPw = ref({})
+const resettingPw = ref({})
+
+const filteredWhitelist = computed(() => {
+  const q = whitelistSearch.value.trim().toLowerCase()
+  if (!q) return whitelist.value
+  return whitelist.value.filter(w => (w.fullname || '').toLowerCase().includes(q))
+})
+const filteredAccounts = computed(() => {
+  const q = accountsSearch.value.trim().toLowerCase()
+  if (!q) return accounts.value
+  return accounts.value.filter(a => (a.username || '').toLowerCase().includes(q) || (a.fullname || '').toLowerCase().includes(q))
+})
+const adminToken = () => localStorage.getItem('admin_token') || ''
+
+async function loadGroups() {
+  try {
+    const data = await api.memberGroups()
+    if (Array.isArray(data.groups) && data.groups.length) groupOptions.value = data.groups
+  } catch { /* fallback hardcoded */ }
+}
+
+async function fetchWhitelist() {
+  whitelistLoading.value = true
+  try {
+    const data = await api.whitelist(adminToken())
+    whitelist.value = data.whitelist || []
+  } catch (e) { handleError(e, 'Whitelist belum dapat dimuat.') }
+  finally { whitelistLoading.value = false }
+}
+
+async function addWhitelist() {
+  const names = whitelistBulk.value.split(/\r?\n/)
+  if (!names.some(n => n.trim()) || whitelistAdding.value) return
+  whitelistAdding.value = true
+  error.value = ''
+  try {
+    const r = await api.whitelistAdd(names, adminToken(), whitelistGroup.value)
+    showSuccess(`Whitelist ditambah (${r.added} baru dari ${r.requested})`)
+    whitelistBulk.value = ''
+    await fetchWhitelist()
+  } catch (e) { handleError(e, 'Gagal menambah whitelist.') }
+  finally { whitelistAdding.value = false }
+}
+
+async function changeGroup(id, group) {
+  if (!group) return
+  error.value = ''
+  try {
+    await api.whitelistUpdateGroup(id, group, adminToken())
+    showSuccess('Kelompok diperbarui')
+    await Promise.all([fetchWhitelist(), fetchAccounts()])
+  } catch (e) { handleError(e, 'Gagal mengubah kelompok.'); await fetchWhitelist() }
+}
+
+async function downloadTemplate() {
+  try {
+    await api.whitelistTemplate(adminToken())
+  } catch (e) { handleError(e, 'Template belum dapat diunduh.') }
+}
+
+function onImportFile(e) {
+  importFile.value = e.target.files?.[0] || null
+  importResult.value = null
+}
+
+async function doImport() {
+  if (!importFile.value || importing.value) return
+  importing.value = true
+  error.value = ''
+  importResult.value = null
+  try {
+    const r = await api.whitelistImport(importFile.value, adminToken())
+    importResult.value = r
+    showSuccess(`Import selesai: ${r.inserted} baru, ${r.updated} diperbarui, ${r.errors.length} error`)
+    await Promise.all([fetchWhitelist(), fetchAccounts()])
+  } catch (e) { handleError(e, 'Import CSV belum berhasil.') }
+  finally { importing.value = false }
+}
+
+async function removeWhitelist(id, fullname) {
+  if (!confirm(`Hapus "${fullname}" dari whitelist?`)) return
+  try {
+    await api.whitelistDelete(id, adminToken())
+    showSuccess('Whitelist dihapus')
+    await fetchWhitelist()
+  } catch (e) { handleError(e, 'Gagal menghapus whitelist.') }
+}
+
+async function fetchAccounts() {
+  accountsLoading.value = true
+  try {
+    const data = await api.memberAccounts(adminToken())
+    accounts.value = data.accounts || []
+  } catch (e) { handleError(e, 'Akun anggota belum dapat dimuat.') }
+  finally { accountsLoading.value = false }
+}
+
+async function doResetPassword(id, username) {
+  const pw = (resetPw.value[id] || '').trim()
+  if (pw.length < 6 || resettingPw.value[id]) {
+    if (pw.length < 6) error.value = 'Password baru minimal 6 karakter.'
+    return
+  }
+  if (!confirm(`Reset password @${username}?`)) return
+  resettingPw.value[id] = true
+  error.value = ''
+  try {
+    await api.memberResetPassword(id, pw, adminToken())
+    showSuccess(`Password @${username} direset`)
+    resetPw.value[id] = ''
+  } catch (e) { handleError(e, 'Gagal mereset password.') }
+  finally { resettingPw.value[id] = false }
+}
+
 onMounted(async () => {
   await checkAuth()
-  if (authed.value) { await Promise.all([fetchMembers(), loadProker()]) }
+  if (authed.value) { await Promise.all([fetchMembers(), loadProker(), loadGroups(), fetchWhitelist(), fetchAccounts()]) }
 })
 </script>
 
@@ -361,6 +492,10 @@ onMounted(async () => {
         <button class="side-item" :class="{active: activeTab==='spinner'}" @click="activeTab='spinner'; loadSpinner()">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
           <span>Spinner</span>
+        </button>
+        <button class="side-item" :class="{active: activeTab==='accounts'}" @click="activeTab='accounts'; fetchWhitelist(); fetchAccounts()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>
+          <span>Akun EC</span><b class="count">{{ accounts.length }}</b>
         </button>
         <div class="side-spacer"></div>
         <button class="side-item logout" @click="logout">
@@ -517,6 +652,102 @@ onMounted(async () => {
                 </button>
               </div>
             </template>
+          </div>
+        </div>
+
+        <!-- Akun EC: whitelist + akun anggota -->
+        <div v-if="activeTab==='accounts'">
+          <h2 class="section-title">Akun Anggota EC</h2>
+          <p class="tiny muted" style="margin-bottom:16px;">Hanya nama di whitelist yang bisa buat akun. Password anggota lupa? Reset dari sini.</p>
+          <p v-if="error" class="error">{{ error }}</p>
+          <p v-if="success" class="success-msg">{{ success }}</p>
+
+          <h3 class="subsection-title">Whitelist Nama ({{ filteredWhitelist.length }})</h3>
+          <div class="toolbar">
+            <div class="search-wrap">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg>
+              <input v-model="whitelistSearch" class="search" placeholder="Cari nama..." />
+            </div>
+            <button class="btn ghost sm" @click="fetchWhitelist" :disabled="whitelistLoading">{{ whitelistLoading ? 'Memuat...' : 'Refresh' }}</button>
+          </div>
+          <div class="whitelist-add">
+            <textarea v-model="whitelistBulk" class="field" rows="3" placeholder="Tambah nama (satu per baris)&#10;Contoh:&#10;Budi Santoso&#10;Siti Aminah"></textarea>
+            <div class="whitelist-add-row">
+              <select v-model="whitelistGroup" class="field sm group-select">
+                <option value="">Tanpa kelompok</option>
+                <option v-for="g in groupOptions" :key="g" :value="g">{{ g }}</option>
+              </select>
+              <button class="btn sm" @click="addWhitelist" :disabled="whitelistAdding">{{ whitelistAdding ? 'Menambah...' : 'Tambah ke Whitelist' }}</button>
+            </div>
+          </div>
+          <div class="import-card">
+            <div class="import-head">
+              <b>Import CSV Kelompok</b>
+              <button class="btn ghost sm" @click="downloadTemplate">Download Template</button>
+            </div>
+            <p class="tiny muted">Header: <code>fullname,group_name</code> · baris kosong diabaikan · nama ada = kelompok di-sync · maksimal 1MB</p>
+            <div class="import-row">
+              <input type="file" accept=".csv,text/csv" class="field sm" @change="onImportFile" />
+              <button class="btn sm" @click="doImport" :disabled="!importFile || importing">{{ importing ? 'Mengimpor...' : 'Import' }}</button>
+            </div>
+            <div v-if="importResult" class="import-result">
+              <span class="tiny">Baru: <b>{{ importResult.inserted }}</b> · Diperbarui: <b>{{ importResult.updated }}</b> · Error: <b>{{ importResult.errors.length }}</b></span>
+              <ul v-if="importResult.errors.length" class="import-errors">
+                <li v-for="(e, i) in importResult.errors.slice(0, 20)" :key="i" class="tiny">Baris {{ e.row }}: {{ e.message }}</li>
+                <li v-if="importResult.errors.length > 20" class="tiny muted">+ {{ importResult.errors.length - 20 }} error lain</li>
+              </ul>
+            </div>
+          </div>
+          <div class="table-card">
+            <div class="table-wrap">
+              <table class="admin-table">
+                <thead><tr><th>Nama Lengkap</th><th>Kelompok</th><th>Status</th><th></th></tr></thead>
+                <tbody>
+                  <tr v-for="w in filteredWhitelist" :key="w.id">
+                    <td><b>{{ w.fullname }}</b></td>
+                    <td>
+                      <select :value="w.group_name || ''" class="field sm group-select" @change="changeGroup(w.id, $event.target.value)">
+                        <option value="">—</option>
+                        <option v-for="g in groupOptions" :key="g" :value="g">{{ g }}</option>
+                      </select>
+                    </td>
+                    <td><span class="jurusan-badge">{{ w.is_registered ? 'Sudah buat akun' : 'Belum daftar' }}</span></td>
+                    <td class="tiny"><button class="btn-icon danger" @click="removeWhitelist(w.id, w.fullname)" title="Hapus">&times;</button></td>
+                  </tr>
+                  <tr v-if="!filteredWhitelist.length"><td colspan="4" class="empty">Whitelist kosong — tambah nama anggota dulu</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <h3 class="subsection-title" style="margin-top:28px;">Akun Terdaftar ({{ filteredAccounts.length }})</h3>
+          <div class="toolbar">
+            <div class="search-wrap">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg>
+              <input v-model="accountsSearch" class="search" placeholder="Cari username / nama..." />
+            </div>
+            <button class="btn ghost sm" @click="fetchAccounts" :disabled="accountsLoading">{{ accountsLoading ? 'Memuat...' : 'Refresh' }}</button>
+          </div>
+          <div class="table-card">
+            <div class="table-wrap">
+              <table class="admin-table">
+                <thead><tr><th>Username</th><th>Nama</th><th>Kelompok</th><th>Reset Password</th></tr></thead>
+                <tbody>
+                  <tr v-for="a in filteredAccounts" :key="a.id">
+                    <td><b>@{{ a.username }}</b></td>
+                    <td class="tiny">{{ a.fullname }}</td>
+                    <td><span v-if="a.group_name" class="jurusan-badge">{{ a.group_name }}</span><span v-else class="tiny muted">—</span></td>
+                    <td>
+                      <div class="reset-row">
+                        <input v-model="resetPw[a.id]" type="password" class="field sm reset-input" placeholder="Password baru (min 6)" />
+                        <button class="btn ghost sm" @click="doResetPassword(a.id, a.username)" :disabled="resettingPw[a.id]">{{ resettingPw[a.id] ? '...' : 'Reset' }}</button>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr v-if="!filteredAccounts.length"><td colspan="4" class="empty">Belum ada akun anggota</td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </main>
@@ -688,4 +919,17 @@ onMounted(async () => {
 .spinner-add-name { flex: 1; }
 .spinner-save-row { display: flex; justify-content: space-between; align-items: center; padding-top: 10px; border-top: 2px solid #e2e8f0; }
 .spinner-save-row .btn { min-width: 100px; }
+.subsection-title { margin: 4px 0 12px; font-size: 16px; font-weight: 900; color: var(--ink, #132238); }
+.success-msg { color: #1a9e54; font-size: 13px; font-weight: 700; }
+.whitelist-add { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.whitelist-add .btn { align-self: flex-start; }
+.whitelist-add-row { display: flex; gap: 8px; align-items: center; }
+.group-select { width: auto; padding: 6px 8px; }
+.import-card { border: 2px solid #e2e8f0; background: #f8fafc; padding: 12px; margin-bottom: 16px; }
+.import-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.import-row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+.import-result { margin-top: 8px; }
+.import-errors { margin: 6px 0 0; padding-left: 18px; color: #b45309; }
+.reset-row { display: flex; gap: 6px; align-items: center; }
+.reset-input { width: 170px; padding: 6px 8px; }
 </style>

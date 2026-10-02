@@ -15,4 +15,4 @@ Endpoints: sama 1:1 dengan Python (ping, game, leaderboard, stories, members, ad
 
 Data backup: `backup-custom/server/data/members.csv` + `scores.json`/`stories.json` (tidak ganggu backend/data python)
 
-Vercel: preset vercel, api/index.js export app. Deploy nanti.
+Vercel: preset vercel, api/index.js export app.

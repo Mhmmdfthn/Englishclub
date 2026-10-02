@@ -13,10 +13,9 @@ app.use(cors({ origin: '*', methods: '*', allowedHeaders: '*' }))
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
-// init DB + seed admin
-import { ensureDb } from './utils/pg.js'
+// init: Supabase adalah primary store (tabel dibuat via SQL Editor, bukan ensureDb).
+// Auth seed lokal hanya jalan saat SUPABASE_* belum diset.
 import { ensureSeed } from './utils/auth.js'
-try { await ensureDb() } catch (e) { console.warn('ensureDb failed (fallback file):', e.message) }
 await ensureSeed()
 
 // routes
@@ -26,6 +25,7 @@ import leaderboard from './routes/leaderboard.js'
 import stories from './routes/stories.js'
 import members from './routes/members.js'
 import admin from './routes/admin.js'
+import memberAuth from './routes/memberAuth.js'
 import proker from './routes/proker.js'
 import spinner from './routes/spinner.js'
 
@@ -35,6 +35,7 @@ app.use('/api/leaderboard', leaderboard)
 app.use('/api/stories', stories)
 app.use('/api/members', members)
 app.use('/api/admin', admin)
+app.use('/api/members-auth', memberAuth)
 app.use('/api/proker', proker)
 app.use('/api/spinner', spinner)
 

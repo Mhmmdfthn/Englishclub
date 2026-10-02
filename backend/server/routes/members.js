@@ -1,23 +1,15 @@
 import { Router } from 'express'
 import { addMember, allMembers, highlight } from '../utils/membersStore.js'
-import { verifyToken, verifyTokenAsync } from '../utils/auth.js'
-import { isDbEnabled } from '../utils/pg.js'
+import { verifyTokenAsync } from '../utils/auth.js'
 import { auditAdmin, auditTech } from '../utils/audit.js'
 
 const r = Router()
 const ALLOWED = new Set(['Ilmu Komputer','Manajemen','Akuntansi','Bisnis Digital','Sains Data','Agribisnis','Lainnya'])
 
 async function requireAdmin(req, res, next) {
-  const bearer = (req.header('authorization') || '').replace(/^Bearer\s+/i, '')
-  const legacy = req.header('x-admin-token')
-  const token = bearer || legacy
-  let username = null
-  if (isDbEnabled()) username = await verifyTokenAsync(token)
-  else username = verifyToken(token)
+  const token = (req.header('authorization') || '').replace(/^Bearer\s+/i, '')
+  const username = await verifyTokenAsync(token)
   if (username) { req.admin = { username }; return next() }
-  const expected = process.env.ADMIN_TOKEN
-  if (expected && token === expected) { req.admin = { username: 'admin' }; return next() }
-  if (!expected) return res.status(500).json({ detail: 'ADMIN_TOKEN belum dikonfigurasi di server' })
   return res.status(401).json({ detail: 'Unauthorized' })
 }
 
@@ -55,11 +47,15 @@ r.post('/', async (req, res) => {
   }
 })
 
-// sync endpoint for Google Apps Script
+// sync endpoint for Google Apps Script (baca Supabase; proteksi JWT admin atau SUPABASE_SYNC_TOKEN)
 r.get('/sync', async (req, res) => {
-  const syncToken = req.header('x-sync-token') || (req.header('authorization') || '').replace(/^Bearer\s+/i, '')
-  const expected = process.env.SYNC_TOKEN || process.env.ADMIN_TOKEN
-  if (!expected || syncToken !== expected) {
+  const bearer = (req.header('authorization') || '').replace(/^Bearer\s+/i, '')
+  const syncToken = req.header('x-sync-token') || bearer
+  const expected = process.env.SUPABASE_SYNC_TOKEN
+  let allowed = false
+  if (expected && syncToken === expected) allowed = true
+  else if (bearer && await verifyTokenAsync(bearer)) allowed = true
+  if (!allowed) {
     return res.status(401).json({ detail: 'Unauthorized. Invalid or missing x-sync-token.' })
   }
   const rows = await allMembers(10000)

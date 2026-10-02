@@ -1,100 +1,127 @@
+// Auth via Supabase Auth (PRD DB SUPABASE). Backend-only service_role.
+// Jika SUPABASE_* belum diset (project belum dibuat), fallback lokal
+// (admins.json + bcrypt + memory token 8h) agar dev/test tetap jalan.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { randomBytes } from 'crypto'
 import bcrypt from 'bcrypt'
-import { isDbEnabled, getDb } from './pg.js'
+import { getSupabase, getSupabaseAuth, isSupabaseEnabled } from './supabase.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const isVercelAuth = Boolean(
-  process.env.VERCEL ||
-  process.env.VERCEL_ENV ||
-  process.env.NOW_REGION ||
-  process.env.AWS_LAMBDA_FUNCTION_NAME ||
-  process.env.LAMBDA_TASK_ROOT ||
-  __dirname.includes('task') ||
-  __dirname.startsWith('/var')
-)
-const origDataDirAuth = join(__dirname, '../data')
-let dataDir = isVercelAuth ? join('/tmp', 'data') : origDataDirAuth
-
+const dataDir = join(__dirname, '../data')
 try {
   if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true })
-} catch (e) {
-  dataDir = join('/tmp', 'data')
-  try { if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true }) } catch {}
-}
+} catch {}
 const adminsPath = join(dataDir, 'admins.json')
-
-if (isVercelAuth) {
-  try {
-    const origAdmins = join(origDataDirAuth, 'admins.json')
-    if (!existsSync(adminsPath) && existsSync(origAdmins)) {
-      writeFileSync(adminsPath, readFileSync(origAdmins, 'utf-8'), 'utf-8')
-    }
-  } catch (e) {
-    console.error('Auth seed copy failed:', e.message)
-  }
-}
 
 function loadAdmins() {
   if (!existsSync(adminsPath)) return []
   try { return JSON.parse(readFileSync(adminsPath, 'utf-8')) } catch { return [] }
 }
 function saveAdmins(arr) {
-  writeFileSync(adminsPath, JSON.stringify(arr, null, 2), 'utf-8')
+  try { writeFileSync(adminsPath, JSON.stringify(arr, null, 2), 'utf-8') } catch (e) {
+    console.error('Auth saveAdmins failed:', e.message)
+  }
 }
 
-// persistent tokens: file + memory (fallback) or DB
-const tokensPath = join(dataDir, 'tokens.json')
 const TTL = 8 * 3600 * 1000
+const tokens = new Map()
 
-function loadTokens() {
-  if (isDbEnabled()) return new Map() // DB will be used, not file
-  if (!existsSync(tokensPath)) return new Map()
-  try {
-    const arr = JSON.parse(readFileSync(tokensPath, 'utf-8'))
-    const m = new Map()
-    for (const { token, username, exp } of arr) {
-      if (Date.now() < exp) m.set(token, { username, exp })
-    }
-    return m
-  } catch { return new Map() }
-}
-function saveTokens() {
-  if (isDbEnabled()) return // DB handles
-  const arr = [...tokens.entries()].map(([token, { username, exp }]) => ({ token, username, exp }))
-  try { writeFileSync(tokensPath, JSON.stringify(arr, null, 2), 'utf-8') } catch (e) {
-    console.error('Auth saveTokens failed:', e.message)
-  }
+function verifyLocalToken(token) {
+  if (!token) return null
+  const v = tokens.get(token)
+  if (!v) return null
+  if (Date.now() > v.exp) { tokens.delete(token); return null }
+  return v.username
 }
 
-const tokens = loadTokens()
-
-export function getAdmin(username) {
-  if (isDbEnabled()) {
-    // sync fallback not possible, use async version getAdminAsync
-    return loadAdmins().find(a => a.username === username) || null
+export async function verifyPassword(username, password) {
+  if (isSupabaseEnabled()) {
+    const sb = getSupabaseAuth()
+    // Cari email admin: username 'admin' -> admin@englishclub.local (konvensi seed)
+    const email = username.includes('@') ? username : `${username}@englishclub.local`
+    const { error } = await sb.auth.signInWithPassword({ email, password })
+    if (error) return false
+    try { await sb.auth.signOut() } catch {}
+    return true
   }
-  return loadAdmins().find(a => a.username === username) || null
+  const adm = loadAdmins().find(a => a.username === username)
+  if (!adm) return false
+  return bcrypt.compare(password, adm.password_hash)
 }
 
-export async function getAdminAsync(username) {
-  if (isDbEnabled()) {
-    const pool = getDb()
-    const { rows } = await pool.query('SELECT username, password_hash, created_at FROM admins WHERE username=$1', [username])
-    return rows[0] || null
+export async function issueToken(username) {
+  if (isSupabaseEnabled()) {
+    const sb = getSupabase()
+    const email = username.includes('@') ? username : `${username}@englishclub.local`
+    // Password sudah diverifikasi di verifyPassword; di sini kita butuh password lagi?
+    // Untuk menjaga kontrak {ok,token}, login route memanggil signIn langsung.
+    // Fallback: token random yang dipetakan ke username, diverifikasi via getUser di verify.
+    // Namun pola benar: route /login memakai supabase langsung (lihat routes/admin.js).
+    // Fungsi ini tetap ada untuk kompatibilitas: kembalikan session token via signIn ulang tidak mungkin
+    // tanpa password, jadi route harus memakai loginWithPassword di bawah.
+    throw new Error('Gunakan loginWithPassword untuk Supabase Auth')
   }
-  return getAdmin(username)
+  const token = randomBytes(24).toString('base64url')
+  tokens.set(token, { username, exp: Date.now() + TTL })
+  return token
+}
+
+export async function loginWithPassword(username, password, emailOverride = null) {
+  const sb = getSupabaseAuth()
+  const email = emailOverride || (username.includes('@') ? username.trim() : `${username.trim()}@englishclub.local`)
+  const { data, error } = await sb.auth.signInWithPassword({ email, password })
+  if (error || !data?.session?.access_token) return null
+  return { token: data.session.access_token, username: username.trim(), email }
+}
+
+export async function verifyTokenAsync(token) {
+  if (!token) return null
+  if (isSupabaseEnabled()) {
+    const sb = getSupabaseAuth()
+    const { data, error } = await sb.auth.getUser(token)
+    if (error || !data?.user) return null
+    const email = data.user.email || ''
+    return email.replace('@englishclub.local', '') || email
+  }
+  return verifyLocalToken(token)
+}
+
+export function verifyToken(token) {
+  if (isSupabaseEnabled()) return null // async path wajib dipakai
+  return verifyLocalToken(token)
+}
+
+export async function revokeToken(token) {
+  if (isSupabaseEnabled()) {
+    // JWT stateless: tidak bisa revoke tanpa blocklist; signOut best-effort.
+    try {
+      const sb = getSupabase()
+      await sb.auth.admin.signOut(token)
+    } catch {}
+    return
+  }
+  tokens.delete(token)
+}
+
+export async function ensureSeed() {
+  if (isSupabaseEnabled()) {
+    console.log('Auth: Supabase Auth aktif (seed via Dashboard > Users)')
+    return
+  }
+  const arr = loadAdmins()
+  if (arr.length === 0) {
+    const hash = await bcrypt.hash('ec2026onlyblue', 10)
+    arr.push({ username: 'admin', password_hash: hash, created_at: new Date().toISOString() })
+    saveAdmins(arr)
+    console.log('Seeded admin lokal: admin / ec2026onlyblue')
+  }
 }
 
 export async function createAdmin(username, password) {
+  if (isSupabaseEnabled()) throw new Error('Buat admin via Supabase Dashboard > Authentication > Users')
   const hash = await bcrypt.hash(password, 10)
-  if (isDbEnabled()) {
-    const pool = getDb()
-    await pool.query('INSERT INTO admins (username, password_hash) VALUES ($1,$2) ON CONFLICT DO NOTHING', [username, hash])
-    return { username }
-  }
   const arr = loadAdmins()
   if (arr.find(a => a.username === username)) throw new Error('Username sudah ada')
   arr.push({ username, password_hash: hash, created_at: new Date().toISOString() })
@@ -102,82 +129,22 @@ export async function createAdmin(username, password) {
   return { username }
 }
 
-export async function verifyPassword(username, password) {
-  if (isDbEnabled()) {
-    const adm = await getAdminAsync(username)
-    if (!adm) return false
-    return bcrypt.compare(password, adm.password_hash)
-  }
-  const adm = getAdmin(username)
-  if (!adm) return false
-  return bcrypt.compare(password, adm.password_hash)
+export async function getAdminAsync(username) {
+  if (isSupabaseEnabled()) return { username }
+  return loadAdmins().find(a => a.username === username) || null
 }
 
-export async function issueToken(username) {
-  const token = randomBytes(24).toString('base64url')
-  const exp = Date.now() + TTL
-  if (isDbEnabled()) {
-    const pool = getDb()
-    await pool.query('INSERT INTO tokens (token, username, exp) VALUES ($1,$2,$3)', [token, username, new Date(exp)])
-  } else {
-    tokens.set(token, { username, exp })
-    saveTokens()
-  }
-  return token
-}
-
-export async function verifyTokenAsync(token) {
-  if (!token) return null
-  if (isDbEnabled()) {
-    const pool = getDb()
-    const { rows } = await pool.query('SELECT username, exp FROM tokens WHERE token=$1', [token])
-    if (!rows.length) return null
-    const exp = new Date(rows[0].exp).getTime()
-    if (Date.now() > exp) {
-      await pool.query('DELETE FROM tokens WHERE token=$1', [token])
-      return null
-    }
-    return rows[0].username
-  }
-  return verifyToken(token)
-}
-
-export function verifyToken(token) {
-  if (!token) return null
-  const v = tokens.get(token)
-  if (!v) return null
-  if (Date.now() > v.exp) { tokens.delete(token); saveTokens(); return null }
-  return v.username
-}
-
-export async function revokeToken(token) {
-  if (isDbEnabled()) {
-    const pool = getDb()
-    await pool.query('DELETE FROM tokens WHERE token=$1', [token])
-    return
-  }
-  tokens.delete(token)
-  saveTokens()
-}
-
-export async function ensureSeed() {
-  if (isDbEnabled()) {
-    const pool = getDb()
-    const { rows } = await pool.query('SELECT COUNT(*) FROM admins')
-    if (parseInt(rows[0].count, 10) === 0) {
-      const hash = await bcrypt.hash('ec2026onlyblue', 10)
-      await pool.query('INSERT INTO admins (username, password_hash) VALUES ($1,$2)', ['admin', hash])
-      console.log('Seeded admin in DB: admin / ec2026onlyblue')
-    }
-    return
-  }
-  const arr = loadAdmins()
-  if (arr.length === 0) {
-    await createAdmin('admin', 'ec2026onlyblue')
-    console.log('Seeded admin: admin / ec2026onlyblue')
-  }
+export function getAdmin(username) {
+  return loadAdmins().find(a => a.username === username) || null
 }
 
 export function listAdmins() {
   return loadAdmins().map(a => ({ username: a.username, created_at: a.created_at }))
+}
+
+// Dipakai route login fallback lokal
+export async function issueLocalToken(username) {
+  const token = randomBytes(24).toString('base64url')
+  tokens.set(token, { username, exp: Date.now() + TTL })
+  return token
 }

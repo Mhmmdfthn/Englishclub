@@ -1,12 +1,18 @@
 import { Router } from 'express'
-import { isKvEnabled, isSheetsEnabled } from '../utils/cloudStore.js'
+import { isSupabaseEnabled } from '../utils/supabase.js'
 const r = Router()
-r.get('/', (req, res) => res.json({
-	pong: true,
-	vercel: Boolean(process.env.VERCEL),
-	adminConfigured: Boolean(process.env.ADMIN_TOKEN),
-	syncConfigured: Boolean(process.env.SYNC_TOKEN || process.env.ADMIN_TOKEN),
-	kvConfigured: isKvEnabled(),
-	sheetsConfigured: isSheetsEnabled(),
-}))
+r.get('/', async (req, res) => {
+  const { supabaseHealth } = await import('../utils/supabase.js')
+  let db = { enabled: isSupabaseEnabled() }
+  try {
+    if (db.enabled) db = await supabaseHealth()
+  } catch {}
+  res.json({
+    pong: true,
+    vercel: Boolean(process.env.VERCEL),
+    supabaseConfigured: isSupabaseEnabled(),
+    supabase: db,
+    syncConfigured: Boolean(process.env.SUPABASE_SYNC_TOKEN),
+  })
+})
 export default r

@@ -1,7 +1,5 @@
 import { Router } from 'express'
-import { isKvEnabled } from '../utils/cloudStore.js'
-import { verifyToken, verifyTokenAsync } from '../utils/auth.js'
-import { isDbEnabled } from '../utils/pg.js'
+import { verifyTokenAsync } from '../utils/auth.js'
 import { auditAdmin } from '../utils/audit.js'
 
 const r = Router()
@@ -12,46 +10,21 @@ const DEFAULT_PRIZES = [
   { name: 'Pin', count: 2 },
 ]
 
+let memoryPrizes = [...DEFAULT_PRIZES]
+
 async function requireAdmin(req, res, next) {
-  const bearer = (req.header('authorization') || '').replace(/^Bearer\s+/i, '')
-  const legacy = req.header('x-admin-token')
-  const token = bearer || legacy || req.body.token
-  let username = null
-  if (isDbEnabled()) username = await verifyTokenAsync(token)
-  else username = verifyToken(token)
+  const token = (req.header('authorization') || '').replace(/^Bearer\s+/i, '')
+  const username = await verifyTokenAsync(token)
   if (username) { req.admin = { username }; return next() }
-  const expected = process.env.ADMIN_TOKEN
-  if (expected && token === expected) { req.admin = { username: 'admin' }; return next() }
   return res.status(401).json({ detail: 'Unauthorized' })
 }
 
 async function getSpinnerPrizes() {
-  if (isKvEnabled()) {
-    const { kv } = await import('@vercel/kv')
-    const raw = await kv.get('config:spinner_prizes')
-    if (Array.isArray(raw) && raw.length > 0) {
-      return raw.map(p => ({
-        name: String(p.name || '').trim().slice(0, 40),
-        count: Math.max(1, Math.min(Number(p.count) || 1, 20)),
-      }))
-    }
-    const legacyItems = await kv.get('config:spinner_items')
-    if (legacyItems && typeof legacyItems === 'object' && !Array.isArray(legacyItems) && Array.isArray(legacyItems.items)) {
-      return legacyItems.items.map(name => ({ name: String(name).trim().slice(0, 40), count: 1 }))
-    }
-    if (Array.isArray(legacyItems)) {
-      return legacyItems.map(name => ({ name: String(name).trim().slice(0, 40), count: 1 }))
-    }
-    return DEFAULT_PRIZES
-  }
-  return DEFAULT_PRIZES
+  return memoryPrizes
 }
 
 async function saveSpinnerPrizes(prizes) {
-  if (isKvEnabled()) {
-    const { kv } = await import('@vercel/kv')
-    await kv.set('config:spinner_prizes', prizes)
-  }
+  memoryPrizes = prizes
 }
 
 r.get('/', async (req, res) => {

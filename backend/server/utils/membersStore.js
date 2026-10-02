@@ -1,5 +1,4 @@
-import { isDbEnabled, getDb } from './pg.js'
-import { addMemberToSheets, cloudMembers, isSheetsEnabled, cloudAddMember, cloudAllMembers, isKvEnabled } from './cloudStore.js'
+import { getSupabase, isSupabaseEnabled } from './supabase.js'
 import { withWIB } from './time.js'
 
 const ALLOWED_JURUSAN = new Set(['Ilmu Komputer','Manajemen','Akuntansi','Bisnis Digital','Sains Data','Agribisnis','Lainnya'])
@@ -10,42 +9,45 @@ function sanitize(v) {
   return v
 }
 
+function toRow(r) {
+  const ts = r.timestamp ? new Date(r.timestamp).toISOString().slice(0, 19) : new Date().toISOString().slice(0, 19)
+  return { timestamp: ts, nama: r.nama, no_hp: r.no_hp, jurusan: r.jurusan }
+}
+
 export async function addMember(nama, no_hp, jurusan) {
   const n = sanitize(nama.trim()).slice(0, 40)
   const hp = sanitize(no_hp.trim()).slice(0, 15)
   const j = sanitize(jurusan.trim()).slice(0, 30)
   if (!ALLOWED_JURUSAN.has(j)) throw new Error(`Jurusan tidak valid: ${j}`)
+
+  if (isSupabaseEnabled()) {
+    const sb = getSupabase()
+    const { data, error } = await sb
+      .from('members')
+      .insert({ nama: n, no_hp: hp, jurusan: j })
+      .select('timestamp, nama, no_hp, jurusan')
+      .single()
+    if (error) throw new Error('Database sibuk, silakan coba lagi')
+    const row = toRow(data)
+    return { ...row, queued: false }
+  }
+
+  // Fallback memory lokal (dipakai sebelum SUPABASE_* diset / project belum dibuat)
   const row = { timestamp: new Date().toISOString().slice(0, 19), nama: n, no_hp: hp, jurusan: j }
-
-  if (isKvEnabled()) {
-    return cloudAddMember(row)
-  }
-  if (isSheetsEnabled()) {
-    return addMemberToSheets(row)
-  }
-  if (isDbEnabled()) {
-    const pool = getDb()
-    const { rows } = await pool.query(
-      'INSERT INTO members (nama, no_hp, jurusan) VALUES ($1,$2,$3) RETURNING timestamp, nama, no_hp, jurusan',
-      [n, hp, j]
-    )
-    const r = rows[0]
-    r.timestamp = new Date(r.timestamp).toISOString().slice(0, 19)
-    return r
-  }
-
-  // Fallback in-memory lokal (tanpa akses filesystem/EROFS)
   memoryMembers.push(row)
-  return row
+  return { ...row, queued: false }
 }
 
 export async function allMembers(limit = 100) {
-  if (isKvEnabled()) return cloudAllMembers(limit)
-  if (isSheetsEnabled()) return withWIB(await cloudMembers(limit))
-  if (isDbEnabled()) {
-    const pool = getDb()
-    const { rows } = await pool.query('SELECT timestamp, nama, no_hp, jurusan FROM members ORDER BY id DESC LIMIT $1', [limit])
-    return withWIB(rows.map(r => ({ ...r, timestamp: new Date(r.timestamp).toISOString().slice(0, 19) })))
+  if (isSupabaseEnabled()) {
+    const sb = getSupabase()
+    const { data, error } = await sb
+      .from('members')
+      .select('timestamp, nama, no_hp, jurusan')
+      .order('id', { ascending: false })
+      .limit(limit)
+    if (error) throw new Error('Database sibuk, silakan coba lagi')
+    return withWIB(data.map(toRow))
   }
   return withWIB([...memoryMembers].reverse().slice(0, limit))
 }

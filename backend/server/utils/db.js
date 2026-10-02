@@ -1,5 +1,4 @@
-import { isDbEnabled, getDb } from './pg.js'
-import { cloudAddScore, cloudAddStory, cloudLatestStories, cloudTopScores, cloudUpdateStoryPrize, isKvEnabled } from './cloudStore.js'
+import { getSupabase, isSupabaseEnabled } from './supabase.js'
 import { withWIB } from './time.js'
 
 let memoryScores = []
@@ -10,12 +9,16 @@ export const db = {
     return memoryScores
   },
   async addScore(name, score, words) {
-    if (isKvEnabled()) return cloudAddScore(name, score, words)
-    if (isDbEnabled()) {
-      const pool = getDb()
-      await pool.query('INSERT INTO scores (name, score, words) VALUES ($1,$2,$3)', [name.slice(0, 20), score, words])
-      const { rows } = await pool.query('SELECT COUNT(*) FROM scores WHERE score > $1', [score])
-      return parseInt(rows[0].count, 10) + 1
+    if (isSupabaseEnabled()) {
+      const sb = getSupabase()
+      const { error } = await sb.from('scores').insert({
+        name: name.slice(0, 20),
+        score,
+        words,
+      })
+      if (error) throw new Error('Database sibuk, silakan coba lagi')
+      const { count } = await sb.from('scores').select('id', { count: 'exact', head: true }).gt('score', score)
+      return (count ?? 0) + 1
     }
     const row = { name: name.slice(0, 20), score, words, created_at: new Date().toISOString() }
     memoryScores.push(row)
@@ -23,11 +26,16 @@ export const db = {
     return better + 1
   },
   async top(limit = 10) {
-    if (isKvEnabled()) return cloudTopScores(limit)
-    if (isDbEnabled()) {
-      const pool = getDb()
-      const { rows } = await pool.query('SELECT name, score, words, created_at FROM scores ORDER BY score DESC, created_at ASC LIMIT $1', [limit])
-      return withWIB(rows)
+    if (isSupabaseEnabled()) {
+      const sb = getSupabase()
+      const { data, error } = await sb
+        .from('scores')
+        .select('name, score, words, created_at')
+        .order('score', { ascending: false })
+        .order('created_at', { ascending: true })
+        .limit(limit)
+      if (error) throw new Error('Database sibuk, silakan coba lagi')
+      return withWIB(data)
     }
     return withWIB([...memoryScores].sort((a, b) => b.score - a.score || new Date(a.created_at) - new Date(b.created_at)).slice(0, limit))
   },
@@ -35,31 +43,44 @@ export const db = {
     return memoryStories
   },
   async addStory(name, batch, comment) {
-    if (isKvEnabled()) return cloudAddStory(name, batch, comment)
-    if (isDbEnabled()) {
-      const pool = getDb()
-      const { rows } = await pool.query('INSERT INTO stories (name, batch, comment) VALUES ($1,$2,$3) RETURNING name, batch, comment', [name.slice(0, 40), batch.slice(0, 30), comment.slice(0, 220)])
-      return rows[0]
+    if (isSupabaseEnabled()) {
+      const sb = getSupabase()
+      const { data, error } = await sb
+        .from('stories')
+        .insert({ name: name.slice(0, 40), batch: batch.slice(0, 30), comment: comment.slice(0, 220) })
+        .select('name, batch, comment, created_at')
+        .single()
+      if (error) throw new Error('Database sibuk, silakan coba lagi')
+      return data
     }
     const row = { name: name.slice(0, 40), batch: batch.slice(0, 30), comment: comment.slice(0, 220), created_at: new Date().toISOString() }
     memoryStories.push(row)
     return row
   },
   async latest(limit = 100) {
-    if (isKvEnabled()) return cloudLatestStories(limit)
-    if (isDbEnabled()) {
-      const pool = getDb()
-      const { rows } = await pool.query('SELECT name, batch, comment, created_at FROM stories ORDER BY id DESC LIMIT $1', [limit])
-      return withWIB(rows)
+    if (isSupabaseEnabled()) {
+      const sb = getSupabase()
+      const { data, error } = await sb
+        .from('stories')
+        .select('name, batch, comment, prize_won, created_at')
+        .order('id', { ascending: false })
+        .limit(limit)
+      if (error) throw new Error('Database sibuk, silakan coba lagi')
+      return withWIB(data.map(({ name, batch, comment, created_at }) => ({ name, batch, comment, created_at })))
     }
     return withWIB([...memoryStories].reverse().slice(0, limit).map(r => ({ name: r.name, batch: r.batch, comment: r.comment, created_at: r.created_at })))
   },
   async updateStoryPrize(id, prize_won) {
-    if (isKvEnabled()) return cloudUpdateStoryPrize(id, prize_won)
-    if (isDbEnabled()) {
-      const pool = getDb()
-      const { rows } = await pool.query('UPDATE stories SET prize_won=$1 WHERE name=$2 RETURNING name, batch, comment, prize_won, created_at', [prize_won, id])
-      return rows[0] || null
+    // Tetap match by `name` (kompatibel perilaku lama + Testimonials.vue).
+    if (isSupabaseEnabled()) {
+      const sb = getSupabase()
+      const { data, error } = await sb
+        .from('stories')
+        .update({ prize_won })
+        .eq('name', id)
+        .select('name, batch, comment, prize_won, created_at')
+      if (error) throw new Error('Database sibuk, silakan coba lagi')
+      return data?.[0] || null
     }
     const idx = memoryStories.findIndex(r => r.name === id)
     if (idx === -1) return null

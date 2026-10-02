@@ -11,6 +11,10 @@ import LandingView from './components/LandingView.vue'
 import PlayFormView from './components/PlayFormView.vue'
 import LeaderboardPage from './components/LeaderboardPage.vue'
 import MemberRegisterMini from './components/MemberRegisterMini.vue'
+import MemberSignupView from './components/MemberSignupView.vue'
+import MemberLoginView from './components/MemberLoginView.vue'
+import MemberDashboardView from './components/MemberDashboardView.vue'
+import SoonView from './components/SoonView.vue'
 import ProgramArticle from './components/ProgramArticle.vue'
 import FoundWords from './components/FoundWords.vue'
 
@@ -25,13 +29,19 @@ const showAdminModal = ref(false)
 function openAdminModal() { showAdminModal.value = true; document.body.style.overflow = 'hidden' }
 function closeAdminModal() { showAdminModal.value = false; document.body.style.overflow = '' }
 
-const routeToScreen = { '/': 'landing', '/daftar': 'register', '/board': 'board', '/main': 'form' }
-const screenToRoute = { landing: '/', register: '/daftar', board: '/board', form: '/main' }
+const routeToScreen = { '/': 'landing', '/daftar': 'register', '/board': 'board', '/main': 'form', '/buat-akun': 'signup', '/masuk': 'login', '/dashboard': 'dashboard' }
+const screenToRoute = { landing: '/', register: '/daftar', board: '/board', form: '/main', signup: '/buat-akun', login: '/masuk', dashboard: '/dashboard' }
+// Flag deploy (Vite, dibake saat build): false -> halaman auth jadi "Segera Hadir" (Vercel production)
+const MEMBER_AUTH_ON = import.meta.env.VITE_MEMBER_AUTH_ENABLED !== 'false'
 
 function syncScreenFromRoute() {
   if (isHiddenAdminRoute.value) return
   if (route.path.startsWith('/program/')) {
     screen.value = 'article'
+    return
+  }
+  if (!MEMBER_AUTH_ON && (route.path === '/masuk' || route.path === '/buat-akun')) {
+    screen.value = 'soon'
     return
   }
   const mapped = routeToScreen[route.path]
@@ -43,9 +53,32 @@ function syncScreenFromRoute() {
 watch(() => route.path, syncScreenFromRoute)
 
 function navigate(screenName) {
+  if (screenName === 'register') screenName = 'landing' // pendaftaran disembunyikan sementara
+  if (!MEMBER_AUTH_ON && (screenName === 'signup' || screenName === 'login')) screenName = 'soon'
+  if (MEMBER_AUTH_ON && (screenName === 'signup' || screenName === 'login') && memberSession.value) screenName = 'landing'
+  if (screenName === 'dashboard' && !memberSession.value) screenName = 'login'
   screen.value = screenName
   const path = screenToRoute[screenName]
   if (path && route.path !== path) router.push(path)
+}
+
+// ---- Sesi akun anggota EC ----
+const memberSession = ref(null)
+try {
+  const t = localStorage.getItem('member_token')
+  const u = localStorage.getItem('member_username')
+  if (t && u) memberSession.value = { username: u, fullname: localStorage.getItem('member_fullname') || '' }
+} catch { /* abaikan */ }
+function handleMemberAuth(member) {
+  memberSession.value = member
+  navigate('dashboard')
+}
+function handleMemberLogout() {
+  localStorage.removeItem('member_token')
+  localStorage.removeItem('member_username')
+  localStorage.removeItem('member_fullname')
+  memberSession.value = null
+  if (screen.value === 'dashboard') navigate('landing')
 }
 function openArticle(p) {
   router.push('/program/' + p.id)
@@ -317,11 +350,15 @@ function areAdjacent(a, b) {
 
   <router-view v-if="isHiddenAdminRoute" />
   <template v-else>
-    <LandingView v-if="screen === 'landing'" @goPlay="navigate('form')" @goBoard="navigate('board')" @goRegister="navigate('register')" @openAdmin="openAdminModal" @goArticle="openArticle" />
+    <LandingView v-if="screen === 'landing'" :member-name="memberSession?.fullname || memberSession?.username || ''" @goPlay="navigate('form')" @goBoard="navigate('board')" @goRegister="navigate('register')" @goLogin="navigate('login')" @goSignup="navigate('signup')" @goDashboard="navigate('dashboard')" @memberLogout="handleMemberLogout" @openAdmin="openAdminModal" @goArticle="openArticle" />
     <ProgramArticle v-else-if="screen === 'article'" />
     <PlayFormView v-else-if="screen === 'form'" :best="bestScore" :error="boardError || dictionaryError" :retriable="connectError" :dictionary-ready="dictionaryReady" @play="startGame" @back="goLanding" />
     <LeaderboardPage v-else-if="screen === 'board'" @back="goLanding" />
     <MemberRegisterMini v-else-if="screen === 'register'" @back="goLanding" />
+    <MemberSignupView v-else-if="screen === 'signup'" @back="goLanding" @done="handleMemberAuth" @goto-login="navigate('login')" />
+    <MemberLoginView v-else-if="screen === 'login'" @back="goLanding" @done="handleMemberAuth" @goto-signup="navigate('signup')" />
+    <MemberDashboardView v-else-if="screen === 'dashboard'" @back="goLanding" @logout="handleMemberLogout" />
+    <SoonView v-else-if="screen === 'soon'" @back="goLanding" />
     <section v-else-if="screen === 'play'" class="screen play">
       <HudBar :score="score" :time-left="timeLeft" :time-total="timeLimit" :combo="combo" :word="activeWord" :fever="isFever" />
       <GameBoard
