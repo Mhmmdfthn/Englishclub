@@ -23,11 +23,11 @@ Jenis: `INIT` | `FEAT` | `FIX` | `REFACTOR` | `CHORE` | `BUILD` | `DOCS` | `TEST
 | Metrik | Nilai |
 |---|---|
 | Repo init | 2026-08-26 04:02 WIB (`d7a8421 GameV1` oleh `mhmmdfthn`) |
-| Rentang aktivitas tercatat | 2026-08-26 00:19 — 2026-08-27 10:15 WIB |
-| Total entri | 48 |
-| Backend | FastAPI + SQLite (5 modul, 60s kompetitif, combo poin) |
-| Frontend | Vue 3 + Vite (9 komponen, landing profil UKM, 3 halaman terpisah) |
-| Status terakhir | Smoke test **LULUS** + build `index-C6eCmXVm.js` 200 OK 2026-08-27 10:14 WIB |
+| Rentang aktivitas tercatat | 2026-08-26 00:19 — 2026-10-03 00:50 WIB |
+| Total entri | 59 |
+| Backend | Node Express + Supabase (Postgres+Auth+Storage); admin JWT; akun anggota + 5 kelompok + CSV sync |
+| Frontend | Vue 3 + Vite (auth /buat-akun+/masuk, dashboard /dashboard ala GH-mobile, soon-flag, daftar hidden) |
+| Status terakhir | Commit `fb81817` pushed `main`; test PRD Supabase+auth+grup+soon **HIJAU**; whitelist real 88 nama |
 
 ---
 
@@ -83,6 +83,17 @@ Jenis: `INIT` | `FEAT` | `FIX` | `REFACTOR` | `CHORE` | `BUILD` | `DOCS` | `TEST
 | 46 | 2026-08-27 10:10 WIB | REFACTOR | `backend/game.py` | Waktu 1 menit + hapus translate | `BASE_TIME 30→60`, `MAX_TIME 60`, hapus `translations.json/cache`, `dictionary.translate`, `GET /api/translate`, `requirements` `requests`, `App/GameOver` hapus arti | ✅ Done |
 | 47 | 2026-08-27 10:14 WIB | CHORE | `.gitignore` + `git rm --cached` | Rapikan direktori | `.gitignore` 48 baris (`node_modules/`, `dist/`, `__pycache__/`, `*.db`), `rm node_modules (767) + __pycache__ + dist`, `git ls-files 33`, `docs/` move, `README.md` baru, hapus `StartScreen.vue`+`WordList.vue` | ✅ Done |
 | 48 | 2026-08-27 10:15 WIB | DOCS | `docs/Activity.md` | Perbarui Activity Log | Tambah entri 35-48, ringkasan 48 entri, status git clean + build `index-C6eCmXVm.js` | ✅ Done |
+| 49 | 2026-10-02 23:10 WIB | REFACTOR | `backend/server/utils/supabase.js` (baru) + `db.js` + `membersStore.js` + `prokerStore.js` | Migrasi primary store ke Supabase | Singleton `SERVICE_ROLE` + Storage `Proker-photos` + health-check; scores/stories/members/proker via PostgREST; fallback memory bila env kosong | ✅ Done |
+| 50 | 2026-10-02 23:15 WIB | REFACTOR | `backend/server/utils/auth.js` + `routes/admin.js` + `members.js` + `proker.js` + `spinner.js` | Auth admin via Supabase Auth | `signInWithPassword/getUser/signOut` (anon-client terpisah); hapus `bcrypt/tokens.json`/`ADMIN_TOKEN`/`x-admin-token`; `pg.js` jadi shim; hapus `cloudStore.js`+`cloudinary.js`; `ping` lapor `supabaseConfigured` | ✅ Done |
+| 51 | 2026-10-02 23:20 WIB | FEAT | `backend/supabase-schema.sql` + `supabase-auth-schema.sql` + `supabase-group-migration.sql` | Skema kanonis Supabase | `members/scores/stories/proker` + seed 4 proker; `ec_members_validation`+`member_profiles` (CITEXT); `group_name` + check 5 grup (Zeus/Athena/Hades/Apollo/Hermes); RLS ON tanpa policy | ✅ Done |
+| 52 | 2026-10-02 23:35 WIB | FEAT | `backend/server/utils/memberAuthStore.js` + `routes/memberAuth.js` + `server/index.js` | Akun anggota EC (PRD Signup) | `POST /members-auth/register` (whitelist case-insensitive, anti ganda 409, pw≥6, email sintetis `@members.englishclub.local`, rollback best-effort, auto-login JWT) + `login` + `me`; admin whitelist CRUD + daftar akun + reset password | ✅ Done |
+| 53 | 2026-10-02 23:50 WIB | FEAT | `memberAuthStore.js` + `memberAuth.js` (`csv-parse`) + tab `Akun EC` `AdminView.vue` | Kelompok + CSV import/sync (PRD v2) | `POST /whitelist/import` (header `fullname,group_name`, toleran alias/BOM/baris kosong/tanpa header, error per-baris, upsert sync, propagasi grup live ke profil) + `GET /whitelist/template` + `GET /groups` + `PUT /whitelist/:id`; UI import + dropdown grup + reset pw | ✅ Done |
+| 54 | 2026-10-02 23:55 WIB | FEAT | `frontend/.../MemberSignupView.vue` + `MemberLoginView.vue` + `MemberDashboardView.vue` + `App.vue` + `router.js` + `api.js` | Halaman akun + dashboard anggota | Rute `/buat-akun`+`/masuk`+`/dashboard` (guard sesi); dashboard ala GH-mobile (profil, kartu grup strip-warna, list info, skeleton/error/empty); sesi localStorage; login→dashboard; `GET /me` + `created_at` | ✅ Done |
+| 55 | 2026-10-03 00:10 WIB | FIX | `backend/server/utils/supabase.js` + `auth.js` + `memberAuth.js` | 3 bug temuan verifikasi live | (1) Session-poisoning: `signIn` di client service_role turunkan role ke `authenticated` → RLS 0 baris; fix auth-client terpisah. (2) Bucket case-sensitive (`Proker-photos`). (3) Login anggota map ke domain admin; fix `emailFor` override | ✅ Done |
+| 56 | 2026-10-03 00:20 WIB | FEAT | `LandingView.vue` (`v-if false`) + `router.js` (`/daftar→/`) + `App.vue` guard | Hide JOIN EC + pendaftaran publik | Section JOIN EC, tombol nav `Daftar`/`Daftar Anggota`, rute `/daftar` redirect landing; API + data pendaftar tak tersentuh (reversibel) | ✅ Done |
+| 57 | 2026-10-03 00:30 WIB | FEAT | `frontend/.../SoonView.vue` + `router.js` + `App.vue` + `LandingView.vue` + `memberAuth.js` + `.env.example` ×2 | Soon-flag member auth (production) | `VITE_MEMBER_AUTH_ENABLED`/`MEMBER_AUTH_ENABLED` (default ON); OFF→halaman Soon + API 503 `Fitur akun segera hadir`; admin whitelist tetap aktif; flag terbake saat build; OFF-build terverifikasi | ✅ Done |
+| 58 | 2026-10-03 00:35 WIB | CHORE | `.gitignore` + `git rm --cached backend/global-config.json` | Amankan secrets | `data/*.json|*.csv` blanket, `global-config.json` untrack (tetap di disk), `__dbg*`; verifikasi `.env`/dist/uploads ignored; `.env.example` placeholder + fix mojibake | ✅ Done |
+| 59 | 2026-10-03 00:50 WIB | TEST | Supabase live (88 whitelist real, 5 grup) | Test plan PRD hijau + cleanup | Register/login/me/whitelist/CSV/reset/pw + grup live + soon ON/OFF; insiden: akun `adliarfaaa` ikut terhapus saat cleanup → flag whitelist direset agar bisa daftar ulang | ✅ Passed |
 
 ---
 
@@ -126,6 +137,7 @@ git ls-files: 33 file (dari 775)
 | v3.4 | 2026-08-27 09:00 WIB | Translate hybrid B2 (332 lokal + MyMemory cache) |
 | v3.5 | 2026-08-27 09:40 WIB | Kembalikan kompetitif 30s + combo, translate cache-only + async parallel |
 | v3.6 | 2026-08-27 10:10 WIB | Waktu 1 menit fixed (tanpa bonus), hapus translate total |
+| v4.0 | 2026-10-02 | Migrasi Supabase penuh + auth admin JWT + akun anggota + 5 kelompok + CSV sync + dashboard + soon-flag + hide daftar (`fb81817`) |
 
 ---
 
