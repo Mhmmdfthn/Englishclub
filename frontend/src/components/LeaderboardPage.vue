@@ -7,11 +7,22 @@ defineEmits(['back'])
 
 const entries = ref([])
 const loading = ref(true)
+const loadError = ref('')
 
-onMounted(async () => {
-  try { entries.value = (await api.topScores()).entries } catch { entries.value = [] }
-  loading.value = false
-})
+async function load() {
+  loading.value = true
+  loadError.value = ''
+  try {
+    entries.value = (await api.topScores()).entries
+  } catch {
+    // Gagal jaringan bukan data kosong: tampilkan error, bukan empty state.
+    loadError.value = 'Skor belum dapat dimuat. Periksa koneksi lalu coba lagi.'
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(load)
 </script>
 
 <template>
@@ -31,7 +42,11 @@ onMounted(async () => {
     </div>
 
     <div class="card lb-card">
-      <p v-if="loading" class="muted small center py-2">Memuat skor...</p>
+      <p v-if="loading" class="muted small center">Memuat skor...</p>
+      <div v-else-if="loadError" class="load-error" role="alert">
+        <p class="error">{{ loadError }}</p>
+        <button class="btn ghost" type="button" @click="load">Muat ulang</button>
+      </div>
       <Leaderboard v-else :entries="entries" />
     </div>
 
@@ -52,5 +67,6 @@ onMounted(async () => {
 .section-badge{ background:var(--royal-blue); color:#fff; font-size:10px; font-weight:800; letter-spacing:1.8px; padding:4px 10px; border-radius:9999px; }
 .section-title h2{ font-size:clamp(22px,4vw,28px); font-weight:900; color:var(--dark-navy); }
 .lb-card{ width:100%; }
+.load-error{ display:flex; flex-direction:column; align-items:center; gap:10px; padding:8px 0; }
 @media (max-width:680px){ .board-page{ padding-left:14px; padding-right:14px; }.page-nav{ margin-bottom:18px; padding:8px 10px; }.page-nav-title{ font-size:11px; }.page-back{ padding:7px 8px; font-size:10px; } }
 </style>

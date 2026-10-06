@@ -1,0 +1,624 @@
+/* English Club — design system layer (P0.2 / P0.3)
+ *
+ * Source of truth:
+ *   fe-docs/FE-DESIGN-SYSTEM.md  (color, typography, spacing, radius, shadow, border, states)
+ *   fe-docs/FE-REDESIGN.md       (product direction)
+ *   fe-docs/FE-SOP-Anti-Slop.md  (restraint rules)
+ *
+ * This file is ADDITIVE and namespaced with `ec-`.
+ * It intentionally does NOT touch the legacy `.btn` / `.card` / `.field` / `.title`
+ * rules in style.css, because those still drive Word Hunt, the registration mini
+ * form and the admin surface, which are out of scope for the redesign.
+ * New UI � including the member auth pages and dashboard � uses these
+ * tokens/classes; existing game/admin UI keeps working untouched.
+ */
+
+:root {
+  /* ---- Brand (FE-DESIGN-SYSTEM §4) ---- */
+  --ec-blue: #0B569B;
+  --ec-blue-strong: #084A85;
+  --ec-blue-600: #1370C0;
+  --ec-yellow: #FFE600;
+  --ec-yellow-soft: #FFF6B8;
+  --ec-ink: #1F2937;
+  --ec-ink-soft: #6B7280;
+  --ec-line: #E5E7EB;
+  --ec-surface: #FFFFFF;
+  --ec-canvas: #F5F7FA;
+
+  /* Tints of the brand blue, used for surfaces only — never for body text. */
+  --ec-blue-050: #F1F6FC;
+  --ec-blue-100: #E3EDF8;
+
+  /* ---- Semantic (FE-DESIGN-SYSTEM §5) ---- */
+  --ec-success: #047857;
+  --ec-success-bg: #ECFDF5;
+  --ec-success-line: #A7F3D0;
+  --ec-warning: #B45309;
+  --ec-warning-bg: #FFFBEB;
+  --ec-warning-line: #FDE68A;
+  --ec-danger: #B91C1C;
+  --ec-danger-bg: #FEF2F2;
+  --ec-danger-line: #FECACA;
+  --ec-info: var(--ec-blue);
+  --ec-info-bg: var(--ec-blue-050);
+  --ec-info-line: #C9DFF5;
+
+  /* ---- Spacing scale (FE-DESIGN-SYSTEM §8) ---- */
+  --ec-space-1: 4px;
+  --ec-space-2: 8px;
+  --ec-space-3: 12px;
+  --ec-space-4: 16px;
+  --ec-space-5: 24px;
+  --ec-space-6: 32px;
+  --ec-space-7: 48px;
+  --ec-space-8: 72px;
+  --ec-space-9: 96px;
+
+  /* ---- Radius hierarchy (FE-DESIGN-SYSTEM §9) ---- */
+  --ec-radius-sm: 8px;
+  --ec-radius-md: 14px;
+  --ec-radius-lg: 18px;
+  --ec-radius-pill: 999px;
+
+  /* ---- Elevation: subtle only, no glow, no colored shadow (FE-DESIGN-SYSTEM §10) ----
+   * Tinted toward the ink colour, not the brand blue. A blue-tinted shadow on
+   * every card reads as the "primary-color glow" tell and makes the surface
+   * look lit rather than raised. */
+  --ec-shadow-sm: 0 1px 2px rgba(31, 41, 55, 0.06);
+  --ec-shadow-md: 0 10px 24px -16px rgba(31, 41, 55, 0.22);
+  --ec-shadow-lg: 0 22px 44px -24px rgba(31, 41, 55, 0.28);
+
+  /* ---- Motion: progressive enhancement (FE-DESIGN-SYSTEM §26) ---- */
+  --ec-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ec-dur: 180ms;
+
+  --ec-focus-ring: 0 0 0 3px #FFFFFF, 0 0 0 6px var(--ec-blue);
+
+  /* ---- Layout container (single source for edge alignment) ---- */
+  --ec-container: 1180px;
+  --ec-gutter: clamp(16px, 4vw, 40px);
+}
+
+/* ------------------------------------------------------------------ *
+ * Layout primitives
+ * ------------------------------------------------------------------ */
+
+.ec-home {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  gap: 0;
+  padding: 0 var(--ec-gutter);
+  /* `.screen` centres flex children; sections need the full column width. */
+  align-items: stretch;
+  /* The app shell disables text selection globally for the Word Hunt board.
+     A content site must allow selection, so the homepage opts back in. */
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.ec-section {
+  width: 100%;
+  padding-block: clamp(48px, 7vw, var(--ec-space-8));
+}
+
+.ec-section--tight {
+  padding-block: clamp(36px, 5vw, var(--ec-space-7));
+}
+
+.ec-section-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ec-space-3);
+  max-width: 620px;
+  margin-bottom: var(--ec-space-6);
+}
+
+.ec-section-head--split {
+  max-width: none;
+  flex-direction: row;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--ec-space-5);
+  flex-wrap: wrap;
+}
+
+/* ------------------------------------------------------------------ *
+ * Typography (FE-DESIGN-SYSTEM §7 — keep the existing font pair)
+ * ------------------------------------------------------------------ */
+
+.ec-eyebrow {
+  display: inline-block;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 0.688rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ec-blue);
+}
+
+.ec-h2 {
+  font-family: 'Outfit', sans-serif;
+  font-size: clamp(1.625rem, 3.4vw, 2.375rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.12;
+  color: var(--ec-ink);
+}
+
+.ec-h3 {
+  font-family: 'Outfit', sans-serif;
+  font-size: clamp(1.062rem, 1.8vw, 1.25rem);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  color: var(--ec-ink);
+}
+
+.ec-lede {
+  font-size: clamp(0.938rem, 1.5vw, 1.062rem);
+  line-height: 1.6;
+  color: var(--ec-ink-soft);
+  max-width: 60ch;
+}
+
+.ec-body {
+  font-size: 0.938rem;
+  line-height: 1.65;
+  color: var(--ec-ink-soft);
+}
+
+.ec-caption {
+  font-size: 0.781rem;
+  line-height: 1.5;
+  color: var(--ec-ink-soft);
+}
+
+.ec-muted {
+  color: var(--ec-ink-soft);
+}
+
+/* ------------------------------------------------------------------ *
+ * Buttons (FE-DESIGN-SYSTEM §12 / §13)
+ * ------------------------------------------------------------------ */
+
+.ec-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ec-space-2);
+  min-height: 48px;
+  padding: 12px 24px;
+  border: 1px solid transparent;
+  border-radius: var(--ec-radius-pill);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 0.906rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--ec-dur) var(--ec-ease),
+    color var(--ec-dur) var(--ec-ease),
+    border-color var(--ec-dur) var(--ec-ease),
+    transform var(--ec-dur) var(--ec-ease);
+}
+
+.ec-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--ec-focus-ring);
+}
+
+.ec-btn:active {
+  transform: translateY(1px);
+}
+
+.ec-btn:disabled,
+.ec-btn[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Primary — the one strong action per area. */
+.ec-btn--primary {
+  background: var(--ec-blue);
+  color: #FFFFFF;
+}
+
+.ec-btn--primary:hover:not(:disabled) {
+  background: var(--ec-blue-600);
+}
+
+/* Accent — yellow is a surface, never body text. */
+.ec-btn--accent {
+  background: var(--ec-yellow);
+  color: var(--ec-ink);
+}
+
+.ec-btn--accent:hover:not(:disabled) {
+  background: #F7DC00;
+}
+
+/* Secondary — supports the primary action.
+   Deliberately not a pill. Rounding every button identically is what flattens a
+   page; only the primary action earns the pill shape. */
+.ec-btn--secondary {
+  background: var(--ec-surface);
+  color: var(--ec-ink);
+  border-color: var(--ec-line);
+  border-radius: var(--ec-radius-md);
+}
+
+.ec-btn--secondary:hover:not(:disabled) {
+  border-color: #C7D2DE;
+  background: var(--ec-blue-050);
+}
+
+/* Ghost — navigation and low priority. */
+.ec-btn--ghost {
+  background: transparent;
+  color: var(--ec-blue);
+  border-radius: var(--ec-radius-md);
+}
+
+.ec-btn--ghost:hover:not(:disabled) {
+  background: var(--ec-blue-050);
+}
+
+/* Destructive — never used for ordinary actions. */
+.ec-btn--danger {
+  background: var(--ec-danger-bg);
+  color: var(--ec-danger);
+  border-color: var(--ec-danger-line);
+}
+
+.ec-btn--sm {
+  min-height: 40px;
+  padding: 9px 18px;
+  font-size: 0.844rem;
+}
+
+.ec-btn--block {
+  width: 100%;
+}
+
+/* ------------------------------------------------------------------ *
+ * Card (FE-DESIGN-SYSTEM §15 — grouping only, not a default container)
+ * ------------------------------------------------------------------ */
+
+.ec-card {
+  background: var(--ec-surface);
+  border: 1px solid var(--ec-line);
+  border-radius: var(--ec-radius-lg);
+  box-shadow: var(--ec-shadow-md);
+}
+
+.ec-card--flush {
+  box-shadow: none;
+}
+
+.ec-card--interactive {
+  display: block;
+  width: 100%;
+  padding: 0;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color var(--ec-dur) var(--ec-ease),
+    box-shadow var(--ec-dur) var(--ec-ease),
+    transform var(--ec-dur) var(--ec-ease);
+}
+
+.ec-card--interactive:hover {
+  border-color: #C9DFF5;
+  box-shadow: var(--ec-shadow-lg);
+  transform: translateY(-2px);
+}
+
+.ec-card--interactive:focus-visible {
+  outline: none;
+  box-shadow: var(--ec-focus-ring);
+}
+
+/* ------------------------------------------------------------------ *
+ * Badge / status indicator (FE-DESIGN-SYSTEM §5)
+ * Status is never communicated by colour alone: every badge has a text label.
+ * ------------------------------------------------------------------ */
+
+.ec-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--ec-line);
+  border-radius: var(--ec-radius-sm);
+  background: var(--ec-canvas);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 0.719rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ec-ink-soft);
+  white-space: nowrap;
+}
+
+.ec-badge--upcoming {
+  background: var(--ec-info-bg);
+  border-color: var(--ec-info-line);
+  color: var(--ec-blue);
+}
+
+.ec-badge--ongoing {
+  background: var(--ec-yellow-soft);
+  border-color: #F2DE7A;
+  color: #7A5B00;
+}
+
+.ec-badge--completed {
+  background: var(--ec-success-bg);
+  border-color: var(--ec-success-line);
+  color: var(--ec-success);
+}
+
+.ec-badge--warning {
+  background: var(--ec-warning-bg);
+  border-color: var(--ec-warning-line);
+  color: var(--ec-warning);
+}
+
+.ec-badge--danger {
+  background: var(--ec-danger-bg);
+  border-color: var(--ec-danger-line);
+  color: var(--ec-danger);
+}
+
+/* ------------------------------------------------------------------ *
+ * Form fields (FE-DESIGN-SYSTEM §14)
+ * ------------------------------------------------------------------ */
+
+.ec-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ec-label {
+  font-size: 0.812rem;
+  font-weight: 700;
+  color: var(--ec-ink);
+}
+
+.ec-field {
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 16px;
+  border: 1px solid var(--ec-line);
+  border-radius: var(--ec-radius-md);
+  background: var(--ec-surface);
+  color: var(--ec-ink);
+  font-family: inherit;
+  font-size: 0.938rem;
+  line-height: 1.4;
+  transition: border-color var(--ec-dur) var(--ec-ease), box-shadow var(--ec-dur) var(--ec-ease);
+}
+
+.ec-field::placeholder {
+  color: #9AA3AE;
+}
+
+.ec-field:hover {
+  border-color: #C7D2DE;
+}
+
+.ec-field:focus-visible {
+  outline: none;
+  border-color: var(--ec-blue);
+  box-shadow: 0 0 0 3px rgba(11, 86, 155, 0.14);
+}
+
+.ec-field[aria-invalid='true'] {
+  border-color: var(--ec-danger);
+}
+
+.ec-field[aria-invalid='true']:focus-visible {
+  box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.14);
+}
+
+textarea.ec-field {
+  resize: vertical;
+}
+
+.ec-helper {
+  font-size: 0.781rem;
+  color: var(--ec-ink-soft);
+}
+
+/* ------------------------------------------------------------------ *
+ * Feedback states (FE-DESIGN-SYSTEM §27–§31, FE-FLOW §28–§31)
+ * ------------------------------------------------------------------ */
+
+.ec-state {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--ec-space-2);
+  padding: var(--ec-space-5);
+  border: 1px solid var(--ec-line);
+  border-radius: var(--ec-radius-lg);
+  background: var(--ec-surface);
+}
+
+.ec-state__title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ec-ink);
+}
+
+.ec-state__body {
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: var(--ec-ink-soft);
+  max-width: 48ch;
+}
+
+.ec-state--error {
+  background: var(--ec-danger-bg);
+  border-color: var(--ec-danger-line);
+}
+
+.ec-state--error .ec-state__title {
+  color: var(--ec-danger);
+}
+
+.ec-state--notice {
+  background: var(--ec-warning-bg);
+  border-color: var(--ec-warning-line);
+}
+
+.ec-skeleton {
+  background: #E9EDF2;
+  border-radius: var(--ec-radius-md);
+  animation: ec-skeleton 1.4s ease-in-out infinite;
+}
+
+@keyframes ec-skeleton {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+/* ------------------------------------------------------------------ *
+ * Horizontal rail — shared behaviour for the Action Dock, the program
+ * list and Stories (FE-DESIGN-SYSTEM §2B / FE-FLOW keyboard baseline).
+ * Implemented in components/ui/HorizontalRail.vue.
+ * ------------------------------------------------------------------ */
+
+.ec-rail {
+  position: relative;
+}
+
+.ec-rail__track {
+  display: flex;
+  gap: var(--ec-space-4);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  /* The app shell hides scrollbars globally; keyboard support and focus rings
+     keep this usable without a visible bar (FE-DESIGN-SYSTEM §2B). */
+  scrollbar-width: none;
+  cursor: grab;
+}
+
+.ec-rail__track::-webkit-scrollbar {
+  display: none;
+}
+
+.ec-rail__track:active {
+  cursor: grabbing;
+}
+
+.ec-rail__track:focus-visible {
+  outline: none;
+  border-radius: var(--ec-radius-md);
+  box-shadow: var(--ec-focus-ring);
+}
+
+.ec-rail__item {
+  scroll-snap-align: start;
+  flex: 0 0 auto;
+}
+
+/* While the rail drifts, snapping has to go. Proximity snapping re-snaps after
+   every scroll settle, and a rail that is always moving would twitch against
+   its own snap target. Snapping is restored the moment drift stops, so manual
+   and keyboard paging keep their detents. */
+.ec-rail__track--drifting {
+  scroll-snap-type: none;
+}
+
+/* WCAG 2.2.2 stop control for the auto-drifting rail. Only rendered when the
+   rail actually drifts, so the manual rails do not grow a dead button. */
+.ec-rail__autoplay {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--ec-line);
+  border-radius: var(--ec-radius-pill);
+  background: var(--ec-surface);
+  color: var(--ec-ink-soft);
+  cursor: pointer;
+  transition: color var(--ec-dur) var(--ec-ease),
+    border-color var(--ec-dur) var(--ec-ease);
+}
+
+.ec-rail__autoplay:hover {
+  color: var(--ec-blue);
+  border-color: var(--ec-blue-100);
+}
+
+/* Scroll affordance. Decorative only — never the sole way to reach content.
+   --ec-rail-fade lets a section match the fade to its own background. */
+.ec-rail__fade {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 56px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.ec-rail__fade--start {
+  left: 0;
+  background: linear-gradient(to right, var(--ec-rail-fade, #FFFFFF), transparent);
+}
+
+.ec-rail__fade--end {
+  right: 0;
+  background: linear-gradient(to left, var(--ec-rail-fade, #FFFFFF), transparent);
+}
+
+/* ------------------------------------------------------------------ *
+ * Utilities
+ * ------------------------------------------------------------------ */
+
+.ec-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ec-btn,
+  .ec-card--interactive,
+  .ec-field,
+  .ec-skeleton,
+  .ec-rail__track,
+  .ec-nav,
+  .ec-nav__link::after {
+    animation: none;
+    transition: none;
+  }
+
+  /* Hover lift is motion, so drop it too rather than only the transition. */
+  .ec-card--interactive:hover {
+    transform: none;
+  }
+}

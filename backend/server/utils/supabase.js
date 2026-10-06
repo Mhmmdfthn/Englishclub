@@ -7,8 +7,16 @@ import { createClient } from '@supabase/supabase-js'
 let client = null
 let authClient = null
 
+function isPlaceholder(value = '') {
+  const v = String(value).trim().toLowerCase()
+  return !v || v.includes('your-project') || v.includes('your-') || v.includes('xxx') || v.includes('example')
+}
+
 export function isSupabaseEnabled() {
-  return Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY)
+  const url = process.env.SUPABASE_URL || ''
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+  if (isPlaceholder(url) || isPlaceholder(key)) return false
+  return Boolean(url && key)
 }
 
 export function getSupabase() {

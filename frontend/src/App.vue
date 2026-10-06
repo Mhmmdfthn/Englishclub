@@ -10,7 +10,6 @@ import HudBar from './components/HudBar.vue'
 import LandingView from './components/LandingView.vue'
 import PlayFormView from './components/PlayFormView.vue'
 import LeaderboardPage from './components/LeaderboardPage.vue'
-import MemberRegisterMini from './components/MemberRegisterMini.vue'
 import MemberSignupView from './components/MemberSignupView.vue'
 import MemberLoginView from './components/MemberLoginView.vue'
 import MemberDashboardView from './components/MemberDashboardView.vue'
@@ -29,8 +28,8 @@ const showAdminModal = ref(false)
 function openAdminModal() { showAdminModal.value = true; document.body.style.overflow = 'hidden' }
 function closeAdminModal() { showAdminModal.value = false; document.body.style.overflow = '' }
 
-const routeToScreen = { '/': 'landing', '/daftar': 'register', '/board': 'board', '/main': 'form', '/buat-akun': 'signup', '/masuk': 'login', '/dashboard': 'dashboard' }
-const screenToRoute = { landing: '/', register: '/daftar', board: '/board', form: '/main', signup: '/buat-akun', login: '/masuk', dashboard: '/dashboard' }
+const routeToScreen = { '/': 'landing', '/board': 'board', '/main': 'form', '/buat-akun': 'signup', '/masuk': 'login', '/dashboard': 'dashboard' }
+const screenToRoute = { landing: '/', board: '/board', form: '/main', signup: '/buat-akun', login: '/masuk', dashboard: '/dashboard' }
 // Flag deploy (Vite, dibake saat build): false -> halaman auth jadi "Segera Hadir" (Vercel production)
 const MEMBER_AUTH_ON = import.meta.env.VITE_MEMBER_AUTH_ENABLED !== 'false'
 
@@ -53,7 +52,6 @@ function syncScreenFromRoute() {
 watch(() => route.path, syncScreenFromRoute)
 
 function navigate(screenName) {
-  if (screenName === 'register') screenName = 'landing' // pendaftaran disembunyikan sementara
   if (!MEMBER_AUTH_ON && (screenName === 'signup' || screenName === 'login')) screenName = 'soon'
   if (MEMBER_AUTH_ON && (screenName === 'signup' || screenName === 'login') && memberSession.value) screenName = 'landing'
   if (screenName === 'dashboard' && !memberSession.value) screenName = 'login'
@@ -84,7 +82,7 @@ function openArticle(p) {
   router.push('/program/' + p.id)
 }
 const greetingIndex = ref(0)
-const greetings = ['Hello!', 'Welcome!', 'Good to see you!', 'Learn with us!']
+const greetings = ['Preparing your English journey...', 'Getting ready to grow...', 'Welcome aboard!', 'Your next lesson starts here!']
 const swipeProgress = ref(0)
 let swipeStartY = 0
 let greetingTimer = null
@@ -108,12 +106,10 @@ const wordSet = ref(new Set())
 const shakeStamp = ref(0)
 const finalStats = ref(null)
 const floatingToast = ref(null)
-const isMuted = ref(sound.muted)
 
 let timerId = null
 const bestScore = computed(() => Number(localStorage.getItem('wh_best') || 0))
 const isFever = computed(() => combo.value >= 3)
-const showSoundBtn = computed(() => false)
 const LETTER_VALUES = { a: 1, b: 3, c: 3, d: 2, e: 1, f: 4, g: 2, h: 4, i: 1, j: 8, k: 5, l: 1, m: 3, n: 1, o: 1, p: 3, q: 10, r: 1, s: 1, t: 1, u: 1, v: 4, w: 4, x: 8, y: 4, z: 10 }
 const LETTERS = 'abcdefghijklmnopqrstuvwxyz'
 
@@ -133,6 +129,7 @@ function handleAdminKey(e) {
 }
 onMounted(() => {
   syncScreenFromRoute()
+  validateMemberSession()
   loadDictionary(api.dictionary)
     .then((words) => { wordSet.value = words; dictionaryReady.value = true })
     .catch(() => { dictionaryError.value = 'Kamus belum dapat dimuat. Periksa koneksi lalu coba lagi.' })
@@ -145,6 +142,24 @@ onMounted(() => {
     clearInterval(greetingTimer)
   }, 2800)
 })
+
+// Token basi (kadaluwarsa/dicabut) dibersihkan saat startup supaya navbar
+// tidak menampilkan status login palsu. Kegagalan jaringan diabaikan.
+async function validateMemberSession() {
+  if (!MEMBER_AUTH_ON) return
+  const t = localStorage.getItem('member_token')
+  if (!t) return
+  try {
+    await api.memberMe(t)
+  } catch (e) {
+    if (e?.status === 401) {
+      localStorage.removeItem('member_token')
+      localStorage.removeItem('member_username')
+      localStorage.removeItem('member_fullname')
+      memberSession.value = null
+    }
+  }
+}
 
 onBeforeUnmount(() => {
   clearInterval(greetingTimer)
@@ -179,10 +194,6 @@ function skipLoading() {
   loading.value = false
   clearInterval(greetingTimer)
   clearTimeout(loadingTimer)
-}
-
-function toggleAudio() {
-  isMuted.value = sound.toggleMute()
 }
 
 function goLanding() {
@@ -322,24 +333,12 @@ function areAdjacent(a, b) {
             <p class="loading-greeting" :key="greetingIndex">{{ greetings[greetingIndex] }}</p>
           </Transition>
           <div class="loading-dots" aria-label="Loading"><span></span><span></span><span></span></div>
-          <p class="loading-hint">Informasi komunitas sedang dimuat</p>
-          <button class="loading-skip" type="button" @click="skipLoading">Lewati</button>
+          <p class="loading-hint">Loading community updates</p>
+          <button class="loading-skip" type="button" @click="skipLoading">Skip</button>
         </div>
       </div>
     </div>
   </transition>
-
-  <!-- Sound Toggle -->
-  <button v-if="showSoundBtn" class="sound-btn" :title="isMuted ? 'Nyalakan Suara' : 'Matikan Suara'" aria-label="Atur suara" @click="toggleAudio">
-    <svg v-if="!isMuted" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-      <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
-    </svg>
-    <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-      <line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/>
-    </svg>
-  </button>
 
   <!-- Floating Toast -->
   <transition name="float-toast">
@@ -350,11 +349,10 @@ function areAdjacent(a, b) {
 
   <router-view v-if="isHiddenAdminRoute" />
   <template v-else>
-    <LandingView v-if="screen === 'landing'" :member-name="memberSession?.fullname || memberSession?.username || ''" @goPlay="navigate('form')" @goBoard="navigate('board')" @goRegister="navigate('register')" @goLogin="navigate('login')" @goSignup="navigate('signup')" @goDashboard="navigate('dashboard')" @memberLogout="handleMemberLogout" @openAdmin="openAdminModal" @goArticle="openArticle" />
+    <LandingView v-if="screen === 'landing'" :member-name="memberSession?.fullname || memberSession?.username || ''" @goPlay="navigate('form')" @goBoard="navigate('board')" @goLogin="navigate('login')" @goSignup="navigate('signup')" @goDashboard="navigate('dashboard')" @memberLogout="handleMemberLogout" @openAdmin="openAdminModal" @goArticle="openArticle" />
     <ProgramArticle v-else-if="screen === 'article'" />
     <PlayFormView v-else-if="screen === 'form'" :best="bestScore" :error="boardError || dictionaryError" :retriable="connectError" :dictionary-ready="dictionaryReady" @play="startGame" @back="goLanding" />
     <LeaderboardPage v-else-if="screen === 'board'" @back="goLanding" />
-    <MemberRegisterMini v-else-if="screen === 'register'" @back="goLanding" />
     <MemberSignupView v-else-if="screen === 'signup'" @back="goLanding" @done="handleMemberAuth" @goto-login="navigate('login')" />
     <MemberLoginView v-else-if="screen === 'login'" @back="goLanding" @done="handleMemberAuth" @goto-signup="navigate('signup')" />
     <MemberDashboardView v-else-if="screen === 'dashboard'" @back="goLanding" @logout="handleMemberLogout" />
@@ -521,29 +519,6 @@ function areAdjacent(a, b) {
   }
   .loading-kicker { font-size: 10px; letter-spacing: 2px; }
 }
-.sound-btn {
-  position: fixed;
-  top: calc(12px + env(safe-area-inset-top));
-  right: calc(14px + env(safe-area-inset-right));
-  width: 38px;
-  height: 38px;
-  border-radius: 0;
-  background: var(--pure-white);
-  border: 2px solid var(--dark-navy);
-  color: var(--dark-navy);
-  display: grid;
-  place-items: center;
-  z-index: 100;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 3px 3px 0 var(--dark-navy);
-}
-.sound-btn:hover {
-  background: var(--vibrant-yellow);
-  color: var(--dark-navy);
-  border-color: var(--dark-navy);
-}
-
 .float-toast {
   position: fixed;
   top: 18%;

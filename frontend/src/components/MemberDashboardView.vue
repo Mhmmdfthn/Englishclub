@@ -7,6 +7,7 @@ const emit = defineEmits(['back', 'logout'])
 
 const loading = ref(true)
 const error = ref('')
+const unauthorized = ref(false)
 const profile = ref({ username: '', fullname: '', group_name: '', created_at: '' })
 
 const GROUP_STYLES = {
@@ -21,9 +22,16 @@ const groupStyle = computed(() => GROUP_STYLES[profile.value.group_name] || { co
 const memberSince = computed(() => (profile.value.created_at ? formatWIB(profile.value.created_at) : '—'))
 const initial = computed(() => (profile.value.fullname || profile.value.username || '?').charAt(0).toUpperCase())
 
+function clearSession() {
+  localStorage.removeItem('member_token')
+  localStorage.removeItem('member_username')
+  localStorage.removeItem('member_fullname')
+}
+
 async function load() {
   loading.value = true
   error.value = ''
+  unauthorized.value = false
   try {
     const t = localStorage.getItem('member_token') || ''
     if (!t) { emit('back'); return }
@@ -31,23 +39,32 @@ async function load() {
     profile.value = r
     localStorage.setItem('member_username', r.username)
     localStorage.setItem('member_fullname', r.fullname || '')
-  } catch {
-    error.value = 'Sesi habis. Masuk lagi.'
+  } catch (e) {
+    if (e?.status === 401) {
+      clearSession()
+      unauthorized.value = true
+      error.value = 'Sesi habis. Masuk lagi untuk lanjut.'
+    } else {
+      error.value = 'Gagal memuat profil. Periksa koneksi lalu coba lagi.'
+    }
   } finally {
     loading.value = false
   }
 }
 
 function doLogout() {
-  localStorage.removeItem('member_token')
-  localStorage.removeItem('member_username')
-  localStorage.removeItem('member_fullname')
+  clearSession()
+  emit('logout')
+}
+
+function loginAgain() {
+  clearSession()
   emit('logout')
 }
 
 function retry() {
   const t = localStorage.getItem('member_token') || ''
-  if (!t) { emit('back'); return }
+  if (!t) { loginAgain(); return }
   load()
 }
 
@@ -55,93 +72,272 @@ onMounted(load)
 </script>
 
 <template>
-  <section class="screen dash-page">
-    <nav class="page-nav dash-nav" aria-label="Navigasi dashboard">
-      <span class="page-nav-title">DASHBOARD</span>
-      <button class="page-back" type="button" @click="doLogout">Keluar</button>
+  <section class="dash">
+    <nav class="dash__nav" aria-label="Navigasi dashboard">
+      <button class="auth__brand" type="button" @click="emit('back')" aria-label="Kembali ke beranda">
+        <img src="/logo-ec.png" alt="Logo English Club UPB" width="36" height="36" />
+        <span>English Club <b>UPB</b></span>
+      </button>
+      <div class="dash__actions">
+        <button class="ec-btn ec-btn--ghost ec-btn--sm" type="button" @click="emit('back')">Beranda</button>
+        <button class="ec-btn ec-btn--secondary ec-btn--sm" type="button" @click="doLogout">Keluar</button>
+      </div>
     </nav>
 
-    <!-- Loading: skeleton -->
-    <div v-if="loading" class="dash-wrap" aria-hidden="true">
-      <div class="skel skel-profile"></div>
-      <div class="skel skel-card"></div>
-      <div class="skel skel-row"></div>
-      <div class="skel skel-row"></div>
+    <div class="dash__head">
+      <span class="ec-eyebrow">Dashboard</span>
+      <h1 class="ec-h2">Halo, {{ profile.fullname || profile.username || 'Anggota EC' }}.</h1>
+      <p class="ec-lede">Ini ringkasan akun anggota English Club kamu.</p>
+    </div>
+
+    <!-- Loading -->
+    <div v-if="loading" class="dash__stack" aria-hidden="true">
+      <div class="ec-skeleton dash__skel dash__skel--profile"></div>
+      <div class="ec-skeleton dash__skel dash__skel--card"></div>
+      <div class="ec-skeleton dash__skel dash__skel--row"></div>
     </div>
 
     <!-- Error -->
-    <div v-else-if="error" class="dash-wrap">
-      <div class="card error-card" role="alert" aria-live="polite">
-        <b>{{ error }}</b>
-        <button class="btn sm" type="button" @click="retry">Coba Lagi</button>
+    <div v-else-if="error" class="ec-state ec-state--error" role="alert">
+      <span class="ec-state__title">{{ unauthorized ? 'Sesi berakhir' : 'Gagal memuat' }}</span>
+      <p class="ec-state__body">{{ error }}</p>
+      <div class="dash__row">
+        <button v-if="!unauthorized" class="ec-btn ec-btn--primary ec-btn--sm" type="button" @click="retry">Coba lagi</button>
+        <button class="ec-btn ec-btn--secondary ec-btn--sm" type="button" @click="loginAgain">Masuk lagi</button>
       </div>
     </div>
 
-    <div v-else class="dash-wrap">
-      <!-- Blok profil ala header profil GH -->
-      <div class="profile-block">
-        <span class="profile-avatar" aria-hidden="true">{{ initial }}</span>
-        <div class="profile-id">
-          <h1>{{ profile.fullname }}</h1>
-          <span class="profile-username">@{{ profile.username }}</span>
+    <div v-else class="dash__stack">
+      <!-- Profil -->
+      <div class="ec-card dash__profile">
+        <span class="dash__avatar" aria-hidden="true">{{ initial }}</span>
+        <div class="dash__identity">
+          <h2 class="ec-h3">{{ profile.fullname }}</h2>
+          <span class="ec-caption">@{{ profile.username }}</span>
         </div>
-        <span v-if="profile.group_name" class="group-chip" :style="{ borderColor: groupStyle.color, color: groupStyle.color }">{{ profile.group_name }}</span>
+        <span v-if="profile.group_name" class="ec-badge" :style="{ borderColor: groupStyle.color, color: groupStyle.color }">{{ profile.group_name }}</span>
       </div>
 
-      <!-- Kartu grup pinned -->
-      <div class="card group-card" :style="{ borderLeftColor: groupStyle.color }">
-        <span class="group-mark" :style="{ background: groupStyle.color }" aria-hidden="true">{{ groupStyle.mark }}</span>
-        <div class="group-info">
-          <span class="panel-kicker">KELOMPOK KAMU</span>
+      <!-- Kelompok -->
+      <div class="ec-card dash__group" :style="{ borderLeftColor: groupStyle.color }">
+        <span class="dash__mark" :style="{ background: groupStyle.color }" aria-hidden="true">{{ groupStyle.mark }}</span>
+        <div>
+          <span class="ec-eyebrow">Kelompok kamu</span>
           <template v-if="profile.group_name">
-            <h2>{{ profile.group_name }}</h2>
+            <h3 class="ec-h3 dash__group-name">{{ profile.group_name }}</h3>
           </template>
           <template v-else>
-            <h2>Belum ada kelompok</h2>
-            <p class="tiny muted">Hubungi Admin EC untuk penetapan kelompok.</p>
+            <h3 class="ec-h3 dash__group-name">Belum ada kelompok</h3>
+            <p class="ec-caption">Hubungi Admin EC untuk penetapan kelompok.</p>
           </template>
         </div>
       </div>
 
-      <!-- List info ala baris GH -->
-      <div class="card info-list">
-        <div class="info-row"><span class="tiny muted">Username</span><b>@{{ profile.username }}</b></div>
-        <div class="info-row"><span class="tiny muted">Nama lengkap</span><b>{{ profile.fullname }}</b></div>
-        <div class="info-row"><span class="tiny muted">Kelompok</span><b>{{ profile.group_name || '—' }}</b></div>
-        <div class="info-row"><span class="tiny muted">Status</span><b>Anggota aktif</b></div>
-        <div class="info-row"><span class="tiny muted">Anggota sejak</span><b>{{ memberSince }}</b></div>
-      </div>
+      <!-- Info -->
+      <dl class="ec-card dash__info">
+        <div class="dash__info-row"><dt class="ec-caption">Username</dt><dd>@{{ profile.username }}</dd></div>
+        <div class="dash__info-row"><dt class="ec-caption">Nama lengkap</dt><dd>{{ profile.fullname }}</dd></div>
+        <div class="dash__info-row"><dt class="ec-caption">Kelompok</dt><dd>{{ profile.group_name || '—' }}</dd></div>
+        <div class="dash__info-row"><dt class="ec-caption">Status</dt><dd>Anggota aktif</dd></div>
+        <div class="dash__info-row"><dt class="ec-caption">Anggota sejak</dt><dd>{{ memberSince }}</dd></div>
+      </dl>
     </div>
   </section>
 </template>
 
 <style scoped>
-.dash-page { padding-bottom: 40px; }
-.dash-nav { position: sticky; top: 0; z-index: 10; }
-.dash-wrap { display: flex; flex-direction: column; gap: 14px; max-width: 640px; margin: 20px auto 0; width: 100%; padding: 0 clamp(14px, 3vw, 24px); }
-.profile-block { display: flex; align-items: center; gap: 14px; padding: 4px 2px; }
-.profile-avatar { flex: 0 0 auto; width: 56px; height: 56px; display: grid; place-items: center; font-size: 24px; font-weight: 900; color: var(--pure-white); background: var(--royal-blue); border: 3px solid #132238; box-shadow: 4px 4px 0 #132238; }
-.profile-id { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.profile-id h1 { margin: 0; font-size: clamp(20px, 4.5vw, 26px); font-weight: 900; letter-spacing: -0.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.profile-username { font-size: 14px; font-weight: 600; color: #57606a; }
-.group-chip { flex: 0 0 auto; padding: 6px 12px; font-size: 12px; font-weight: 900; letter-spacing: 0.06em; text-transform: uppercase; border: 3px solid; background: #fff; }
-.group-card { display: flex; gap: 16px; align-items: center; padding: 20px; border-left-width: 10px; }
-.group-mark { flex: 0 0 auto; width: 56px; height: 56px; display: grid; place-items: center; font-size: 20px; font-weight: 900; color: #fff; border: 3px solid #132238; }
-.group-info h2 { margin: 6px 0 0; font-size: clamp(26px, 6vw, 36px); font-weight: 900; letter-spacing: -0.02em; }
-.info-list { padding: 4px 18px; }
-.info-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 13px 0; border-bottom: 2px solid #e8edf2; min-height: 44px; }
-.info-row:last-child { border-bottom: 0; }
-.info-row b { text-align: right; overflow: hidden; text-overflow: ellipsis; }
-.error-card { padding: 20px; display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
-.skel { border: 3px solid #e8edf2; background: linear-gradient(90deg, #eef1f4 25%, #f7f9fb 50%, #eef1f4 75%); background-size: 200% 100%; animation: skel 1.2s infinite; }
-.skel-profile { height: 64px; }
-.skel-card { height: 120px; }
-.skel-row { height: 48px; }
-@keyframes skel { 100% { background-position: -200% 0; } }
-@media (max-width: 680px) {
-  .dash-nav .page-nav-title { font-size: 13px; }
-  .profile-avatar { width: 48px; height: 48px; font-size: 20px; }
-  .group-card { padding: 16px; gap: 12px; }
-  .group-mark { width: 48px; height: 48px; font-size: 17px; }
+.dash {
+  width: 100%;
+  max-width: 720px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ec-space-5);
+  padding: clamp(16px, 3vh, 28px) 16px 48px;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.dash__nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ec-space-3);
+  min-height: 64px;
+  flex-wrap: wrap;
+}
+
+.auth__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ec-space-3);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ec-ink);
+  font-family: 'Outfit', sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.auth__brand img {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  padding: 3px;
+  border-radius: var(--ec-radius-pill);
+  background: var(--ec-surface);
+  border: 1px solid var(--ec-line);
+}
+
+.auth__brand b {
+  color: var(--ec-blue);
+  font-weight: 700;
+}
+
+.dash__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--ec-space-2);
+}
+
+.dash__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ec-space-3);
+}
+
+.dash__stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ec-space-4);
+}
+
+.dash__skel {
+  min-height: 64px;
+}
+
+.dash__skel--card {
+  min-height: 120px;
+}
+
+.dash__skel--row {
+  min-height: 180px;
+}
+
+.dash__row {
+  display: flex;
+  gap: var(--ec-space-2);
+  flex-wrap: wrap;
+  margin-top: var(--ec-space-1);
+}
+
+.dash__profile {
+  display: flex;
+  align-items: center;
+  gap: var(--ec-space-4);
+  padding: var(--ec-space-5);
+  box-shadow: none;
+}
+
+.dash__avatar {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--ec-radius-md);
+  background: var(--ec-blue);
+  color: #FFFFFF;
+  font-family: 'Outfit', sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.dash__identity {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dash__identity .ec-h3 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dash__group {
+  display: flex;
+  align-items: center;
+  gap: var(--ec-space-4);
+  padding: var(--ec-space-5);
+  border-left-width: 8px;
+  box-shadow: none;
+}
+
+.dash__mark {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--ec-radius-md);
+  color: #FFFFFF;
+  font-family: 'Outfit', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.dash__group-name {
+  margin-top: 4px;
+  font-size: clamp(22px, 5vw, 30px);
+}
+
+.dash__info {
+  margin: 0;
+  padding: var(--ec-space-2) var(--ec-space-5);
+  box-shadow: none;
+}
+
+.dash__info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--ec-space-3);
+  padding: 13px 0;
+  border-bottom: 1px solid var(--ec-line);
+}
+
+.dash__info-row:last-child {
+  border-bottom: 0;
+}
+
+.dash__info-row dd {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ec-ink);
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 560px) {
+  .dash__profile,
+  .dash__group {
+    padding: var(--ec-space-4);
+    gap: var(--ec-space-3);
+  }
+
+  .dash__avatar,
+  .dash__mark {
+    width: 48px;
+    height: 48px;
+    font-size: 18px;
+  }
 }
 </style>

@@ -10,7 +10,6 @@ const program = ref(null)
 const loading = ref(true)
 const error = ref('')
 const currentPhoto = ref(0)
-const mobileOpen = ref(false)
 const imageLoading = ref(true)
 const lightboxOpen = ref(false)
 
@@ -27,15 +26,36 @@ function statusLabel() {
   return s === 'completed' ? 'Selesai' : s === 'ongoing' ? 'Sedang berlangsung' : 'Akan datang'
 }
 
+const STATUS_BADGE = {
+  upcoming: 'ec-badge--upcoming',
+  ongoing: 'ec-badge--ongoing',
+  completed: 'ec-badge--completed',
+}
+
+function statusBadge() {
+  return STATUS_BADGE[program.value?.status] || STATUS_BADGE.upcoming
+}
+
+const dateFormatter = new Intl.DateTimeFormat('id-ID', {
+  timeZone: 'UTC',
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+})
+
+// Tanggal proker adalah YYYY-MM-DD kalender (sama seperti HappeningSection),
+// bukan stempel UTC — jadi diparse sebagai tanggal kalender.
+function formatDate(value) {
+  if (!value) return ''
+  const d = new Date(`${value}T00:00:00Z`)
+  return Number.isNaN(d.getTime()) ? String(value) : dateFormatter.format(d)
+}
+
 function next() { if (photos.value.length) currentPhoto.value = (currentPhoto.value + 1) % photos.value.length }
 function prev() { if (photos.value.length) currentPhoto.value = (currentPhoto.value - 1 + photos.value.length) % photos.value.length }
 
-function toggleMobile() { mobileOpen.value = !mobileOpen.value }
-function closeMobile() { mobileOpen.value = false }
-
-function goBack() { closeMobile(); router.push('/') }
+function goBack() { router.push('/') }
 function goSection(id) {
-  closeMobile()
   router.push('/#' + id)
 }
 
@@ -69,31 +89,17 @@ watch(currentPhoto, () => { imageLoading.value = true })
 <template>
   <section class="program-screen">
     <nav class="article-nav" aria-label="Navigasi utama">
-      <a class="nav-brand" href="#top" aria-label="Kembali ke beranda" @click.prevent="goBack"><img src="/Logo_ec.jpg" alt="Logo English Club UPB" /></a>
-      <a class="nav-link" href="#profil" @click.prevent="goSection('profil')">Profil</a>
-      <a class="nav-link" href="#program" @click.prevent="goSection('program')">Program</a>
-      <a class="nav-link" href="#cerita" @click.prevent="goSection('cerita')">Kesan Pengunjung</a>
+      <button class="nav-brand" type="button" aria-label="Kembali ke beranda" @click="goBack"><img src="/logo-ec.png" alt="Logo English Club UPB" /></button>
+      <div class="nav-links">
+        <a class="nav-link" href="#top" @click.prevent="goSection('top')">Home</a>
+        <a class="nav-link" href="#happening" @click.prevent="goSection('happening')">What's Happening</a>
+        <a class="nav-link" href="#about" @click.prevent="goSection('about')">About</a>
+        <a class="nav-link" href="#stories" @click.prevent="goSection('stories')">Stories</a>
+      </div>
       <div class="nav-actions">
-        <button class="nav-button" type="button" @click="goBack">Kembali</button>
+        <button class="ec-btn ec-btn--primary ec-btn--sm" type="button" @click="goBack">Kembali</button>
       </div>
-      <button class="hamburger" type="button" aria-label="Buka menu" :aria-expanded="mobileOpen" @click="toggleMobile">
-        <span class="ham-line" :class="{ open: mobileOpen }"></span>
-        <span class="ham-line" :class="{ open: mobileOpen }"></span>
-        <span class="ham-line" :class="{ open: mobileOpen }"></span>
-      </button>
-      <button class="nav-close" type="button" aria-label="Kembali" @click="goBack"><span class="material-symbols-outlined">close</span></button>
     </nav>
-
-    <Transition name="mobile-drawer">
-      <div v-if="mobileOpen" class="mobile-drawer" @click.self="closeMobile">
-        <div class="mobile-panel">
-          <a href="#profil" @click.prevent="goSection('profil')">Profil</a>
-          <a href="#program" @click.prevent="goSection('program')">Program</a>
-          <a href="#cerita" @click.prevent="goSection('cerita')">Kesan Pengunjung</a>
-          <button class="btn" type="button" @click="goBack">Kembali</button>
-        </div>
-      </div>
-    </Transition>
 
     <div class="article-body-wrap">
       <div v-if="loading" class="article-state">
@@ -102,15 +108,15 @@ watch(currentPhoto, () => { imageLoading.value = true })
 
       <div v-else-if="error" class="article-state">
         <p>{{ error }}</p>
-        <button class="btn ghost" type="button" @click="goBack">Kembali ke Beranda</button>
+        <button class="ec-btn ec-btn--secondary" type="button" @click="goBack">Kembali ke Beranda</button>
       </div>
 
       <article v-else-if="program" class="article-content">
         <header class="article-head">
-          <span class="article-kicker">{{ program.id }}</span>
+          <span class="ec-badge" :class="statusBadge()">{{ statusLabel() }}</span>
           <h1 class="article-title">{{ program.title }}</h1>
           <div class="article-meta">
-            <span class="meta-item"><span class="material-symbols-outlined loc-icon">calendar_month</span>{{ program.date || 'Tanggal Menyusul' }} ({{ statusLabel() }})</span>
+            <span class="meta-item"><span class="material-symbols-outlined loc-icon">calendar_month</span>{{ formatDate(program.date) || 'Tanggal menyusul' }}</span>
             <span class="meta-item"><span class="material-symbols-outlined loc-icon">location_on</span>Universitas Putra Bangsa</span>
           </div>
         </header>
@@ -159,94 +165,75 @@ watch(currentPhoto, () => { imageLoading.value = true })
   background: var(--pure-white);
 }
 .article-nav {
-  position: fixed;
+  position: sticky;
   top: 0;
   left: 0;
   right: 0;
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 24px;
-  min-height: 64px;
-  padding: 10px max(14px, calc((100vw - 1100px) / 2));
-  background: var(--pure-white);
-  border-bottom: 3px solid var(--ink);
-  box-shadow: 0 4px 0 var(--royal-blue);
+  gap: var(--ec-space-5);
+  min-height: 72px;
+  padding: 8px clamp(16px, 4vw, 40px);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: saturate(1.1) blur(8px);
+  -webkit-backdrop-filter: saturate(1.1) blur(8px);
+  border-bottom: 1px solid var(--ec-line);
   z-index: 20;
 }
 .nav-brand {
-  display: flex;
+  display: grid;
   flex: 0 0 auto;
-  align-items: center;
+  place-items: center;
   width: 42px;
   height: 42px;
-  margin-right: 6px;
+  padding: 3px;
+  border: 0;
+  border-radius: var(--ec-radius-pill);
+  background: var(--ec-surface);
+  cursor: pointer;
 }
 .nav-brand img {
   display: block;
-  width: 36px;
-  height: 36px;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
   mix-blend-mode: multiply;
 }
-.article-nav > a,
-.mobile-panel a {
-  color: var(--ink);
-  font-size: 13px;
-  font-weight: 700;
-  text-decoration: none;
+.nav-brand:focus-visible {
+  outline: none;
+  box-shadow: var(--ec-focus-ring);
 }
-.article-nav > a:hover { color: var(--royal-blue); }
-.nav-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
-.nav-button {
-  padding: 9px 16px;
-  color: var(--pure-white);
-  background: var(--royal-blue);
-  border: 2px solid var(--ink);
-  box-shadow: 3px 3px 0 var(--ink);
-  font-size: 12px;
-  font-weight: 800;
-  cursor: pointer;
-  min-height: 44px;
-}
-.nav-button:hover { background: var(--royal-blue-light); }
-.nav-close {
-  display: none;
-  flex: 0 0 auto;
+.nav-links {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  color: var(--ink);
-  background: #fff;
-  border: 1px solid var(--ink);
-  cursor: pointer;
+  gap: var(--ec-space-5);
+  margin-left: auto;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
-.nav-close .material-symbols-outlined { font-size: 24px; }
-.nav-close:hover { color: var(--pure-white); background: var(--royal-blue); }
-.hamburger {
+.nav-links::-webkit-scrollbar {
   display: none;
-  flex-direction: column;
-  justify-content: center;
-  gap: 5px;
-  width: 44px;
-  height: 44px;
-  padding: 8px;
-  background: #fff;
-  border: none;
-  cursor: pointer;
 }
-.ham-line { display: block; width: 100%; height: 3px; background: var(--ink); transition: transform 0.2s ease, opacity 0.2s ease; }
-.ham-line.open:nth-child(1) { transform: translateY(8px) rotate(45deg); }
-.ham-line.open:nth-child(2) { opacity: 0; }
-.ham-line.open:nth-child(3) { transform: translateY(-8px) rotate(-45deg); }
-.mobile-drawer { position: fixed; inset: 0; z-index: 19; background: rgba(29,43,58,0.45); backdrop-filter: blur(4px); display: grid; place-items: start center; padding-top: 76px; }
-.mobile-panel { width: min(92%, 360px); display: flex; flex-direction: column; gap: 10px; padding: 18px; background: #fff; border: 3px solid var(--ink); box-shadow: 8px 8px 0 var(--ink); }
-.mobile-panel a { display: block; padding: 14px 12px; font-weight: 800; font-size: 15px; text-align: center; border: 2px solid var(--ink); background: #fff; }
-.mobile-panel .btn { width: 100%; justify-content: center; min-height: 48px; }
-.mobile-drawer-enter-active, .mobile-drawer-leave-active { transition: opacity 0.22s ease; }
-.mobile-drawer-enter-from, .mobile-drawer-leave-to { opacity: 0; }
+.nav-link {
+  position: relative;
+  padding: 6px 2px;
+  color: var(--ec-ink);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color var(--ec-dur) var(--ec-ease);
+}
+.nav-link:hover {
+  color: var(--ec-blue);
+}
+.nav-link:focus-visible {
+  outline: none;
+  border-radius: var(--ec-radius-sm);
+  box-shadow: var(--ec-focus-ring);
+}
+.nav-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
 
 .article-body-wrap {
   width: 100%;
@@ -254,7 +241,7 @@ watch(currentPhoto, () => { imageLoading.value = true })
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 92px clamp(18px, 4vw, 40px) 52px;
+  padding: clamp(24px, 4vw, 40px) clamp(18px, 4vw, 40px) 52px;
 }
 .article-state {
   width: 100%;
@@ -274,10 +261,9 @@ watch(currentPhoto, () => { imageLoading.value = true })
   flex-direction: column;
   align-items: stretch;
 }
-.article-head { text-align: left; margin-bottom: 26px; }
-.article-kicker { color: var(--royal-blue); font-size: 11px; font-weight: 900; letter-spacing: 0.18em; text-transform: uppercase; }
+.article-head { text-align: left; margin-bottom: 26px; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
 .article-title {
-  margin: 10px 0 16px;
+  margin: 0 0 4px;
   font-family: 'Outfit', 'Plus Jakarta Sans', sans-serif;
   font-size: clamp(30px, 5vw, 48px);
   font-weight: 900;
@@ -401,13 +387,9 @@ watch(currentPhoto, () => { imageLoading.value = true })
 .lightbox-fade-enter-active, .lightbox-fade-leave-active { transition: opacity 0.22s ease; }
 .lightbox-fade-enter-from, .lightbox-fade-leave-to { opacity: 0; }
 @media (max-width: 680px) {
-  .article-nav { gap: 12px; min-height: 56px; padding: 8px 12px; }
-  .nav-brand { width: 38px; height: 38px; margin-right: auto; }
-  .nav-brand img { width: 30px; height: 30px; }
-  .nav-link, .nav-actions { display: none !important; }
-  .hamburger { display: flex !important; }
-  .nav-close { display: flex !important; }
-  .article-body-wrap { padding-top: 76px; }
+  .article-nav { gap: var(--ec-space-3); min-height: 64px; }
+  .nav-links { gap: var(--ec-space-4); }
+  .nav-link { font-size: 13px; }
   .article-head { margin-bottom: 18px; }
   .article-meta { flex-direction: column; align-items: flex-start; gap: 6px; }
   .meta-item + .meta-item { margin-left: 0; }

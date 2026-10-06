@@ -74,8 +74,10 @@ export async function getById(id) {
   if (isSupabaseEnabled()) {
     const sb = getSupabase()
     const { data, error } = await sb.from('proker').select('*').eq('id', id).single()
-    if (error) return null
-    return fromDbRow(data)
+    if (!error && data) return fromDbRow(data)
+    // Tabel kosong / baris belum ada (mis. DEFAULT saat seed): fallback ke DEFAULT
+    // supaya detail tetap bisa dibuka dari daftar.
+    return DEFAULT.map(normalize).find(p => p.id === id) || null
   }
   return memoryProker.map(normalize).find(p => p.id === id) || null
 }
