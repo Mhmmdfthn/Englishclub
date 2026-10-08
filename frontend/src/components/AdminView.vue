@@ -1,10 +1,13 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../api.js'
 import { displayTime, todayWIB, wibDay } from '../utils/time.js'
 import RichTextEditor from './RichTextEditor.vue'
 import ProkerMediaInput from './ProkerMediaInput.vue'
+
+// Display QR: chunk terpisah, hanya diunduh saat tab Absensi dibuka.
+const QrDisplayView = defineAsyncComponent(() => import('./QrDisplayView.vue'))
 
 const props = defineProps({ isModal: Boolean, embedded: Boolean })
 const emit = defineEmits(['back'])
@@ -542,6 +545,10 @@ onMounted(async () => {
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>
           <span>Akun EC</span><b class="count">{{ accounts.length }}</b>
         </button>
+        <button class="side-item" :class="{active: activeTab==='absensi'}" @click="activeTab='absensi'">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><rect x="7" y="13" width="4" height="4" rx="0.5"/></svg>
+          <span>Absensi QR</span>
+        </button>
         <div class="side-spacer"></div>
         <button class="side-item logout" @click="logout">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -794,6 +801,10 @@ onMounted(async () => {
               </table>
             </div>
           </div>
+        </div>
+        <!-- Absensi QR: display + live list (lazy, hanya saat tab dibuka) -->
+        <div v-else-if="activeTab==='absensi'">
+          <QrDisplayView v-if="activeTab==='absensi'" :token="adminToken()" :key="'qr-'+activeTab" />
         </div>
       </main>
     </div>

@@ -5,6 +5,8 @@ import { formatWIB } from '../utils/time.js'
 
 // Brankas admin: chunk terpisah, hanya diunduh saat tab Admin dibuka.
 const AdminView = defineAsyncComponent(() => import('./AdminView.vue'))
+// Presensi QR: chunk terpisah, hanya diunduh saat tab Absensi dibuka.
+const PresensiView = defineAsyncComponent(() => import('./PresensiView.vue'))
 
 const emit = defineEmits(['back', 'logout'])
 
@@ -236,7 +238,6 @@ onBeforeUnmount(() => {
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><polyline points="9 14 11 16 15 12"/></svg>
               <span>Absensi</span>
-              <span class="dash__soon">Segera</span>
             </button>
             <button
               class="dash__menu-item"
@@ -428,10 +429,15 @@ onBeforeUnmount(() => {
         </div>
       </template>
 
-      <!-- Absensi / Materi: belum ada kontrak backend, tampilkan status -->
-      <div v-else-if="dashTab === 'absensi' || dashTab === 'materi'" class="ec-state ec-state--notice dash__soon-card" role="status">
-        <span class="ec-state__title">{{ dashTab === 'absensi' ? 'Absensi segera hadir' : 'Materi segera hadir' }}</span>
-        <p class="ec-state__body">{{ dashTab === 'absensi' ? 'Fitur absensi kegiatan belum dibuka. Pantau pengumuman komunitas untuk jadwal berikutnya.' : 'Kumpulan materi pembelajaran belum tersedia. Pantau pengumuman komunitas.' }}</p>
+      <!-- Absensi: presensi QR + password + list + recent -->
+      <div v-else-if="dashTab === 'absensi'">
+        <PresensiView />
+      </div>
+
+      <!-- Materi: belum ada kontrak backend, tampilkan status -->
+      <div v-else-if="dashTab === 'materi'" class="ec-state ec-state--notice dash__soon-card" role="status">
+        <span class="ec-state__title">Materi segera hadir</span>
+        <p class="ec-state__body">Kumpulan materi pembelajaran belum tersedia. Pantau pengumuman komunitas.</p>
         <div class="dash__soon-actions">
           <button class="ec-btn ec-btn--secondary ec-btn--sm" type="button" @click="dashTab = 'dashboard'">Kembali ke Dashboard</button>
           <button class="ec-btn ec-btn--ghost ec-btn--sm" type="button" @click="goHome">Ke Beranda</button>

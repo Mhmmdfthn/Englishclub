@@ -227,6 +227,53 @@ export const api = {
     req('/api/admin/check-member', {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     }),
+
+  attendanceActive: (token) =>
+    req('/api/attendance/active', {
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    }),
+
+  attendanceCheckin: (qr, password, token) =>
+    req('/api/attendance/checkin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ qr, password }),
+    }),
+
+  attendanceList: (session, token) =>
+    req(`/api/attendance/list?session=${encodeURIComponent(session)}`, {
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    }),
+
+  attendanceMine: (token) =>
+    req('/api/attendance/mine', {
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    }),
+
+  attendanceSession: (title, token) =>
+    req('/api/attendance/sessions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ title }),
+    }),
+
+  attendanceDisplayToken: (session, token) =>
+    req(`/api/attendance/display-token?session=${encodeURIComponent(session)}`, {
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    }),
+
+  attendanceClose: (session, token) =>
+    req(`/api/attendance/sessions/${encodeURIComponent(session)}/close`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    }),
+
+  attendanceCorrect: (id, status, token) =>
+    req(`/api/attendance/records/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ status }),
+    }),
 }
 
 function buildForm(data, file) {
