@@ -379,7 +379,6 @@ function areAdjacent(a, b) {
   position: relative;
   justify-content: flex-start;
   padding-top: max(18px, env(safe-area-inset-top));
-  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   gap: 12px;
   background-color: var(--pure-white);
   background-image: radial-gradient(rgba(29, 43, 58, 0.13) 1px, transparent 1px);
@@ -497,10 +496,10 @@ function areAdjacent(a, b) {
 @keyframes loading-dot { from { opacity: .3; transform: translateY(0); } to { opacity: 1; transform: translateY(-4px); } }
 @media (max-width:680px) {
   .loading-greeting {
-    min-height: 52px;
+    min-height: 58px;
     margin-top: 16px;
-    font-size: clamp(28px, 9vw, 44px);
-    line-height: 1;
+    font-size: clamp(36px, 10vw, 54px);
+    line-height: .98;
     text-shadow: 0 5px 24px rgba(0,0,0,.24);
   }
   .loading-kicker { font-size: 10px; letter-spacing: 2px; }
@@ -522,10 +521,7 @@ function areAdjacent(a, b) {
   box-shadow: 0 8px 24px rgba(0,0,0,0.5), 0 0 20px rgba(255,230,0,0.4);
   z-index: 999;
   pointer-events: none;
-  max-width: calc(100vw - 32px);
-  text-align: center;
-  overflow-wrap: anywhere;
-  white-space: normal;
+  white-space: nowrap;
 }
 .float-toast.fever-toast {
   background: linear-gradient(135deg, #F97316, var(--vibrant-yellow));
@@ -543,4 +539,43 @@ function areAdjacent(a, b) {
   40%  { transform:translate(-50%,-5px) scale(1); }
   100% { opacity:0; transform:translate(-50%,-35px) scale(0.95); }
 }
+.admin-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: start center;
+  padding: 18px;
+  background: rgba(29,43,58,0.62);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  overflow: auto;
+}
+.admin-modal-card {
+  position: relative;
+  width: min(100%, 1100px);
+  max-height: 90dvh;
+  overflow: auto;
+  background: var(--bg-secondary, #F1F5F9);
+  border: 3px solid var(--dark-navy);
+  box-shadow: 8px 8px 0 var(--dark-navy);
+  padding: 0;
+}
+.modal-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  border: 2px solid var(--dark-navy);
+  font-size: 22px;
+  font-weight: 900;
+  cursor: pointer;
+  z-index: 2;
+}
+.admin-modal-enter-active, .admin-modal-leave-active { transition: opacity 0.22s ease; }
+.admin-modal-enter-from, .admin-modal-leave-to { opacity: 0; }
 </style>
