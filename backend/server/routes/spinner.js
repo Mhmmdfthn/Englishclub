@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { verifyTokenAsync } from '../utils/auth.js'
+import { requireAdmin } from '../utils/auth.js'
 import { auditAdmin } from '../utils/audit.js'
 
 const r = Router()
@@ -11,13 +11,6 @@ const DEFAULT_PRIZES = [
 ]
 
 let memoryPrizes = [...DEFAULT_PRIZES]
-
-async function requireAdmin(req, res, next) {
-  const token = (req.header('authorization') || '').replace(/^Bearer\s+/i, '')
-  const username = await verifyTokenAsync(token)
-  if (username) { req.admin = { username }; return next() }
-  return res.status(401).json({ detail: 'Unauthorized' })
-}
 
 async function getSpinnerPrizes() {
   return memoryPrizes

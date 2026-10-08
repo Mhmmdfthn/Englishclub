@@ -1,17 +1,10 @@
 import { Router } from 'express'
 import { addMember, allMembers, highlight } from '../utils/membersStore.js'
-import { verifyTokenAsync } from '../utils/auth.js'
+import { requireAdmin, verifyTokenAsync } from '../utils/auth.js'
 import { auditAdmin, auditTech } from '../utils/audit.js'
 
 const r = Router()
 const ALLOWED = new Set(['Ilmu Komputer','Manajemen','Akuntansi','Bisnis Digital','Sains Data','Agribisnis','Lainnya'])
-
-async function requireAdmin(req, res, next) {
-  const token = (req.header('authorization') || '').replace(/^Bearer\s+/i, '')
-  const username = await verifyTokenAsync(token)
-  if (username) { req.admin = { username }; return next() }
-  return res.status(401).json({ detail: 'Unauthorized' })
-}
 
 // public highlight
 r.get('/highlight', async (req, res) => {

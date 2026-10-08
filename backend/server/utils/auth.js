@@ -93,6 +93,18 @@ export function verifyToken(token) {
   return verifyLocalToken(token)
 }
 
+// Guard admin terpusat (dipakai semua router admin; logika identik di
+// satu tempat agar tidak drift). Menerima Bearer maupun x-admin-token.
+export async function requireAdmin(req, res, next) {
+  const token = (req.header('authorization') || '').replace(/^Bearer\s+/i, '') || req.header('x-admin-token')
+  const username = await verifyTokenAsync(token)
+  if (username) {
+    req.admin = { username }
+    return next()
+  }
+  return res.status(401).json({ detail: 'Unauthorized' })
+}
+
 export async function revokeToken(token) {
   if (isSupabaseEnabled()) {
     // JWT stateless: tidak bisa revoke tanpa blocklist; signOut best-effort.

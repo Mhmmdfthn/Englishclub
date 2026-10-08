@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import multer from 'multer'
-import { verifyTokenAsync } from '../utils/auth.js'
+import { requireAdmin } from '../utils/auth.js'
 import { loginWithPassword } from '../utils/auth.js'
 import { getSupabaseAuth, isSupabaseEnabled } from '../utils/supabase.js'
 import {
@@ -42,13 +42,6 @@ function sendStoreError(res, e, fallback) {
     return res.status(503).json({ error: 'Database sibuk, silakan coba lagi' })
   }
   return res.status(status).json({ detail: e.message })
-}
-
-async function requireAdmin(req, res, next) {
-  const token = (req.header('authorization') || '').replace(/^Bearer\s+/i, '')
-  const username = await verifyTokenAsync(token)
-  if (username) { req.admin = { username }; return next() }
-  return res.status(401).json({ detail: 'Unauthorized' })
 }
 
 function requireSupabase(req, res, next) {
