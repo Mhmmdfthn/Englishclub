@@ -17,9 +17,9 @@ function openMenu(e) {
   checkAdminAccess()
 }
 
-// Pintu Menu Admin: hanya username terdaftar di allowlist (UX saja;
-// enforcement penuh tetap di backend saat login admin).
-const isAdminMember = ref(false)
+// Pintu Menu Admin: hanya superadmin (UX saja; enforcement penuh
+// tetap di backend saat login admin).
+const isSuperAdmin = ref(false)
 let adminChecked = false
 async function checkAdminAccess() {
   if (adminChecked) return
@@ -29,7 +29,7 @@ async function checkAdminAccess() {
   if (!t) return
   try {
     const r = await api.adminCheckMember(t)
-    isAdminMember.value = r?.isAdmin === true
+    isSuperAdmin.value = r?.isAdmin === true && r?.role === 'superadmin'
   } catch { /* gagal = pintu disembunyikan */ }
 }
 
@@ -255,7 +255,7 @@ onBeforeUnmount(() => {
               <span>Profil Saya</span>
             </button>
             <button
-              v-if="isAdminMember"
+              v-if="isSuperAdmin"
               class="dash__menu-item"
               type="button"
               @click="goAdmin"
