@@ -1,45 +1,19 @@
 ﻿<script setup>
-import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { api } from '../api.js'
 import { formatWIB } from '../utils/time.js'
-
-const AdminView = defineAsyncComponent(() => import('./AdminView.vue'))
 
 const emit = defineEmits(['back', 'logout'])
 
 const dashTab = ref('dashboard')
 const menuOpen = ref(false)
-const isAdminMember = ref(false)
-const isSuperAdmin = ref(false)
 const isDesktop = ref(false)
 let menuTrigger = null
-let adminChecked = false
 let dashMq = null
 
 function openMenu(e) {
   menuTrigger = e?.currentTarget || null
   menuOpen.value = true
-  checkAdminAccess()
-}
-
-// Pintu Menu Admin: hanya superadmin. Ini UX saja; enforcement penuh
-// tetap di backend saat login admin.
-async function checkAdminAccess() {
-  if (adminChecked) return
-  adminChecked = true
-  let t = ''
-  try { t = localStorage.getItem('member_token') || '' } catch { return }
-  if (!t) return
-  try {
-    const r = await api.adminCheckMember(t)
-    isAdminMember.value = r?.isAdmin === true
-    isSuperAdmin.value = r?.isAdmin === true && r?.role === 'superadmin'
-  } catch { /* gagal = pintu disembunyikan */ }
-}
-
-function goAdmin() {
-  dashTab.value = 'admin'
-  closeMenu(false)
 }
 
 function closeMenu(returnFocus = true) {
@@ -63,7 +37,7 @@ function goHome() {
 }
 
 const tabTitle = computed(() => (
-  { dashboard: 'Dashboard', absensi: 'Absensi', materi: 'Materi', profil: 'Profil Saya', admin: 'Admin' }[dashTab.value] || 'Dashboard'
+  { dashboard: 'Dashboard', absensi: 'Absensi', materi: 'Materi', profil: 'Profil Saya' }[dashTab.value] || 'Dashboard'
 ))
 
 function onMenuKey(e) {
@@ -258,17 +232,6 @@ onBeforeUnmount(() => {
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
               <span>Profil Saya</span>
             </button>
-            <button
-              v-if="isSuperAdmin"
-              class="dash__menu-item"
-              :class="{ active: dashTab === 'admin' }"
-              type="button"
-              :aria-current="dashTab === 'admin' ? 'page' : null"
-              @click="goTab('admin')"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-              <span>Menu Admin</span>
-            </button>
           </nav>
 
           <button class="dash__logout dash__menu-logout" type="button" @click="doLogout">
@@ -437,16 +400,6 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <!-- Admin tertanam (superadmin): login + fitur admin penuh di sini -->
-      <div v-else-if="dashTab === 'admin'" class="dash__admin-tab">
-        <AdminView v-if="isSuperAdmin" embedded @back="dashTab = 'dashboard'" />
-        <div v-else class="ec-state ec-state--error" role="status">
-          <span class="ec-state__title">Khusus superadmin</span>
-          <p class="ec-state__body">Hubungi superadmin untuk meminta akses admin.</p>
-          <button class="ec-btn ec-btn--secondary ec-btn--sm" type="button" @click="dashTab = 'dashboard'">Kembali ke Dashboard</button>
-        </div>
-      </div>
-
     </div>
 
     </div>
@@ -606,9 +559,6 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   margin-top: 4px;
 }
-
-/* ── Tab admin tertanam ───────────────────────────────────── */
-.dash__admin-tab { min-width: 0; }
 
 /* ── Body ─────────────────────────────────────────────────── */
 .dash__body {
