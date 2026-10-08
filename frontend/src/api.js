@@ -221,6 +221,12 @@ export const api = {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ newPassword }),
     }),
+
+  // True/false apakah username member ini terdaftar di allowlist admin.
+  adminCheckMember: (token) =>
+    req('/api/admin/check-member', {
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    }),
 }
 
 function buildForm(data, file) {
