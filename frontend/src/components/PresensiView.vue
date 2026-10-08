@@ -1,8 +1,17 @@
 <script setup>
-import { onBeforeUnmount, ref } from 'vue'
+import { defineAsyncComponent, onBeforeUnmount, ref } from 'vue'
 import { Html5Qrcode } from 'html5-qrcode'
 import { api } from '../api.js'
 import { formatWIB } from '../utils/time.js'
+
+// Display QR: chunk terpisah, hanya diunduh saat mode display dibuka.
+const QrDisplayView = defineAsyncComponent(() => import('./QrDisplayView.vue'))
+
+const props = defineProps({
+  canDisplay: { type: Boolean, default: false },
+})
+
+const presensiMode = ref('scan') // 'scan' | 'display'
 
 function memberToken() {
   try { return localStorage.getItem('member_token') || '' } catch { return '' }
@@ -167,8 +176,27 @@ onBeforeUnmount(async () => {
     </div>
 
     <template v-else>
+      <!-- Mode: pindai vs display (display khusus superadmin) -->
+      <div v-if="canDisplay" class="presensi__modes" role="tablist" aria-label="Mode absensi">
+        <button
+          type="button" role="tab" :aria-selected="presensiMode === 'scan'"
+          class="presensi__mode" :class="{ active: presensiMode === 'scan' }"
+          @click="presensiMode = 'scan'"
+        >Pindai</button>
+        <button
+          type="button" role="tab" :aria-selected="presensiMode === 'display'"
+          class="presensi__mode" :class="{ active: presensiMode === 'display' }"
+          @click="presensiMode = 'display'; stopScan()"
+        >Display QR</button>
+      </div>
+
+      <!-- Display QR untuk layar/proyektor (superadmin) -->
+      <div v-if="canDisplay && presensiMode === 'display'" class="ec-card presensi__card">
+        <QrDisplayView :token="memberToken()" :key="'qr-absensi'" />
+      </div>
+
       <!-- Check-in -->
-      <div class="ec-card presensi__card">
+      <div v-show="!canDisplay || presensiMode === 'scan'" class="ec-card presensi__card">
         <h2 class="presensi__sectitle">Check-in QR</h2>
         <p class="ec-body">Ketik password akunmu, lalu pindai QR yang tampil di layar panitia (berganti tiap 7 detik).</p>
         <label class="ec-label" for="presensi-pw">Password akun</label>
@@ -245,6 +273,10 @@ onBeforeUnmount(async () => {
 
 <style scoped>
 .presensi { display: flex; flex-direction: column; gap: 16px; }
+.presensi__modes { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; background: var(--ec-canvas); border: 1px solid var(--ec-line); border-radius: var(--ec-radius-pill); }
+.presensi__mode { min-height: 44px; border: 0; border-radius: var(--ec-radius-pill); background: transparent; color: var(--ec-ink-soft); font-family: inherit; font-size: 0.875rem; font-weight: 700; cursor: pointer; }
+.presensi__mode.active { background: var(--ec-surface); color: var(--ec-ink); box-shadow: var(--ec-shadow-sm); }
+.presensi__mode:focus-visible { outline: none; box-shadow: var(--ec-focus-ring); }
 .presensi__head { display: flex; flex-direction: column; gap: 3px; padding-bottom: 4px; }
 .presensi__eyebrow { font-size: 11.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ec-blue); }
 .presensi__title { font-family: 'Outfit', sans-serif; font-size: clamp(22px, 5.5vw, 30px); font-weight: 800; letter-spacing: -0.025em; color: var(--ec-ink); line-height: 1.15; margin: 0; }

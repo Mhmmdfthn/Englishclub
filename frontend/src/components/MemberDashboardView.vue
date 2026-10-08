@@ -431,7 +431,7 @@ onBeforeUnmount(() => {
 
       <!-- Absensi: presensi QR + password + list + recent -->
       <div v-else-if="dashTab === 'absensi'">
-        <PresensiView />
+        <PresensiView :can-display="isSuperAdmin" />
       </div>
 
       <!-- Materi: belum ada kontrak backend, tampilkan status -->
