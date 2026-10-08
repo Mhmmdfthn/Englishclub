@@ -157,6 +157,8 @@ function retry() {
 
 onMounted(() => {
   load()
+  // Sidebar desktop permanen tanpa klik hamburger, jadi cek akses jalan di sini juga.
+  checkAdminAccess()
   window.addEventListener('keydown', onMenuKey)
   try {
     dashMq = window.matchMedia('(min-width: 1024px)')
