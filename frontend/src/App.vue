@@ -1,5 +1,5 @@
 <script setup>
-import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from './api.js'
 import { loadDictionary } from './dictionary.js'
@@ -17,16 +17,10 @@ import SoonView from './components/SoonView.vue'
 import ProgramArticle from './components/ProgramArticle.vue'
 import FoundWords from './components/FoundWords.vue'
 
-const AdminView = defineAsyncComponent(() => import('./components/AdminView.vue'))
-
 const route = useRoute()
 const router = useRouter()
 const screen = ref('landing')
 const loading = ref(true)
-const isHiddenAdminRoute = computed(() => route.path === '/ec-admin-2026')
-const showAdminModal = ref(false)
-function openAdminModal() { showAdminModal.value = true; document.body.style.overflow = 'hidden' }
-function closeAdminModal() { showAdminModal.value = false; document.body.style.overflow = '' }
 
 const routeToScreen = { '/': 'landing', '/board': 'board', '/main': 'form', '/buat-akun': 'signup', '/masuk': 'login', '/dashboard': 'dashboard' }
 const screenToRoute = { landing: '/', board: '/board', form: '/main', signup: '/buat-akun', login: '/masuk', dashboard: '/dashboard' }
@@ -34,7 +28,6 @@ const screenToRoute = { landing: '/', board: '/board', form: '/main', signup: '/
 const MEMBER_AUTH_ON = import.meta.env.VITE_MEMBER_AUTH_ENABLED !== 'false'
 
 function syncScreenFromRoute() {
-  if (isHiddenAdminRoute.value) return
   if (route.path.startsWith('/program/')) {
     screen.value = 'article'
     return
@@ -126,20 +119,12 @@ function tick() {
   timeLeft.value = Math.max(0, timeLeft.value - 0.1)
   if (timeLeft.value <= 0) endGame()
 }
-function handleAdminKey(e) {
-  if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'a') {
-    e.preventDefault()
-    openAdminModal()
-  }
-  if (e.key === 'Escape' && showAdminModal.value) closeAdminModal()
-}
 onMounted(() => {
   syncScreenFromRoute()
   validateMemberSession()
   loadDictionary(api.dictionary)
     .then((words) => { wordSet.value = words; dictionaryReady.value = true })
     .catch(() => { dictionaryError.value = 'Kamus belum dapat dimuat. Periksa koneksi lalu coba lagi.' })
-  window.addEventListener('keydown', handleAdminKey)
   greetingTimer = setInterval(() => {
     greetingIndex.value = (greetingIndex.value + 1) % greetings.length
   }, 2000)
@@ -171,7 +156,6 @@ onBeforeUnmount(() => {
   clearInterval(greetingTimer)
   clearTimeout(loadingTimer)
   stopTimer()
-  window.removeEventListener('keydown', handleAdminKey)
 })
 
 function beginSwipe(event) {
@@ -353,9 +337,8 @@ function areAdjacent(a, b) {
     </div>
   </transition>
 
-  <router-view v-if="isHiddenAdminRoute" />
-  <template v-else>
-    <LandingView v-if="screen === 'landing'" :member-name="memberSession?.fullname || memberSession?.username || ''" @goPlay="navigate('form')" @goBoard="navigate('board')" @goLogin="navigate('login')" @goSignup="navigate('signup')" @goDashboard="navigate('dashboard')" @memberLogout="handleMemberLogout" @openAdmin="openAdminModal" @goArticle="openArticle" />
+  <template>
+    <LandingView v-if="screen === 'landing'" :member-name="memberSession?.fullname || memberSession?.username || ''" @goPlay="navigate('form')" @goBoard="navigate('board')" @goLogin="navigate('login')" @goSignup="navigate('signup')" @goDashboard="navigate('dashboard')" @memberLogout="handleMemberLogout" @goArticle="openArticle" />
     <ProgramArticle v-else-if="screen === 'article'" />
     <PlayFormView v-else-if="screen === 'form'" :best="bestScore" :error="boardError || dictionaryError" :retriable="connectError" :dictionary-ready="dictionaryReady" @play="startGame" @back="goLanding" />
     <LeaderboardPage v-else-if="screen === 'board'" @back="goLanding" />
@@ -389,14 +372,6 @@ function areAdjacent(a, b) {
       <button class="btn ghost" type="button" @click="goLanding">Kembali ke Beranda</button>
     </section>
   </template>
-  <Transition name="admin-modal">
-    <div v-if="showAdminModal" class="admin-modal-overlay" @click.self="closeAdminModal">
-      <div class="admin-modal-card">
-        <button class="modal-close" aria-label="Tutup" @click="closeAdminModal">×</button>
-        <AdminView is-modal @back="closeAdminModal" />
-      </div>
-    </div>
-  </Transition>
 </template>
 
 <style scoped>
@@ -404,6 +379,7 @@ function areAdjacent(a, b) {
   position: relative;
   justify-content: flex-start;
   padding-top: max(18px, env(safe-area-inset-top));
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   gap: 12px;
   background-color: var(--pure-white);
   background-image: radial-gradient(rgba(29, 43, 58, 0.13) 1px, transparent 1px);
@@ -521,10 +497,10 @@ function areAdjacent(a, b) {
 @keyframes loading-dot { from { opacity: .3; transform: translateY(0); } to { opacity: 1; transform: translateY(-4px); } }
 @media (max-width:680px) {
   .loading-greeting {
-    min-height: 58px;
+    min-height: 52px;
     margin-top: 16px;
-    font-size: clamp(36px, 10vw, 54px);
-    line-height: .98;
+    font-size: clamp(28px, 9vw, 44px);
+    line-height: 1;
     text-shadow: 0 5px 24px rgba(0,0,0,.24);
   }
   .loading-kicker { font-size: 10px; letter-spacing: 2px; }
@@ -546,7 +522,10 @@ function areAdjacent(a, b) {
   box-shadow: 0 8px 24px rgba(0,0,0,0.5), 0 0 20px rgba(255,230,0,0.4);
   z-index: 999;
   pointer-events: none;
-  white-space: nowrap;
+  max-width: calc(100vw - 32px);
+  text-align: center;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 .float-toast.fever-toast {
   background: linear-gradient(135deg, #F97316, var(--vibrant-yellow));
@@ -564,43 +543,4 @@ function areAdjacent(a, b) {
   40%  { transform:translate(-50%,-5px) scale(1); }
   100% { opacity:0; transform:translate(-50%,-35px) scale(0.95); }
 }
-.admin-modal-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 70;
-  display: grid;
-  place-items: start center;
-  padding: 18px;
-  background: rgba(29,43,58,0.62);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  overflow: auto;
-}
-.admin-modal-card {
-  position: relative;
-  width: min(100%, 1100px);
-  max-height: 90dvh;
-  overflow: auto;
-  background: var(--bg-secondary, #F1F5F9);
-  border: 3px solid var(--dark-navy);
-  box-shadow: 8px 8px 0 var(--dark-navy);
-  padding: 0;
-}
-.modal-close {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 36px;
-  height: 36px;
-  display: grid;
-  place-items: center;
-  background: #fff;
-  border: 2px solid var(--dark-navy);
-  font-size: 22px;
-  font-weight: 900;
-  cursor: pointer;
-  z-index: 2;
-}
-.admin-modal-enter-active, .admin-modal-leave-active { transition: opacity 0.22s ease; }
-.admin-modal-enter-from, .admin-modal-leave-to { opacity: 0; }
 </style>

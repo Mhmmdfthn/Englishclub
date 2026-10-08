@@ -12,13 +12,6 @@ import SoonView from './components/SoonView.vue'
 const MEMBER_AUTH_ON = import.meta.env.VITE_MEMBER_AUTH_ENABLED !== 'false'
 import ProgramArticle from './components/ProgramArticle.vue'
 
-const AdminView = () => import('./components/AdminView.vue')
-
-function adminGuard() {
-  // auth handled inside AdminView via /api/admin/verify (server-side)
-  return true
-}
-
 const router = createRouter({
   history: createWebHistory(),
   routes: [
@@ -31,7 +24,6 @@ const router = createRouter({
     { path: '/masuk', name: 'login', component: MEMBER_AUTH_ON ? MemberLoginView : SoonView },
     { path: '/dashboard', name: 'dashboard', component: MemberDashboardView },
     { path: '/program/:id', name: 'program-article', component: ProgramArticle },
-    { path: '/ec-admin-2026', name: 'admin', component: AdminView, beforeEnter: adminGuard, meta: { hidden: true } },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
   scrollBehavior(to) {
