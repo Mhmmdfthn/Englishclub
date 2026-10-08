@@ -9,6 +9,10 @@ const props = defineProps({
 
 const emit = defineEmits(['replay', 'back'])
 
+function safeStorageGet(k) {
+  try { return localStorage.getItem(k) || '' } catch { return '' }
+}
+
 const displayedScore = ref(0)
 onMounted(() => {
   const target = props.stats.score
@@ -24,7 +28,7 @@ onMounted(() => {
   save()
 })
 
-const name = ref(localStorage.getItem('wh_name') || '')
+const name = ref(safeStorageGet('wh_name'))
 const savedRank = ref(null)
 const saving = ref(false)
 const saveError = ref('')

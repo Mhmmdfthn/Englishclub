@@ -139,6 +139,11 @@ watch(currentPhoto, () => { imageLoading.value = true })
           </div>
         </div>
       </article>
+
+      <div v-else class="article-state">
+        <p>Program tidak ditemukan.</p>
+        <button class="ec-btn ec-btn--secondary" type="button" @click="goBack">Kembali ke Beranda</button>
+      </div>
     </div>
 
     <Transition name="lightbox-fade">

@@ -221,6 +221,37 @@ export const api = {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ newPassword }),
     }),
+
+  adminAllowlist: (token) =>
+    req('/api/admin/allowlist', {
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    }),
+
+  adminAllowlistAdd: (username, token) =>
+    req('/api/admin/allowlist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ username }),
+    }),
+
+  adminAllowlistRemove: (username, token) =>
+    req(`/api/admin/allowlist/${encodeURIComponent(username)}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    }),
+
+  adminSetRole: (username, role, menus, token) =>
+    req(`/api/admin/roles/${encodeURIComponent(username)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ role, menus }),
+    }),
+
+  // True/false apakah username member ini terdaftar di allowlist admin.
+  adminCheckMember: (token) =>
+    req('/api/admin/check-member', {
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    }),
 }
 
 function buildForm(data, file) {

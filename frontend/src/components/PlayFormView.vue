@@ -9,12 +9,18 @@ defineProps({
 })
 
 const emit = defineEmits(['play', 'back'])
-const name = ref(localStorage.getItem('wh_name') || '')
+function safeGet(k) {
+  try { return localStorage.getItem(k) || '' } catch { return '' }
+}
+function safeSet(k, v) {
+  try { localStorage.setItem(k, v) } catch { /* storage diblokir: abaikan */ }
+}
+const name = ref(safeGet('wh_name'))
 const selectedMode = ref('santai')
 const showSystemInfo = ref(false)
 
 function submit() {
-  localStorage.setItem('wh_name', name.value.trim() || 'Anonim')
+  safeSet('wh_name', name.value.trim() || 'Anonim')
   emit('play')
 }
 </script>
@@ -151,10 +157,10 @@ function submit() {
   .form-page{ padding-left:14px; padding-right:14px; }
   .page-nav { margin-bottom:18px; padding:8px 10px; }
   .page-nav-title { font-size:11px; }
-  .page-back { padding:7px 8px; font-size:10px; }
+  .page-back { padding:10px 12px; font-size:12px; min-height:44px; }
   .play-layout{ grid-template-columns:1fr; gap:18px; }
   .mode-panel{ padding:28px 22px; }
-  .mode-panel h1{ font-size:clamp(36px, 12vw, 58px); }
+  .mode-panel h1{ font-size:clamp(30px, 10vw, 48px); }
   .form-card{ padding:30px 20px; }
 }
 </style>

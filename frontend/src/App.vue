@@ -108,7 +108,13 @@ const finalStats = ref(null)
 const floatingToast = ref(null)
 
 let timerId = null
-const bestScore = computed(() => Number(localStorage.getItem('wh_best') || 0))
+function safeGet(key) {
+  try { return localStorage.getItem(key) || '' } catch { return '' }
+}
+function safeSet(key, val) {
+  try { localStorage.setItem(key, val) } catch { /* storage diblokir: abaikan */ }
+}
+const bestScore = computed(() => Number(safeGet('wh_best')) || 0)
 const isFever = computed(() => combo.value >= 3)
 const LETTER_VALUES = { a: 1, b: 3, c: 3, d: 2, e: 1, f: 4, g: 2, h: 4, i: 1, j: 8, k: 5, l: 1, m: 3, n: 1, o: 1, p: 3, q: 10, r: 1, s: 1, t: 1, u: 1, v: 4, w: 4, x: 8, y: 4, z: 10 }
 const LETTERS = 'abcdefghijklmnopqrstuvwxyz'
@@ -235,9 +241,9 @@ async function startGame() {
 function endGame() {
   if (screen.value !== 'play') return
   stopTimer()
-  const prevBest = Number(localStorage.getItem('wh_best') || 0)
+  const prevBest = Number(safeGet('wh_best')) || 0
   const isRecord = score.value > prevBest
-  if (isRecord) localStorage.setItem('wh_best', String(score.value))
+  if (isRecord) safeSet('wh_best', String(score.value))
   finalStats.value = {
     score: score.value,
     words: [...foundWords.value],
@@ -378,6 +384,10 @@ function areAdjacent(a, b) {
       @replay="startGame"
       @back="goLanding"
     />
+    <section v-else class="screen" role="status">
+      <p class="error">Terjadi kesalahan tampilan. Tenang, datamu aman.</p>
+      <button class="btn ghost" type="button" @click="goLanding">Kembali ke Beranda</button>
+    </section>
   </template>
   <Transition name="admin-modal">
     <div v-if="showAdminModal" class="admin-modal-overlay" @click.self="closeAdminModal">

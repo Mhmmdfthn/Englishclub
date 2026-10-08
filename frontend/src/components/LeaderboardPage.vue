@@ -13,7 +13,9 @@ async function load() {
   loading.value = true
   loadError.value = ''
   try {
-    entries.value = (await api.topScores()).entries
+    const data = await api.topScores()
+    // Terima {entries}, array mentah, atau {data} agar beda kontrak tak blank.
+    entries.value = Array.isArray(data) ? data : (data?.entries || data?.data || [])
   } catch {
     // Gagal jaringan bukan data kosong: tampilkan error, bukan empty state.
     loadError.value = 'Skor belum dapat dimuat. Periksa koneksi lalu coba lagi.'
@@ -68,5 +70,5 @@ onMounted(load)
 .section-title h2{ font-size:clamp(22px,4vw,28px); font-weight:900; color:var(--dark-navy); }
 .lb-card{ width:100%; }
 .load-error{ display:flex; flex-direction:column; align-items:center; gap:10px; padding:8px 0; }
-@media (max-width:680px){ .board-page{ padding-left:14px; padding-right:14px; }.page-nav{ margin-bottom:18px; padding:8px 10px; }.page-nav-title{ font-size:11px; }.page-back{ padding:7px 8px; font-size:10px; } }
+@media (max-width:680px){ .board-page{ padding-left:14px; padding-right:14px; }.page-nav{ margin-bottom:18px; padding:8px 10px; }.page-nav-title{ font-size:11px; }.page-back{ padding:10px 12px; font-size:12px; min-height:44px; } }
 </style>
