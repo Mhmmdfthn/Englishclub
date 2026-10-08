@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { requireAdmin } from '../utils/auth.js'
+import { requireAdminOrSuperMember as requireAdmin } from '../utils/auth.js'
 import { auditAdmin } from '../utils/audit.js'
 
 const r = Router()

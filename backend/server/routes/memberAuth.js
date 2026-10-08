@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import multer from 'multer'
-import { requireAdmin } from '../utils/auth.js'
+import { requireAdminOrSuperMember as requireAdmin } from '../utils/auth.js'
 import { loginWithPassword } from '../utils/auth.js'
 import { getSupabaseAuth, isSupabaseEnabled } from '../utils/supabase.js'
 import {

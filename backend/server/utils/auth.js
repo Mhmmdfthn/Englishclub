@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url'
 import { randomBytes } from 'crypto'
 import bcrypt from 'bcrypt'
 import { getSupabase, getSupabaseAuth, isSupabaseEnabled } from './supabase.js'
+import { listAllowed } from './adminAllowlist.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const dataDir = join(__dirname, '../data')
@@ -98,6 +99,53 @@ export function verifyToken(token) {
 export async function requireAdmin(req, res, next) {
   const token = (req.header('authorization') || '').replace(/^Bearer\s+/i, '') || req.header('x-admin-token')
   const username = await verifyTokenAsync(token)
+  if (username) {
+    req.admin = { username }
+    return next()
+  }
+  return res.status(401).json({ detail: 'Unauthorized' })
+}
+
+// Verifikasi token untuk jalur brankas. Kembalikan username bila SALAH SATU
+// terpenuhi: JWT admin valid, atau JWT member yang terdaftar SUPERADMIN.
+// Selain itu kembalikan null. Tidak pernah melempar.
+export async function verifyAdminOrSuperMemberToken(token) {
+  if (!token) return null
+  try {
+    if (isSupabaseEnabled()) {
+      const { data, error } = await getSupabaseAuth().auth.getUser(token)
+      if (!error && data?.user) {
+        const email = data.user.email || ''
+        if (email.endsWith('@members.englishclub.local')) {
+          const username = email.split('@')[0] || ''
+          try {
+            const list = await listAllowed()
+            const hit = list.find((a) => String(a.username || '').toLowerCase() === username.toLowerCase())
+            if (hit && hit.role !== 'operator') return username
+          } catch {
+            return null
+          }
+          return null
+        }
+      }
+    }
+    const adminUser = await verifyTokenAsync(token)
+    // Hasil verify yang masih mengandung '@' bukan username admin yang sah
+    // (mis. email member lolos strip domain) — tolak di jalur kredensial.
+    if (adminUser && !String(adminUser).includes('@')) return adminUser
+    return null
+  } catch {
+    return null
+  }
+}
+
+// Guard brankas: lolos bila SALAH SATU terpenuhi —
+// (a) JWT admin valid (jalur kredensial /ec-admin-2026), atau
+// (b) JWT member valid yang username-nya terdaftar sebagai SUPERADMIN.
+// Token member biasa / operator / tak dikenal → 401. Tanpa bocorkan daftar.
+export async function requireAdminOrSuperMember(req, res, next) {
+  const token = (req.header('authorization') || '').replace(/^Bearer\s+/i, '') || req.header('x-admin-token')
+  const username = await verifyAdminOrSuperMemberToken(token)
   if (username) {
     req.admin = { username }
     return next()

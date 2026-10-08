@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { addMember, allMembers, highlight } from '../utils/membersStore.js'
-import { requireAdmin, verifyTokenAsync } from '../utils/auth.js'
+import { requireAdminOrSuperMember as requireAdmin, verifyAdminOrSuperMemberToken } from '../utils/auth.js'
 import { auditAdmin, auditTech } from '../utils/audit.js'
 
 const r = Router()
@@ -47,7 +47,7 @@ r.get('/sync', async (req, res) => {
   const expected = process.env.SUPABASE_SYNC_TOKEN
   let allowed = false
   if (expected && syncToken === expected) allowed = true
-  else if (bearer && await verifyTokenAsync(bearer)) allowed = true
+  else if (bearer && await verifyAdminOrSuperMemberToken(bearer)) allowed = true
   if (!allowed) {
     return res.status(401).json({ detail: 'Unauthorized. Invalid or missing x-sync-token.' })
   }

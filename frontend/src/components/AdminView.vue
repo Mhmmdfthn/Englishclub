@@ -56,16 +56,32 @@ const creating = ref(false)
 const savingProker = ref({})
 
 async function checkAuth() {
-  const t = localStorage.getItem('admin_token') || ''
+  // Mode tertanam: tidak ada form login, validasi sesi member sebagai superadmin.
+  if (props.embedded) return checkMemberAuth()
+  const t = adminToken()
   if (!t) { authed.value = false; return }
   try {
     const r = await api.verifyAdmin(t)
     authed.value = true
     authedUser.value = r.username || 'admin'
   } catch {
-    localStorage.removeItem('admin_token')
+    clearAdminToken()
     authed.value = false
   }
+}
+
+async function checkMemberAuth() {
+  const t = adminToken()
+  if (!t) { authed.value = false; return }
+  try {
+    const r = await api.adminCheckMember(t)
+    if (r?.isAdmin === true && r?.role === 'superadmin') {
+      authed.value = true
+      authedUser.value = safeGet('member_fullname') || safeGet('member_username') || 'admin'
+      return
+    }
+  } catch { /* gagal = tampilkan status terblokir */ }
+  authed.value = false
 }
 
 async function login() {
@@ -88,9 +104,16 @@ async function login() {
 }
 
 function logout() {
-  const t = localStorage.getItem('admin_token')
+  if (props.embedded) {
+    // Mode tertanam: tidak ada sesi admin terpisah; keluar = kembali ke tab dashboard.
+    // Sesi login anggota TIDAK dihapus dan tidak panggil API logout.
+    authed.value = false
+    emit('back')
+    return
+  }
+  const t = adminToken()
   if (t) fetch('/api/admin/logout', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ token: t }) }).catch(()=>{})
-  localStorage.removeItem('admin_token')
+  clearAdminToken()
   authed.value = false
   members.value = []
   proker.value = []
@@ -103,9 +126,9 @@ async function fetchMembers() {
   loading.value = true
   error.value = ''
   try {
-    const t = localStorage.getItem('admin_token') || ''
+    const t = adminToken() || ''
     const res = await fetch('/api/members', { headers: { Authorization: `Bearer ${t}`, 'x-admin-token': t } })
-    if (res.status === 401) { error.value = 'Sesi habis. Login lagi.'; authed.value = false; localStorage.removeItem('admin_token'); return }
+    if (res.status === 401) { error.value = 'Sesi habis. Login lagi.'; logout(); return }
     if (res.status === 500) { error.value = 'Server belum konfigurasi ADMIN_TOKEN'; return }
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const data = await res.json()
@@ -116,7 +139,7 @@ async function fetchMembers() {
 }
 
 function exportCsv() {
-  const t = localStorage.getItem('admin_token') || ''
+  const t = adminToken() || ''
   fetch('/api/members/export', { headers: { Authorization: `Bearer ${t}`, 'x-admin-token': t } }).then(async r => {
     if (r.status === 401) { error.value = 'Unauthorized — login lagi'; authed.value = false; return }
     if (!r.ok) { error.value = 'Export belum berhasil.'; return }
@@ -154,7 +177,7 @@ function prokerFields(draft) {
 }
 
 async function saveProker(p) {
-  const t = localStorage.getItem('admin_token') || ''
+  const t = adminToken() || ''
   const draft = prokerDraft.value[p.id]
   if (!draft || typeof draft.title !== 'string' || typeof draft.description !== 'string') {
     error.value = 'Data Proker belum siap disimpan.'
@@ -196,11 +219,11 @@ async function createProker() {
   creating.value = true
   try {
     if (media instanceof File) {
-      await api.addProkerMedia(fields, media, localStorage.getItem('admin_token') || '')
+      await api.addProkerMedia(fields, media, adminToken() || '')
     } else if (typeof media === 'string' && media.trim()) {
-      await api.addProker({ ...fields, imageUrl: media.trim() }, localStorage.getItem('admin_token') || '')
+      await api.addProker({ ...fields, imageUrl: media.trim() }, adminToken() || '')
     } else {
-      await api.addProker(fields, localStorage.getItem('admin_token') || '')
+      await api.addProker(fields, adminToken() || '')
     }
     newProker.value = { title: '', description: '', imageUrl: '', date: '', status: 'upcoming' }
     newCover.value = null
@@ -218,7 +241,7 @@ async function doConfirmedDelete() {
   const c = confirmState.value
   if (!c) return
   confirmState.value = null
-  const t = localStorage.getItem('admin_token') || ''
+  const t = adminToken() || ''
   try {
     if (c.type === 'proker') {
       await api.deleteProker(c.id, t)
@@ -235,7 +258,7 @@ async function uploadGallery(p, event) {
   const files = event.target.files
   if (!files || !files.length) return
   if ((p.photos?.length || 0) + files.length > 3) { error.value = 'Maksimal 3 foto per proker'; return }
-  const t = localStorage.getItem('admin_token') || ''
+  const t = adminToken() || ''
   const fd = new FormData()
   for (const f of files) fd.append('photos', f)
   galleryUploading.value[p.id] = true
@@ -250,7 +273,7 @@ async function uploadGallery(p, event) {
 async function addGalleryUrl(p) {
   const u = (galleryUrl.value[p.id] || '').trim()
   if (!u) return
-  const t = localStorage.getItem('admin_token') || ''
+  const t = adminToken() || ''
   galleryAdding.value[p.id] = true
   try {
     const res = await fetch(`/api/proker/${p.id}/photos`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t}`, 'x-admin-token': t }, body: JSON.stringify({ url: u }) })
@@ -307,7 +330,7 @@ async function saveSpinner() {
   if (spinnerPrizes.value.length < 2 || spinnerSaving.value) return
   spinnerSaving.value = true
   try {
-    const t = localStorage.getItem('admin_token') || ''
+    const t = adminToken() || ''
     await api.updateSpinner(spinnerPrizes.value, t)
   } catch { /* silent */ }
   finally { spinnerSaving.value = false }
@@ -340,7 +363,16 @@ const filteredAccounts = computed(() => {
   if (!q) return accounts.value
   return accounts.value.filter(a => (a.username || '').toLowerCase().includes(q) || (a.fullname || '').toLowerCase().includes(q))
 })
-const adminToken = () => localStorage.getItem('admin_token') || ''
+function safeGet(k) {
+  try { return localStorage.getItem(k) || '' } catch { return '' }
+}
+// Sumber token: sesi member bila tertanam di dashboard, admin_token bila mandiri.
+const adminToken = () => safeGet(props.embedded ? 'member_token' : 'admin_token')
+function clearAdminToken() {
+  // Jangan pernah hapus member_token (itu sesi login anggota).
+  if (props.embedded) return
+  try { localStorage.removeItem('admin_token') } catch { /* abaikan */ }
+}
 
 async function loadGroups() {
   try {
@@ -449,9 +481,9 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section class="admin-shell" :class="{ 'is-embedded': embedded }">
+  <section class="admin-shell" :class="{ 'is-embedded': props.embedded }">
     <!-- Top nav (disembunyikan dalam mode tertanam: header dashboard yang pegang) -->
-    <nav v-if="!embedded" class="admin-topbar">
+    <nav v-if="!props.embedded" class="admin-topbar">
       <div class="topbar-left">
         <img src="/Logo_ec.jpg" alt="EC" class="topbar-logo" />
         <span class="topbar-title">ADMIN <b>EC UPB</b></span>
@@ -460,8 +492,8 @@ onMounted(async () => {
       <button class="page-back" type="button" @click="goBack">← Kembali</button>
     </nav>
 
-    <!-- Login -->
-    <div v-if="!authed" class="login-wrap">
+    <!-- Login (jalur kredensial; tidak dipakai dalam mode tertanam) -->
+    <div v-if="!authed && !props.embedded" class="login-wrap">
       <div class="card login-card">
         <div class="login-head">
           <div class="login-icon">EC</div>
@@ -475,6 +507,19 @@ onMounted(async () => {
         <button class="btn login-btn" :disabled="loading" @click="login">{{ loading ? 'Memeriksa...' : 'Masuk' }}</button>
         <p v-if="error" class="error" style="margin-top:12px;">{{ error }}</p>
         <p class="tiny muted" style="margin-top:10px; text-align:center;">Default: <code>admin / ec2026onlyblue</code></p>
+      </div>
+    </div>
+
+    <!-- Tertanam tapi sesi member bukan superadmin: terblokir, bukan form login -->
+    <div v-else-if="!authed && props.embedded" class="login-wrap">
+      <div class="card login-card">
+        <div class="login-head">
+          <div class="login-icon">EC</div>
+          <h2>Akses Ditolak</h2>
+          <p class="tiny muted">Menu admin khusus superadmin.</p>
+        </div>
+        <p v-if="error" class="error" style="margin-top:12px;">{{ error }}</p>
+        <button class="btn login-btn" type="button" @click="goBack">Kembali ke Dashboard</button>
       </div>
     </div>
 
