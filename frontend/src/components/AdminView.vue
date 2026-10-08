@@ -6,12 +6,12 @@ import { displayTime, todayWIB, wibDay } from '../utils/time.js'
 import RichTextEditor from './RichTextEditor.vue'
 import ProkerMediaInput from './ProkerMediaInput.vue'
 
-const props = defineProps({ isModal: Boolean })
+const props = defineProps({ isModal: Boolean, embedded: Boolean })
 const emit = defineEmits(['back'])
 const router = useRouter()
 
 function goBack() {
-  if (props.isModal) emit('back')
+  if (props.isModal || props.embedded) emit('back')
   else router.push('/')
 }
 function textOnly(html) { return (html || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() }
@@ -449,9 +449,9 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section class="admin-shell">
-    <!-- Top nav -->
-    <nav class="admin-topbar">
+  <section class="admin-shell" :class="{ 'is-embedded': embedded }">
+    <!-- Top nav (disembunyikan dalam mode tertanam: header dashboard yang pegang) -->
+    <nav v-if="!embedded" class="admin-topbar">
       <div class="topbar-left">
         <img src="/Logo_ec.jpg" alt="EC" class="topbar-logo" />
         <span class="topbar-title">ADMIN <b>EC UPB</b></span>
@@ -770,6 +770,7 @@ onMounted(async () => {
 
 <style scoped>
 .admin-shell { width: 100%; min-height: 100dvh; background: var(--bg-secondary, #F1F5F9); }
+.admin-shell.is-embedded { min-height: 0; border-radius: var(--ec-radius-lg, 18px); overflow: hidden; }
 .admin-topbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 18px; background: #fff; border-bottom: 3px solid var(--dark-navy); box-shadow: 0 2px 0 var(--vibrant-yellow); }
 .topbar-left { display: flex; align-items: center; gap: 10px; }
 .topbar-logo { width: 32px; height: 32px; object-fit: contain; mix-blend-mode: multiply; }

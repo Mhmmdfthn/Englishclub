@@ -1,7 +1,10 @@
 ﻿<script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 'vue'
 import { api } from '../api.js'
 import { formatWIB } from '../utils/time.js'
+
+// Brankas admin: chunk terpisah, hanya diunduh saat tab Admin dibuka.
+const AdminView = defineAsyncComponent(() => import('./AdminView.vue'))
 
 const emit = defineEmits(['back', 'logout'])
 
@@ -34,8 +37,8 @@ async function checkAdminAccess() {
 }
 
 function goAdmin() {
+  dashTab.value = 'admin'
   closeMenu(false)
-  window.location.assign('/ec-admin-2026')
 }
 
 function closeMenu(returnFocus = true) {
@@ -59,7 +62,7 @@ function goHome() {
 }
 
 const tabTitle = computed(() => (
-  { dashboard: 'Dashboard', absensi: 'Absensi', materi: 'Materi', profil: 'Profil Saya' }[dashTab.value] || 'Dashboard'
+  { dashboard: 'Dashboard', absensi: 'Absensi', materi: 'Materi', profil: 'Profil Saya', admin: 'Admin' }[dashTab.value] || 'Dashboard'
 ))
 
 function onMenuKey(e) {
@@ -431,6 +434,16 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
+      <!-- Brankas Admin tertanam (superadmin): login + fitur admin penuh di sini -->
+      <div v-else-if="dashTab === 'admin'" class="dash__admin-tab">
+        <AdminView v-if="isSuperAdmin" embedded @back="dashTab = 'dashboard'" />
+        <div v-else class="ec-state ec-state--error" role="status">
+          <span class="ec-state__title">Khusus superadmin</span>
+          <p class="ec-state__body">Hubungi superadmin untuk meminta akses admin.</p>
+          <button class="ec-btn ec-btn--secondary ec-btn--sm" type="button" @click="dashTab = 'dashboard'">Kembali ke Dashboard</button>
+        </div>
+      </div>
+
     </div>
 
     </div>
@@ -590,6 +603,9 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   margin-top: 4px;
 }
+
+/* ── Tab admin tertanam ───────────────────────────────────── */
+.dash__admin-tab { min-width: 0; }
 
 /* ── Body ─────────────────────────────────────────────────── */
 .dash__body {
