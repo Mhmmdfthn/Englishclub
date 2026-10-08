@@ -5,7 +5,7 @@ import { loginWithPassword } from '../utils/auth.js'
 import { emailFor, findProfileById } from '../utils/memberAuthStore.js'
 import { auditAdmin } from '../utils/audit.js'
 import {
-  getOrCreateToday, getSession, closeSession, recordCheckin, listRecords, myRecords,
+  getActiveSession, createSession, getSession, closeSession, recordCheckin, listRecords, myRecords,
   buildQrPayload, parseQrPayload, verifyQrToken,
   checkPwRate, recordPwFail, resetPwRate,
 } from '../utils/attendanceStore.js'
@@ -53,25 +53,42 @@ async function requireMember(req, res) {
   }
 }
 
-// ---- Anggota: sesi aktif hari ini (untuk list + judul) ----
+// ---- Sesi aktif (tanpa auto-create): untuk anggota maupun panitia ----
 r.get('/active', async (req, res) => {
-  const me = await requireMember(req, res)
-  if (!me) return
   try {
-    const s = await getOrCreateToday()
-    if (!s.is_active) return res.json({ ok: true, session: null })
-    res.json({ ok: true, session: { id: s.id, title: s.title, date: s.date } })
+    if (!requireSupabaseDb(req, res)) return
+    const token = (req.header('authorization') || '').replace(/^Bearer\s+/i, '')
+    if (!token) return res.status(401).json({ detail: 'Unauthorized' })
+    const { verifyTokenAsync } = await import('../utils/auth.js')
+    const { data, error } = await getSupabaseAuth().auth.getUser(token)
+    if (!error && data?.user) {
+      const email = data.user.email || ''
+      if (email.endsWith('@members.englishclub.local')) {
+        const profile = await findProfileById(data.user.id)
+        if (!profile) return res.status(401).json({ detail: 'Unauthorized' })
+      } else if (!(await verifyTokenAsync(token))) {
+        return res.status(401).json({ detail: 'Unauthorized' })
+      }
+    } else {
+      return res.status(401).json({ detail: 'Unauthorized' })
+    }
+    const s = await getActiveSession()
+    if (!s) return res.json({ ok: true, session: null })
+    res.json({ ok: true, session: { id: s.id, title: s.title, date: s.date, is_active: s.is_active } })
   } catch (e) {
     sendStoreError(res, e, 'Absensi active error:')
   }
 })
 
-// ---- Panitia: sesi hari ini (buat otomatis bila belum ada) ----
+// ---- Panitia: buat sesi baru (otomatis tutup sesi aktif lain; maks 1 aktif) ----
 r.post('/sessions', requireAdmin, async (req, res) => {
   try {
     if (!requireSupabaseDb(req, res)) return
     const { title } = req.body ?? {}
-    const s = await getOrCreateToday(String(title || '').slice(0, 80), req.admin?.username || 'admin')
+    if (!title || typeof title !== 'string' || !title.trim()) {
+      return res.status(422).json({ detail: 'Judul sesi wajib diisi.' })
+    }
+    const s = await createSession(title, req.admin?.username || 'admin')
     await auditAdmin('Sesi absensi dibuka', req.admin?.username || 'admin', { session_id: s.id, title: s.title })
     res.json({ ok: true, session: { id: s.id, title: s.title, date: s.date, is_active: s.is_active } })
   } catch (e) {

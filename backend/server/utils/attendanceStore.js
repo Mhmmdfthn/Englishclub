@@ -57,32 +57,36 @@ export function verifyQrToken(secret, win, hmac, now = Date.now()) {
 // ---- storage (Supabase primary, memory fallback ala pola repo) ----
 const mem = { sessions: [], records: [] }
 
-function memSession(date) {
-  return mem.sessions.find((s) => s.date === date && s.is_active)
-}
-
-export async function getOrCreateToday(title = '', createdBy = '') {
-  const date = todayWIB()
+// ---- sesi manual: dibuka/ditutup panitia, maksimal 1 aktif ----
+export async function getActiveSession() {
   const sb = getSupabase()
   if (!sb) {
-    let s = memSession(date)
-    if (!s) {
-      s = { id: `mem-${date}`, title: title || `Pertemuan ${date}`, date, secret: randomBytes(32).toString('hex'), is_active: true, created_by: createdBy, created_at: new Date().toISOString() }
-      mem.sessions.push(s)
-    } else if (title) s.title = title
-    return s
+    return mem.sessions.find((s) => s.is_active) || null
   }
-  const { data: found, error: findErr } = await sb
+  const { data, error } = await sb
     .from('ec_attendance_sessions')
     .select('*')
-    .eq('date', date)
     .eq('is_active', true)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
-  if (findErr) throw fail(503, 'Database sibuk, silakan coba lagi')
-  if (found) return found
-  const row = { title: title || `Pertemuan ${date}`, date, secret: randomBytes(32).toString('hex'), is_active: true, created_by: createdBy }
+  if (error) throw fail(503, 'Database sibuk, silakan coba lagi')
+  return data || null
+}
+
+export async function createSession(title = '', createdBy = '') {
+  const clean = String(title || '').trim().slice(0, 80) || `Pertemuan ${todayWIB()}`
+  const sb = getSupabase()
+  if (!sb) {
+    // Satu aktif: tutup sesi lama dulu.
+    for (const s of mem.sessions) s.is_active = false
+    const s = { id: `mem-${Date.now()}`, title: clean, date: todayWIB(), secret: randomBytes(32).toString('hex'), is_active: true, created_by: createdBy, created_at: new Date().toISOString() }
+    mem.sessions.push(s)
+    return s
+  }
+  const { error: closeErr } = await sb.from('ec_attendance_sessions').update({ is_active: false }).eq('is_active', true)
+  if (closeErr) throw fail(503, 'Database sibuk, silakan coba lagi')
+  const row = { title: clean, date: todayWIB(), secret: randomBytes(32).toString('hex'), is_active: true, created_by: createdBy }
   const { data, error } = await sb.from('ec_attendance_sessions').insert(row).select('*').single()
   if (error) throw fail(503, 'Database sibuk, silakan coba lagi')
   return data

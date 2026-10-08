@@ -15,14 +15,38 @@ const loadError = ref('')
 const list = ref([])
 const closing = ref(false)
 const correcting = ref({})
+const newTitle = ref('')
+const creating = ref(false)
 
 let qrTimer = null
 let listTimer = null
 let countTimer = null
 
-async function ensureSession() {
-  const r = await api.attendanceSession('', props.token)
-  session.value = r.session
+async function loadActive() {
+  const r = await api.attendanceActive(props.token)
+  session.value = r.session || null
+  list.value = []
+  qrUrl.value = ''
+}
+
+async function createSession() {
+  if (!newTitle.value.trim() || creating.value) return
+  creating.value = true
+  loadError.value = ''
+  try {
+    const r = await api.attendanceSession(newTitle.value.trim(), props.token)
+    session.value = { id: r.session.id, title: r.session.title, date: r.session.date, is_active: true }
+    newTitle.value = ''
+    await Promise.all([refreshQr(), refreshList()])
+    stopTimers()
+    qrTimer = setInterval(refreshQr, 2500)
+    listTimer = setInterval(refreshList, 3000)
+    countTimer = setInterval(() => { expiresIn.value = Math.max(0, expiresIn.value - 1) }, 1000)
+  } catch (e) {
+    loadError.value = e?.message || 'Gagal membuat sesi.'
+  } finally {
+    creating.value = false
+  }
 }
 
 async function refreshQr() {
@@ -55,9 +79,16 @@ function stopTimers() {
 async function start() {
   loading.value = true
   loadError.value = ''
+  const timeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('Koneksi lambat. Periksa jaringan lalu coba lagi.')), 20000),
+  )
   try {
-    await ensureSession()
-    await Promise.all([refreshQr(), refreshList()])
+    await Promise.race([(async () => {
+      await loadActive()
+      if (!session.value) return
+      await Promise.all([refreshQr(), refreshList()])
+    })(), timeout])
+    if (!session.value) return
     stopTimers()
     qrTimer = setInterval(refreshQr, 2500)
     listTimer = setInterval(refreshList, 3000)
@@ -156,6 +187,26 @@ onBeforeUnmount(() => stopTimers())
       </ul>
       <p v-else class="ec-body">Belum ada yang check-in. QR siap dipindai.</p>
     </template>
+    <div v-else class="ec-state" role="status">
+      <span class="ec-state__title">Tidak ada sesi aktif</span>
+      <p class="ec-state__body">Buat sesi baru untuk membuka presensi. Membuat sesi baru otomatis menutup sesi lama.</p>
+      <label class="ec-label" for="qr-new-title">Judul sesi</label>
+      <input
+        id="qr-new-title"
+        v-model="newTitle"
+        class="ec-field"
+        maxlength="80"
+        placeholder="cth. Pertemuan Rutin 12 Okt"
+        @keyup.enter="createSession"
+      />
+      <div class="qr-display__actions" style="margin-top:10px">
+        <button class="ec-btn ec-btn--primary ec-btn--sm" type="button" :disabled="creating || !newTitle.trim()" @click="createSession">
+          {{ creating ? 'Membuat...' : 'Buka Sesi Baru' }}
+        </button>
+        <button class="ec-btn ec-btn--ghost ec-btn--sm" type="button" @click="start">Refresh</button>
+      </div>
+      <p v-if="loadError" class="qr-display__err" role="alert">{{ loadError }}</p>
+    </div>
   </div>
 </template>
 
@@ -173,4 +224,6 @@ onBeforeUnmount(() => stopTimers())
 .qr-display__name { flex: 1; min-width: 0; font-size: 0.875rem; font-weight: 700; color: var(--ec-ink); display: flex; flex-direction: column; }
 .qr-display__name small { font-weight: 500; color: var(--ec-ink-soft); }
 .qr-display__status { width: auto; min-height: 44px; }
+.qr-display__actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.qr-display__err { font-size: 0.875rem; font-weight: 700; padding: 10px 14px; border-radius: var(--ec-radius-md); background: var(--ec-danger-bg); color: var(--ec-danger); border: 1px solid var(--ec-danger-line); }
 </style>

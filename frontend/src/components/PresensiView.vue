@@ -1,8 +1,22 @@
 <script setup>
 import { defineAsyncComponent, onBeforeUnmount, ref } from 'vue'
-import { Html5Qrcode } from 'html5-qrcode'
 import { api } from '../api.js'
 import { formatWIB } from '../utils/time.js'
+
+// Scanner kamera dimuat malas (dynamic import) agar chunk tab tetap ringan
+// dan gagal unduh tampil sebagai pesan ramah, bukan blank.
+let Html5QrcodeCtor = null
+async function getScannerCtor() {
+  if (!Html5QrcodeCtor) {
+    try {
+      const mod = await import('html5-qrcode')
+      Html5QrcodeCtor = mod.Html5Qrcode
+    } catch {
+      throw new Error('Pustaka scanner gagal dimuat. Periksa koneksi lalu coba lagi, atau pakai kode manual.')
+    }
+  }
+  return Html5QrcodeCtor
+}
 
 // Display QR: chunk terpisah, hanya diunduh saat mode display dibuka.
 const QrDisplayView = defineAsyncComponent(() => import('./QrDisplayView.vue'))
@@ -46,12 +60,18 @@ let pollTimer = null
 async function loadAll() {
   loading.value = true
   loadError.value = ''
+  // Pagar timeout: skeleton tak boleh selamanya bila jaringan macet total.
+  const timeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('Koneksi lambat. Periksa jaringan lalu coba lagi.')), 20000),
+  )
   try {
-    const t = memberToken()
-    if (!t) throw { status: 401, message: 'Sesi habis. Masuk lagi.' }
-    const a = await api.attendanceActive(t)
-    session.value = a.session || null
-    await Promise.all([refreshList(false), refreshMine(false)])
+    await Promise.race([(async () => {
+      const t = memberToken()
+      if (!t) throw { status: 401, message: 'Sesi habis. Masuk lagi.' }
+      const a = await api.attendanceActive(t)
+      session.value = a.session || null
+      await Promise.all([refreshList(false), refreshMine(false)])
+    })(), timeout])
   } catch (e) {
     loadError.value = e?.message || 'Gagal memuat absensi.'
   } finally {
@@ -85,7 +105,8 @@ async function startScan() {
     return
   }
   try {
-    if (!scanner) scanner = new Html5Qrcode('presensi-qr-reader')
+    const Ctor = await getScannerCtor()
+    if (!scanner) scanner = new Ctor('presensi-qr-reader')
     scanning.value = true
     await scanner.start(
       { facingMode: 'environment' },
@@ -99,7 +120,7 @@ async function startScan() {
     )
   } catch (e) {
     scanning.value = false
-    result.value = { ok: false, message: 'Kamera tidak dapat dibuka. Izinkan akses kamera atau pakai kode manual di bawah.' }
+    result.value = { ok: false, message: e?.message || 'Kamera tidak dapat dibuka. Izinkan akses kamera atau pakai kode manual di bawah.' }
   }
 }
 
