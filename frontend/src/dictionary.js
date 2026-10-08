@@ -30,14 +30,21 @@ function writeWords(db, words) {
 }
 
 export async function loadDictionary(fetchWords) {
-  const db = await openDatabase()
+  // IndexedDB bisa tidak tersedia/diblokir: jangan pernah gagalkan boot,
+  // langsung ambil dari jaringan sebagai fallback.
   try {
-    const cached = await readWords(db)
-    if (cached?.length) return new Set(cached)
-    const words = await fetchWords()
-    await writeWords(db, words)
-    return new Set(words)
-  } finally {
-    db.close()
+    if (typeof indexedDB === 'undefined') throw new Error('no-indexeddb')
+    const db = await openDatabase()
+    try {
+      const cached = await readWords(db)
+      if (cached?.length) return new Set(cached)
+      const words = await fetchWords()
+      await writeWords(db, words)
+      return new Set(words)
+    } finally {
+      try { db.close() } catch { /* abaikan */ }
+    }
+  } catch {
+    return new Set(await fetchWords())
   }
 }

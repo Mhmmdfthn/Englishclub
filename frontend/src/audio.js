@@ -3,7 +3,13 @@
 class AudioManager {
   constructor() {
     this.ctx = null
-    this.muted = localStorage.getItem('wh_muted') === 'true'
+    // Jangan baca storage di konstruktor tanpa guard: modul ini di-import
+    // saat boot, throw di sini = seluruh aplikasi gagal mount (blank).
+    try {
+      this.muted = localStorage.getItem('wh_muted') === 'true'
+    } catch {
+      this.muted = false
+    }
   }
 
   init() {
@@ -20,7 +26,7 @@ class AudioManager {
 
   toggleMute() {
     this.muted = !this.muted
-    localStorage.setItem('wh_muted', String(this.muted))
+    try { localStorage.setItem('wh_muted', String(this.muted)) } catch { /* abaikan */ }
     return this.muted
   }
 

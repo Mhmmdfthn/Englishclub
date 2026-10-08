@@ -114,13 +114,16 @@ async function load() {
   loading.value = true
   error.value = ''
   unauthorized.value = false
+  let t = ''
+  try { t = localStorage.getItem('member_token') || '' } catch { /* storage diblokir */ }
   try {
-    const t = localStorage.getItem('member_token') || ''
     if (!t) { emit('back'); return }
     const r = await api.memberMe(t)
     profile.value = r
-    localStorage.setItem('member_username', r.username)
-    localStorage.setItem('member_fullname', r.fullname || '')
+    try {
+      localStorage.setItem('member_username', r.username)
+      localStorage.setItem('member_fullname', r.fullname || '')
+    } catch { /* storage diblokir: abaikan */ }
   } catch (e) {
     if (e?.status === 401) {
       clearSession()

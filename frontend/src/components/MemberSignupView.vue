@@ -30,9 +30,11 @@ async function submit() {
     const r = await api.memberRegister(fullname.value.trim(), username.value.trim(), password.value)
     success.value = `Akun @${r.username} dibuat. Selamat datang, ${r.fullname}!`
     if (r.token) {
-      localStorage.setItem('member_token', r.token)
-      localStorage.setItem('member_username', r.username)
-      localStorage.setItem('member_fullname', r.fullname || '')
+      try {
+        localStorage.setItem('member_token', r.token)
+        localStorage.setItem('member_username', r.username)
+        localStorage.setItem('member_fullname', r.fullname || '')
+      } catch { /* storage diblokir: sesi tak tersimpan, user bisa login manual */ }
     }
     setTimeout(() => emit('done', { username: r.username, fullname: r.fullname }), 900)
   } catch (e) {

@@ -18,9 +18,11 @@ async function submit() {
   submitting.value = true
   try {
     const r = await api.memberLogin(u, password.value)
-    localStorage.setItem('member_token', r.token)
-    localStorage.setItem('member_username', r.username)
-    localStorage.setItem('member_fullname', r.fullname || '')
+    try {
+      localStorage.setItem('member_token', r.token)
+      localStorage.setItem('member_username', r.username)
+      localStorage.setItem('member_fullname', r.fullname || '')
+    } catch { error.value = 'Browser memblokir penyimpanan. Aktifkan cookies untuk masuk.'; return }
     emit('done', { username: r.username, fullname: r.fullname })
   } catch (e) {
     if (e?.status === 401) error.value = 'Username atau password salah.'

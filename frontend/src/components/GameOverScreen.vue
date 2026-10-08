@@ -41,7 +41,7 @@ async function save() {
   try {
     const usedName = name.value.trim() || 'Anonim'
     const r = await api.saveScore(usedName, props.stats.score, props.stats.words.length)
-    localStorage.setItem('wh_name', usedName)
+    try { localStorage.setItem('wh_name', usedName) } catch { /* abaikan */ }
     savedRank.value = r.rank
   } catch (e) {
     saveError.value = 'Skor belum tersimpan. Coba lagi.'
