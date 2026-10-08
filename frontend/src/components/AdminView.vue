@@ -816,6 +816,14 @@ onMounted(async () => {
 <style scoped>
 .admin-shell { width: 100%; min-height: 100dvh; background: var(--ec-canvas, #F5F7FA); color: var(--ec-ink, #1F2937); }
 .admin-shell.is-embedded { min-height: 0; border-radius: var(--ec-radius-lg, 18px); overflow: hidden; }
+/* Mode tertanam: sidebar vertikal jadi bar menu horizontal di atas konten,
+   agar tidak dobel sidebar dengan panel dashboard. */
+.admin-shell.is-embedded .dashboard { display: flex; flex-direction: column; min-height: 0; }
+.admin-shell.is-embedded .sidebar { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 14px; border-right: 0; border-bottom: 1px solid var(--ec-line, #E5E7EB); }
+.admin-shell.is-embedded .side-item { flex: 1 1 140px; justify-content: center; white-space: nowrap; }
+.admin-shell.is-embedded .side-spacer { display: none; }
+.admin-shell.is-embedded .side-item.logout { margin: 0 0 0 auto; flex: 0 0 auto; }
+.admin-shell.is-embedded .main { padding: 16px clamp(12px, 2vw, 20px) 24px; }
 
 /* Jembatan bahasa desain: class legacy di dalam admin memakai tampilan ec-.
    Template tidak diubah — hanya definisi CSS. */
