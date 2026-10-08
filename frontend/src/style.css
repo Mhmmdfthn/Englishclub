@@ -359,6 +359,16 @@ textarea:focus-visible {
   outline-offset: 2px;
 }
 
+/* Mobile foundation (2026-10): 320px min viewport, safe-area support.
+   Breakpoint scale: 640 / 860 / 1024. Tap targets min 44px (WCAG 2.5.8). */
+:root {
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+img, svg, video {
+  max-width: 100%;
+}
+
 /* Respect users who prefer reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *,

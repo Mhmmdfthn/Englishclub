@@ -542,7 +542,8 @@ textarea.ec-field {
 }
 
 /* WCAG 2.2.2 stop control for the auto-drifting rail. Only rendered when the
-   rail actually drifts, so the manual rails do not grow a dead button. */
+   rail actually drifts, so the manual rails do not grow a dead button.
+   Mobile foundation: 44px minimum tap target (WCAG 2.5.8), 320px min viewport. */
 .ec-rail__autoplay {
   position: absolute;
   right: 0;
@@ -551,8 +552,8 @@ textarea.ec-field {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border: 1px solid var(--ec-line);
   border-radius: var(--ec-radius-pill);
@@ -590,6 +591,17 @@ textarea.ec-field {
 }
 
 /* ------------------------------------------------------------------ *
+ * Mobile foundation (2026-10): single breakpoint scale 640 / 860 / 1024,
+ * min viewport 320px, 44px tap targets (WCAG 2.5.8), safe-area bottom for
+ * notched phones. Legacy @media values (480/540/620/680/720/760/880/900/920/980)
+ * are being migrated toward this scale file by file.
+ * ------------------------------------------------------------------ */
+
+.ec-safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ------------------------------------------------------------------ *
  * Utilities
  * ------------------------------------------------------------------ */
 
@@ -620,5 +632,19 @@ textarea.ec-field {
   /* Hover lift is motion, so drop it too rather than only the transition. */
   .ec-card--interactive:hover {
     transform: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .ec-section-head {
+    margin-bottom: var(--ec-space-4);
+  }
+
+  .ec-h2 {
+    font-size: clamp(1.375rem, 6vw, 1.625rem);
+  }
+
+  .ec-lede {
+    font-size: 0.938rem;
   }
 }

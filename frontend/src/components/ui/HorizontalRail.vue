@@ -233,6 +233,15 @@ onBeforeUnmount(() => {
   if (rafId != null) cancelAnimationFrame(rafId)
   resizeObserver?.disconnect()
 })
+
+defineExpose({
+  scrollPrev: () => scrollByStep(-1),
+  scrollNext: () => scrollByStep(1),
+  toggleAutoplay,
+  canScrollBack,
+  canScrollForward,
+  autoplayEnabled,
+})
 </script>
 
 <template>

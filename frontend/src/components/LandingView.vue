@@ -1,4 +1,4 @@
-﻿<script setup>
+<script setup>
 import PublicNavbar from './home/PublicNavbar.vue'
 import HeroSection from './home/HeroSection.vue'
 import HappeningSection from './home/HappeningSection.vue'
@@ -6,17 +6,7 @@ import AboutSection from './home/AboutSection.vue'
 import StoriesSection from './home/StoriesSection.vue'
 import SiteFooter from './home/SiteFooter.vue'
 
-/**
- * LandingView — the public homepage.
- *
- * Structure follows PRD_Homepage_Redesign §6 (locked):
- *   Sticky Navbar → Hero (+ Action Dock) → What's Happening → About → Stories → Footer
- *
- * This file is now only the composition shell. Every section owns its own data and its
- * own loading / empty / error states, and all events still bubble up to App.vue, which
- * keeps owning routing, member session and the Word Hunt logic. No route, API call or
- * existing behaviour was changed here.
- */
+
 const props = defineProps({
   memberName: { type: String, default: '' },
 })
@@ -28,7 +18,6 @@ const emit = defineEmits([
   'goSignup',
   'goDashboard',
   'memberLogout',
-  'openAdmin',
   'goArticle',
 ])
 
@@ -55,22 +44,21 @@ function onDockAction(key) {
 </script>
 
 <template>
-  <div class="screen ec-home">
+  <div class="ec-home-shell">
     <PublicNavbar
       :member-name="memberName"
       :auth-enabled="MEMBER_AUTH_ON"
       @go-login="emit('goLogin')"
       @go-dashboard="emit('goDashboard')"
       @member-logout="emit('memberLogout')"
-      @open-admin="emit('openAdmin')"
     />
 
     <main class="landing__main">
       <HeroSection :authenticated="!!memberName" @action="onDockAction" />
 
-      <HappeningSection @open="emit('goArticle', $event)" />
-
       <AboutSection />
+
+      <HappeningSection @open="emit('goArticle', $event)" />
 
       <StoriesSection />
     </main>
@@ -87,10 +75,23 @@ function onDockAction(key) {
 </template>
 
 <style scoped>
-.landing__main {
-  /* The header and footer are siblings of main, not children, so the page has a
-     real content landmark for assistive tech. */
-  display: block;
+.ec-home-shell {
   width: 100%;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  background: var(--ec-surface, #ffffff);
+  color: var(--ec-ink, #1f2937);
+  user-select: text;
+  -webkit-user-select: text;
+  overflow-x: clip;
+}
+
+.landing__main {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  flex: 1 0 auto;
 }
 </style>

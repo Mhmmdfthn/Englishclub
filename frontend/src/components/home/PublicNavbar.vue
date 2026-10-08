@@ -21,36 +21,12 @@ defineProps({
   authEnabled: { type: Boolean, default: true },
 })
 
-const emit = defineEmits(['goLogin', 'goDashboard', 'memberLogout', 'openAdmin'])
+const emit = defineEmits(['goLogin', 'goDashboard', 'memberLogout'])
 
 const scrolled = ref(false)
 
-// Hidden admin entry, preserved from the previous navbar: repeated clicks or a
-// long press on the brand mark open the admin panel.
-const logoClicks = ref(0)
-let logoTimer = null
-let pressTimer = null
-
 function onScroll() {
   scrolled.value = window.scrollY > 12
-}
-
-function onLogoClick() {
-  logoClicks.value++
-  clearTimeout(logoTimer)
-  logoTimer = setTimeout(() => { logoClicks.value = 0 }, 800)
-  if (logoClicks.value >= 5) {
-    logoClicks.value = 0
-    emit('openAdmin')
-  }
-}
-
-function onPressStart() {
-  pressTimer = setTimeout(() => emit('openAdmin'), 800)
-}
-
-function onPressEnd() {
-  clearTimeout(pressTimer)
 }
 
 onMounted(() => {
@@ -58,12 +34,8 @@ onMounted(() => {
   window.addEventListener('scroll', onScroll, { passive: true })
 })
 
-// The gesture timers must not survive navigation, otherwise a long press fires
-// `openAdmin` after the component that owns it is already gone.
 onBeforeUnmount(() => {
   window.removeEventListener('scroll', onScroll)
-  clearTimeout(logoTimer)
-  clearTimeout(pressTimer)
 })
 </script>
 
@@ -74,10 +46,6 @@ onBeforeUnmount(() => {
         class="ec-nav__brand"
         href="#top"
         aria-label="English Club UPB, kembali ke atas"
-        @click="onLogoClick"
-        @pointerdown="onPressStart"
-        @pointerup="onPressEnd"
-        @pointerleave="onPressEnd"
       >
         <img class="ec-nav__logo" src="/logo-ec.png" alt="" width="36" height="36" />
         <span class="ec-nav__brand-text">
@@ -88,8 +56,8 @@ onBeforeUnmount(() => {
 
       <nav class="ec-nav__links" aria-label="Navigasi utama">
         <a class="ec-nav__link ec-nav__link--home" href="#top">Home</a>
-        <a class="ec-nav__link" href="#happening">What's Happening</a>
         <a class="ec-nav__link" href="#about">About</a>
+        <a class="ec-nav__link" href="#happening">What's Happening</a>
         <a class="ec-nav__link" href="#stories">Stories</a>
       </nav>
 
@@ -104,7 +72,7 @@ onBeforeUnmount(() => {
           </button>
         </template>
         <button v-else-if="authEnabled" class="ec-btn ec-btn--primary ec-btn--sm" type="button" @click="emit('goLogin')">
-          Masuk
+          Login
         </button>
       </div>
     </div>
@@ -231,8 +199,8 @@ onBeforeUnmount(() => {
 .ec-nav__logout {
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border: 1px solid var(--ec-line);
   border-radius: var(--ec-radius-pill);
   background: var(--ec-surface);
@@ -243,7 +211,7 @@ onBeforeUnmount(() => {
 
 .ec-nav__logout:hover {
   color: var(--ec-blue);
-  border-color: #C9DFF5;
+  border-color: var(--ec-info-line);
 }
 
 .ec-nav__logout:focus-visible {
@@ -253,30 +221,50 @@ onBeforeUnmount(() => {
 
 @media (max-width: 720px) {
   .ec-nav__inner {
-    min-height: 64px;
-    gap: var(--ec-space-2) var(--ec-space-3);
+    min-height: 56px;
+    gap: 6px 12px;
     flex-wrap: wrap;
-    padding-block: 8px;
+    padding-block: 6px;
   }
 
   .ec-nav__links {
     order: 3;
     flex: 0 0 100%;
-    justify-content: center;
-    gap: clamp(10px, 4vw, 20px);
+    justify-content: flex-start;
+    gap: 4px;
     margin-left: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+  }
+
+  .ec-nav__links::-webkit-scrollbar {
+    display: none;
   }
 
   .ec-nav__link {
-    font-size: clamp(0.688rem, 3.2vw, 0.812rem);
+    font-size: 0.78rem;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    padding: 10px 8px;
+    flex: 0 0 auto;
   }
 
   .ec-nav__account {
     margin-left: auto;
   }
 
+  .ec-nav__account .ec-btn {
+    min-height: 44px;
+  }
+
   .ec-nav__brand-text {
     font-size: 0.938rem;
+    max-width: 38vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 </style>

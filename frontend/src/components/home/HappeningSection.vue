@@ -1,4 +1,4 @@
-﻿<script setup>
+<script setup>
 import { computed, onMounted, ref } from 'vue'
 import { ArrowRight, CalendarDays } from 'lucide-vue-next'
 import { api } from '../../api.js'
@@ -6,14 +6,9 @@ import { api } from '../../api.js'
 /**
  * HappeningSection — "What's Happening at English Club?"
  *
- * PRD_Homepage_Redesign §7.4: shows real proker data so visitors can discover programs
- * without opening a separate page first. Cards stay scannable (cover, title, status,
- * short caption, one clear detail affordance) in a wrapping 3-2-1 grid.
- * The requested status chips filter this already-loaded dataset locally;
- * no filter endpoint or invented backend capability is introduced.
- *
- * Data, loading, error and empty states all come from the existing `/api/proker`.
- * Nothing here is invented.
+ * Displays active & past programs in a responsive 3-column grid.
+ * Program cards stay scannable with cover photo, status badge, date, title,
+ * and a clear detail affordance. Status chips filter locally without fake endpoints.
  */
 const emit = defineEmits(['open'])
 
@@ -23,16 +18,16 @@ const error = ref('')
 const activeFilter = ref('all')
 
 const filters = [
-  { key: 'all', label: 'All' },
+  { key: 'all', label: 'All Programs' },
   { key: 'upcoming', label: 'Upcoming' },
   { key: 'ongoing', label: 'Ongoing' },
   { key: 'completed', label: 'Completed' },
 ]
 
 const STATUS = {
-  upcoming: { label: 'Akan datang', badge: 'ec-badge--upcoming' },
-  ongoing: { label: 'Berlangsung', badge: 'ec-badge--ongoing' },
-  completed: { label: 'Selesai', badge: 'ec-badge--completed' },
+  upcoming: { label: 'Akan Datang', badge: 'happening__badge--upcoming' },
+  ongoing: { label: 'Berlangsung', badge: 'happening__badge--ongoing' },
+  completed: { label: 'Selesai', badge: 'happening__badge--completed' },
 }
 
 function statusOf(item) {
@@ -51,8 +46,7 @@ function plainText(html) {
   return (html || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
-// Trim on a word boundary so the clamped caption never ends mid-word.
-function teaser(value, limit = 130) {
+function teaser(value, limit = 110) {
   const text = plainText(value)
   if (text.length <= limit) return text
   const cut = text.slice(0, limit)
@@ -67,8 +61,6 @@ const dateFormatter = new Intl.DateTimeFormat('id-ID', {
   year: 'numeric',
 })
 
-// Proker dates arrive as plain YYYY-MM-DD, so they are read as calendar dates
-// rather than as the UTC stamps formatWIB() in utils/time.js is built for.
 function formatDate(value) {
   if (!value) return ''
   const d = new Date(`${value}T00:00:00Z`)
@@ -76,10 +68,14 @@ function formatDate(value) {
 }
 
 const cardCount = computed(() => proker.value.length)
-const visibleProker = computed(() => activeFilter.value === 'all'
-  ? proker.value
-  : proker.value.filter((item) => statusKey(item) === activeFilter.value))
-const activeFilterLabel = computed(() => filters.find((filter) => filter.key === activeFilter.value)?.label || 'selected')
+const visibleProker = computed(() =>
+  activeFilter.value === 'all'
+    ? proker.value
+    : proker.value.filter((item) => statusKey(item) === activeFilter.value)
+)
+const activeFilterLabel = computed(
+  () => filters.find((f) => f.key === activeFilter.value)?.label || 'selected'
+)
 
 async function load() {
   loading.value = true
@@ -97,245 +93,160 @@ onMounted(load)
 </script>
 
 <template>
-  <section id="happening" class="ec-section happening">
-    <div class="ec-section-head">
-      <span class="ec-eyebrow">Program</span>
-      <h2 class="ec-h2">What's Happening at English Club?</h2>
-      <p class="ec-lede">Program kerja dan aktivitas English Club—yang akan datang, sedang berlangsung, maupun selesai.</p>
-    </div>
-
-    <div v-if="!loading && !error && cardCount > 0" class="happening__filters" role="group" aria-label="Filter program berdasarkan status">
-      <button
-        v-for="filter in filters"
-        :key="filter.key"
-        class="happening__filter"
-        :class="{ 'happening__filter--active': activeFilter === filter.key }"
-        type="button"
-        :aria-pressed="activeFilter === filter.key"
-        @click="activeFilter = filter.key"
-      >
-        {{ filter.label }}
-      </button>
-    </div>
-
-    <!-- Loading -->
-    <div v-if="loading" class="happening__grid" aria-hidden="true">
-      <div v-for="n in 3" :key="n" class="happening__skeleton">
-        <div class="ec-skeleton happening__skeleton-media"></div>
-        <div class="ec-skeleton happening__skeleton-line"></div>
-        <div class="ec-skeleton happening__skeleton-line"></div>
-      </div>
-    </div>
-
-    <!-- Error -->
-    <div v-else-if="error" class="ec-state ec-state--error" role="alert">
-      <p class="ec-state__title">Program belum dapat dimuat</p>
-      <p class="ec-state__body">{{ error }}</p>
-      <button class="ec-btn ec-btn--secondary ec-btn--sm" type="button" @click="load">Coba lagi</button>
-    </div>
-
-    <!-- Empty -->
-    <div v-else-if="cardCount === 0" class="ec-state">
-      <p class="ec-state__title">Belum ada program</p>
-      <p class="ec-state__body">Belum ada program yang dipublikasikan. Program English Club akan muncul di sini begitu tersedia.</p>
-    </div>
-
-    <!-- Programs -->
-    <template v-else>
-      <div v-if="visibleProker.length === 0" class="ec-state happening__filtered-empty">
-        <p class="ec-state__title">No {{ activeFilterLabel.toLowerCase() }} programs yet</p>
-        <p class="ec-state__body">Coba lihat semua program atau pilih status lainnya.</p>
-        <button class="ec-btn ec-btn--secondary ec-btn--sm" type="button" @click="activeFilter = 'all'">View all programs</button>
+  <section id="happening" class="happening">
+    <div class="happening__inner">
+      <div class="ec-section-head">
+        <span class="ec-eyebrow">Aktivitas & Agenda</span>
+        <h2 class="ec-h2">What's Happening at English Club?</h2>
+        <p class="ec-lede">Program kerja, agenda rutin, dan aktivitas komunitas mahasiswa English Club UPB.</p>
       </div>
 
-      <template v-else>
-      <div class="happening__list">
-        <div
-          v-for="(p, index) in visibleProker"
-          :key="p.id"
-          class="happening__item"
+      <!-- Status Filters -->
+      <div v-if="!loading && !error && cardCount > 0" class="happening__filters" role="group" aria-label="Filter program berdasarkan status">
+        <button
+          v-for="filter in filters"
+          :key="filter.key"
+          class="happening__filter"
+          :class="{ 'happening__filter--active': activeFilter === filter.key }"
+          type="button"
+          :aria-pressed="activeFilter === filter.key"
+          @click="activeFilter = filter.key"
         >
-          <button class="ec-card ec-card--interactive happening__card" type="button" @click="emit('open', p)">
-            <span class="happening__heading" :class="`happening__heading--${statusKey(p)}`">
-              <img class="happening__image" :src="coverOf(p)" :alt="`Foto program ${p.title}`" loading="lazy" decoding="async" draggable="false" />
-            </span>
+          {{ filter.label }}
+        </button>
+      </div>
 
-            <span class="happening__body">
-              <span class="ec-h3 happening__title">{{ p.title }}</span>
-              <span class="ec-badge happening__status" :class="statusOf(p).badge">{{ statusOf(p).label }}</span>
-              <span class="happening__details">
-                <span v-if="formatDate(p.date)" class="happening__meta">
-                  <CalendarDays :size="13" :stroke-width="1.9" aria-hidden="true" />
-                  {{ formatDate(p.date) }}
-                </span>
-                <span v-if="teaser(p.description || p.caption, 72)" class="happening__desc">
-                  {{ teaser(p.description || p.caption, 72) }}
-                </span>
-              </span>
-
-              <span class="happening__cta">
-                View
-                <ArrowRight :size="15" :stroke-width="2" aria-hidden="true" />
-              </span>
-            </span>
-          </button>
+      <!-- Loading Skeletons -->
+      <div v-if="loading" class="happening__grid" aria-hidden="true">
+        <div v-for="n in 3" :key="n" class="happening__skeleton">
+          <div class="ec-skeleton happening__skeleton-media"></div>
+          <div class="happening__skeleton-body">
+            <div class="ec-skeleton happening__skeleton-badge"></div>
+            <div class="ec-skeleton happening__skeleton-title"></div>
+            <div class="ec-skeleton happening__skeleton-line"></div>
+          </div>
         </div>
       </div>
+
+      <!-- Error State -->
+      <div v-else-if="error" class="ec-state ec-state--error" role="alert">
+        <p class="ec-state__title">Program belum dapat dimuat</p>
+        <p class="ec-state__body">{{ error }}</p>
+        <button class="ec-btn ec-btn--secondary ec-btn--sm" type="button" @click="load">Coba lagi</button>
+      </div>
+
+      <!-- Empty State -->
+      <div v-else-if="cardCount === 0" class="ec-state">
+        <p class="ec-state__title">Belum ada program</p>
+        <p class="ec-state__body">Belum ada program yang dipublikasikan. Agenda kegiatan baru akan segera hadir.</p>
+      </div>
+
+      <!-- Programs Grid -->
+      <template v-else>
+        <div v-if="visibleProker.length === 0" class="ec-state happening__filtered-empty">
+          <p class="ec-state__title">Tidak ada program {{ activeFilterLabel.toLowerCase() }}</p>
+          <p class="ec-state__body">Coba lihat semua program untuk melihat agenda lainnya.</p>
+          <button class="ec-btn ec-btn--secondary ec-btn--sm" type="button" @click="activeFilter = 'all'">Lihat Semua Program</button>
+        </div>
+
+        <div v-else class="happening__grid">
+          <article
+            v-for="p in visibleProker"
+            :key="p.id"
+            class="happening__card"
+            @click="emit('open', p)"
+          >
+            <div class="happening__media">
+              <img
+                class="happening__image"
+                :src="coverOf(p)"
+                :alt="`Foto kegiatan ${p.title}`"
+                loading="lazy"
+                decoding="async"
+                draggable="false"
+              />
+              <span class="happening__badge" :class="statusOf(p).badge">
+                <span class="happening__badge-dot" aria-hidden="true"></span>
+                {{ statusOf(p).label }}
+              </span>
+            </div>
+
+            <div class="happening__body">
+              <div v-if="formatDate(p.date)" class="happening__meta">
+                <CalendarDays :size="14" :stroke-width="2" aria-hidden="true" />
+                <span>{{ formatDate(p.date) }}</span>
+              </div>
+
+              <h3 class="happening__title">{{ p.title }}</h3>
+
+              <p v-if="teaser(p.description || p.caption)" class="happening__desc">
+                {{ teaser(p.description || p.caption) }}
+              </p>
+
+              <div class="happening__footer">
+                <span class="happening__cta">
+                  Detail Program
+                  <ArrowRight :size="15" :stroke-width="2.2" aria-hidden="true" />
+                </span>
+              </div>
+            </div>
+          </article>
+        </div>
       </template>
-    </template>
+    </div>
   </section>
 </template>
 
 <style scoped>
 .happening {
-  /* Keep the section clear of the sticky navbar when reached via anchor. */
+  width: 100%;
+  padding: clamp(56px, 7vw, 92px) 0;
+  background: var(--ec-surface, #ffffff);
+  border-bottom: 1px solid var(--ec-line);
   scroll-margin-top: 84px;
 }
 
-.happening__list {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--ec-space-4);
-  align-items: stretch;
-}
-
-.happening__item {
-  width: 100%;
-  min-width: 0;
-  min-height: 220px;
-}
-
-.happening__card {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-.happening__heading {
-  position: relative;
-  flex: 0 0 auto;
-  display: block;
-  height: 190px;
-  overflow: hidden;
-  background: var(--happening-tone);
-  --happening-tone: #FFF9E5;
-}
-
-.happening__heading--ongoing {
-  --happening-tone: #EAF8F2;
-}
-
-.happening__heading--completed {
-  --happening-tone: #EAF4FD;
-}
-
-.happening__image {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.happening__title {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  line-height: 1.28;
-}
-
-.happening__body {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  align-items: start;
-  gap: 8px;
-  flex: 1 1 auto;
-  min-height: 0;
-  padding: 12px 14px;
-  text-align: left;
-}
-
-.happening__status {
-  justify-self: start;
-  padding: 4px 10px;
-  border: 0;
-  border-radius: var(--ec-radius-pill);
-  font-size: 0.65rem;
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-.happening__details {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-height: 0;
-}
-
-.happening__meta {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 0.72rem;
-  line-height: 1.35;
-  font-weight: 600;
-  color: var(--ec-ink-soft);
-}
-
-.happening__desc {
-  font-size: 0.72rem;
-  line-height: 1.4;
-  color: var(--ec-ink-soft);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.happening__cta {
-  display: inline-flex;
-  align-items: center;
-  justify-self: end;
-  gap: 5px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--ec-blue);
+.happening__inner {
+  width: min(100%, var(--ec-container));
+  margin: 0 auto;
+  padding-inline: var(--ec-gutter);
 }
 
 .happening__filters {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: calc(var(--ec-space-6) * -1 + var(--ec-space-2));
-  margin-bottom: var(--ec-space-5);
+  margin-top: -12px;
+  margin-bottom: var(--ec-space-6);
 }
 
 .happening__filter {
-  min-height: 36px;
-  padding: 8px 16px;
+  min-height: 44px;
+  padding: 10px 18px;
   border: 1px solid var(--ec-line);
   border-radius: var(--ec-radius-pill);
   background: var(--ec-surface);
   color: var(--ec-ink);
   font: inherit;
-  font-size: 0.78rem;
+  font-size: 0.813rem;
   font-weight: 600;
   line-height: 1;
   cursor: pointer;
-  transition: background var(--ec-dur) var(--ec-ease), color var(--ec-dur) var(--ec-ease), border-color var(--ec-dur) var(--ec-ease);
+  flex: 0 0 auto;
+  transition: all var(--ec-dur) var(--ec-ease);
 }
 
 .happening__filter:hover:not(.happening__filter--active) {
   border-color: var(--ec-blue);
   color: var(--ec-blue);
+  background: var(--ec-blue-050);
 }
 
 .happening__filter--active {
-  border-color: var(--ec-ink);
-  background: var(--ec-ink);
-  color: var(--ec-surface);
+  border-color: var(--ec-blue);
+  background: var(--ec-blue);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(11, 86, 155, 0.2);
 }
 
 .happening__filter:focus-visible {
@@ -343,56 +254,246 @@ onMounted(load)
   box-shadow: var(--ec-focus-ring);
 }
 
-.happening__filtered-empty {
-  text-align: left;
+.happening__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(20px, 3vw, 32px);
+  align-items: stretch;
+}
+
+.happening__card {
+  display: flex;
+  flex-direction: column;
+  background: var(--ec-surface);
+  border: 1px solid var(--ec-line);
+  border-radius: var(--ec-radius-lg);
+  overflow: hidden;
+  cursor: pointer;
+  box-shadow: var(--ec-shadow-sm);
+  transition: transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1),
+              box-shadow 0.24s cubic-bezier(0.2, 0.8, 0.2, 1),
+              border-color 0.2s ease;
+}
+
+.happening__card:hover {
+  transform: translateY(-5px);
+  border-color: rgba(11, 86, 155, 0.3);
+  box-shadow: 0 16px 36px -12px rgba(11, 86, 155, 0.16), 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.happening__card:hover .happening__image {
+  transform: scale(1.04);
+}
+
+.happening__card:hover .happening__cta {
+  color: var(--ec-blue-strong);
 }
 
 .happening__card:hover .happening__cta svg {
-  transform: translateX(3px);
+  transform: translateX(4px);
+}
+
+.happening__media {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  background: var(--ec-blue-050);
+}
+
+.happening__image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.happening__badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--ec-radius-pill);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.happening__badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.happening__badge--upcoming {
+  background: rgba(255, 251, 235, 0.94);
+  color: #B45309;
+  border: 1px solid rgba(253, 230, 138, 0.8);
+}
+
+.happening__badge--ongoing {
+  background: rgba(236, 253, 245, 0.94);
+  color: #047857;
+  border: 1px solid rgba(167, 243, 208, 0.8);
+}
+
+.happening__badge--completed {
+  background: rgba(241, 245, 249, 0.94);
+  color: #475569;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.happening__body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  padding: 20px 22px 22px;
+  text-align: left;
+}
+
+.happening__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.781rem;
+  font-weight: 600;
+  color: var(--ec-ink-soft);
+  margin-bottom: 8px;
+}
+
+.happening__title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.18rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--ec-ink);
+  margin: 0 0 8px 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.happening__desc {
+  font-size: 0.844rem;
+  line-height: 1.55;
+  color: var(--ec-ink-soft);
+  margin: 0 0 16px 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.happening__footer {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid rgba(229, 231, 235, 0.6);
+}
+
+.happening__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.813rem;
+  font-weight: 700;
+  color: var(--ec-blue);
+  transition: color var(--ec-dur) var(--ec-ease);
 }
 
 .happening__cta svg {
   transition: transform var(--ec-dur) var(--ec-ease);
 }
 
-.happening__grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--ec-space-4);
-}
-
+/* Skeleton loader */
 .happening__skeleton {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ec-space-3);
-  padding: var(--ec-space-4);
   border: 1px solid var(--ec-line);
   border-radius: var(--ec-radius-lg);
+  overflow: hidden;
   background: var(--ec-surface);
 }
 
 .happening__skeleton-media {
-  aspect-ratio: 4 / 3;
-  border-radius: var(--ec-radius-md);
+  aspect-ratio: 16 / 10;
+  border-radius: 0;
 }
 
-.happening__skeleton-line {
-  height: 14px;
+.happening__skeleton-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.happening__skeleton-badge {
+  width: 80px;
+  height: 20px;
+  border-radius: var(--ec-radius-pill);
+}
+
+.happening__skeleton-title {
+  height: 22px;
+  width: 85%;
   border-radius: var(--ec-radius-sm);
 }
 
-@media (max-width: 1020px) {
-  .happening__list,
+.happening__skeleton-line {
+  height: 16px;
+  width: 65%;
+  border-radius: var(--ec-radius-sm);
+}
+
+@media (max-width: 980px) {
   .happening__grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@media (max-width: 640px) {
-  .happening__list,
+@media (max-width: 620px) {
+  .happening {
+    padding: 44px 0;
+    scroll-margin-top: 120px;
+  }
+
+  .happening__filters {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    margin-bottom: var(--ec-space-4);
+    padding-bottom: 4px;
+    margin-inline: calc(-1 * var(--ec-gutter));
+    padding-inline: var(--ec-gutter);
+  }
+
+  .happening__filters::-webkit-scrollbar {
+    display: none;
+  }
+
   .happening__grid {
     grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .happening__body {
+    padding: 16px 16px 18px;
+  }
+
+  .happening__title {
+    font-size: 1.05rem;
+  }
+
+  .happening__desc {
+    font-size: 0.813rem;
+    margin-bottom: 12px;
   }
 }
 </style>
-

@@ -1,57 +1,54 @@
 <script setup>
 import { computed, onBeforeUnmount, ref } from 'vue'
-import { ListChecks, Telescope } from 'lucide-vue-next'
+import { ArrowRight, CheckCircle2, ListChecks, Telescope } from 'lucide-vue-next'
 
 /**
- * AboutSection — who English Club is + sortable photo deck + visi & misi.
+ * AboutSection — who English Club is + interactive photo deck + visi & misi.
  *
- * Layout (permintaan user):
- *   atas: [Who we are | deck foto interaktif]
- *   bawah: [kotak Visi | kotak Misi] berjejer 2 kolom.
+ * Layout:
+ *   top: [Who we are | interactive photo deck]
+ *   bottom: [Visi card | Misi card] 2 equal columns.
  *
- * Deck foto: tumpukan kartu, klik kartu paling depan -> animasi swap
- * seperti memilah foto, kartu yang sudah dilihat pindah ke belakang lagi
- * (rotasi FIFO melingkar, bukan keluar dari deck).
+ * Deck foto: 3D-styled card stack, click to swap FIFO with smooth swipe animation.
  */
 const vision = [
-  'Latihan bahasa Inggris yang mudah diikuti mahasiswa.',
-  'Anggota yang lebih percaya diri saat berbicara di kelas dan di tempat kerja.',
+  'Mewujudkan wadah latihan bahasa Inggris yang inklusif, ramah, dan aplikatif bagi seluruh mahasiswa.',
+  'Membentuk anggota yang percaya diri, kompeten, dan siap berkomunikasi di kancah akademik maupun profesional.',
 ]
 
 const mission = [
-  'Latihan speaking dan listening secara rutin.',
-  'Kesempatan untuk mempraktikkan public speaking.',
-  'Kegiatan dan kompetisi berbahasa Inggris.',
-  'Dukungan untuk anggota yang mengikuti kegiatan akademik dan organisasi.',
+  'Menyelenggarakan sesi latihan speaking dan listening secara rutin dan interaktif.',
+  'Memberikan ruang eksplorasi public speaking, diskusi kritis, dan presentasi berbahasa Inggris.',
+  'Mengadakan kompetisi, workshop, dan kegiatan kreatif penunjang kemampuan bahasa Inggris.',
+  'Mendukung anggota dalam pengembangan soft skill dan keikutsertaan kegiatan keilmuan kampus.',
 ]
 
 const photos = [
-  { src: '/Eli_mascout.jpg', alt: 'Maskot Eli English Club', caption: 'Eli — maskot English Club' },
-  { src: '/Tom_mascout.jpg', alt: 'Maskot Tom English Club', caption: 'Tom — maskot English Club' },
-  { src: '/Eli.png', alt: 'Ilustrasi Eli', caption: 'Eli dalam versi ilustrasi' },
-  { src: '/logo-ec.png', alt: 'Logo English Club UPB', caption: 'Logo English Club UPB' },
+  { src: '/Eli_mascout.jpg', alt: 'Maskot Eli English Club', caption: 'Eli — Maskot Resmi English Club UPB' },
+  { src: '/Eli.png', alt: 'Ilustrasi Maskot Eli', caption: 'Eli The Mascot — Siap Menemanimu Belajar' },
+  { src: '/logo-ec.png', alt: 'Logo English Club UPB', caption: 'Logo Resmi English Club UPB Kebumen' },
 ]
 
-// Urutan deck: order[0] = kartu paling depan.
+// Urutan deck: order[0] = kartu teratas
 const order = ref(photos.map((_, i) => i))
 const leaving = ref(false)
 const leavingId = ref(-1)
 let leaveTimer = null
 
 const topPhoto = computed(() => photos[order.value[0]])
+const currentIndex = computed(() => order.value[0])
 
 function nextPhoto() {
   if (leaving.value || order.value.length < 2) return
   leaving.value = true
   leavingId.value = order.value[0]
   clearTimeout(leaveTimer)
-  // Tunggu animasi swap selesai, lalu pindah kartu depan ke belakang.
   leaveTimer = setTimeout(() => {
     const first = order.value.shift()
     order.value.push(first)
     leaving.value = false
     leavingId.value = -1
-  }, 380)
+  }, 360)
 }
 
 function positionOf(id) {
@@ -63,29 +60,48 @@ onBeforeUnmount(() => clearTimeout(leaveTimer))
 
 <template>
   <section id="about" class="about">
-    <div class="ec-section about__inner">
-      <div class="ec-section-head about__eyebrow">
-        <span class="ec-eyebrow">About English Club</span>
+    <div class="about__inner">
+      <div class="ec-section-head">
+        <span class="ec-eyebrow">Tentang Kami</span>
+        <h2 class="ec-h2">Mengenal Lebih Dekat English Club</h2>
+        <p class="ec-lede">Wadah mahasiswa Universitas Putra Bangsa untuk mengeksplorasi potensi dan bahasa Inggris bersama.</p>
       </div>
 
-      <!-- Atas: teks + deck foto -->
-      <div class="about__grid">
-        <div class="about__left">
-          <h2 class="ec-h2 about__title">Belajar bahasa Inggris bareng mahasiswa UPB.</h2>
-          <div class="about__who">
-            <h3 class="ec-h3">Who we are</h3>
-            <p class="ec-body">
-              <b>English Club UPB</b> adalah UKM di bawah <b>BEM — Departemen Keilmuan</b> Universitas Putra Bangsa
-              Kebumen. Kegiatan kami berfokus pada latihan bahasa Inggris dan kegiatan kampus.
-            </p>
-            <p class="ec-body">
-              Terbuka untuk seluruh mahasiswa yang ingin berlatih speaking, listening, dan public speaking.
-            </p>
-            <p class="ec-caption about__hint">Klik foto di samping untuk memilah dan melihat dokumentasi berikutnya.</p>
+      <!-- Top Row: Who we are + Photo Deck -->
+      <div class="about__top">
+        <div class="about__who">
+          <div class="about__badge-org">
+            <span class="about__badge-dot"></span>
+            UKM BEM — Departemen Keilmuan UPB Kebumen
+          </div>
+
+          <h3 class="about__headline">
+            Belajar bahasa Inggris tanpa rasa takut salah, tumbuh bersama komunitas.
+          </h3>
+
+          <p class="about__body-text">
+            <b>English Club UPB</b> adalah Unit Kegiatan Mahasiswa di bawah naungan BEM Departemen Keilmuan
+            Universitas Putra Bangsa Kebumen. Kami berkomitmen menciptakan lingkungan yang suportif untuk mengasah kemampuan bahasa Inggris praktis.
+          </p>
+
+          <p class="about__body-text">
+            Mulai dari percakapan santai sehari-hari, debat, storytelling, hingga persiapan TOEFL dan public speaking—semua dikemas dalam suasana yang hangat dan menyenangkan.
+          </p>
+
+          <div class="about__features">
+            <div class="about__feature-item">
+              <span class="about__feature-icon">✨</span>
+              <span>Terbuka untuk semua jurusan & angkatan</span>
+            </div>
+            <div class="about__feature-item">
+              <span class="about__feature-icon">🗣️</span>
+              <span>Fokus pada praktik langsung & kepercayaan diri</span>
+            </div>
           </div>
         </div>
 
-        <div class="deck" aria-label="Dokumentasi English Club">
+        <!-- Photo Deck -->
+        <div class="deck" aria-label="Dokumentasi dan Maskot English Club">
           <div class="deck__stage">
             <figure
               v-for="(photo, id) in photos"
@@ -105,62 +121,82 @@ onBeforeUnmount(() => clearTimeout(leaveTimer))
                 v-if="positionOf(id) === 0"
                 type="button"
                 class="deck__tap"
-                :aria-label="`Foto: ${photo.caption}. Klik untuk pindah ke belakang.`"
+                :aria-label="`Foto: ${photo.caption}. Klik untuk foto berikutnya.`"
                 @click="nextPhoto"
               >
                 <img :src="photo.src" :alt="photo.alt" loading="lazy" />
-                <figcaption class="deck__caption">
-                  <span>{{ photo.caption }}</span>
-                  <span class="deck__next" aria-hidden="true">Lihat berikutnya &#8594;</span>
-                </figcaption>
+                <div class="deck__caption">
+                  <span class="deck__caption-title">{{ photo.caption }}</span>
+                  <span class="deck__caption-action">Klik foto &rarr;</span>
+                </div>
               </button>
               <template v-else>
-                <img :src="photo.src" :alt="photo.alt" loading="lazy" aria-hidden="true" tabindex="-1" />
+                <img :src="photo.src" alt="" loading="lazy" aria-hidden="true" />
                 <figcaption class="deck__caption" aria-hidden="true">
-                  <span>{{ photo.caption }}</span>
+                  <span class="deck__caption-title">{{ photo.caption }}</span>
                 </figcaption>
               </template>
             </figure>
           </div>
 
-          <div class="deck__meta">
+          <!-- Deck Navigation Controls -->
+          <div class="deck__controls">
             <div class="deck__dots" aria-hidden="true">
               <span
-                v-for="(id, i) in order"
-                :key="id"
+                v-for="(_, i) in photos"
+                :key="i"
                 class="deck__dot"
-                :class="{ 'is-active': i === 0 }"
+                :class="{ 'is-active': i === currentIndex }"
               ></span>
             </div>
-            <p class="ec-caption">
-              Foto {{ 1 }} dari {{ photos.length }} — <b>{{ topPhoto.caption }}</b>
-            </p>
-            <button type="button" class="ec-btn ec-btn--secondary ec-btn--sm deck__btn" @click="nextPhoto">
-              Pilah foto berikutnya
+
+            <span class="deck__counter" role="status">
+              Foto {{ currentIndex + 1 }} dari {{ photos.length }}
+            </span>
+
+            <button type="button" class="deck__btn" @click="nextPhoto" aria-label="Lihat foto berikutnya">
+              Foto Berikutnya
+              <ArrowRight :size="15" :stroke-width="2.2" aria-hidden="true" />
             </button>
           </div>
         </div>
       </div>
 
-      <!-- Bawah: 2 kotak berjejer -->
+      <!-- Bottom Row: Visi & Misi Cards -->
       <div class="vm">
         <article class="vm__card vm__card--visi" aria-labelledby="visi-title">
           <div class="vm__head">
-            <span class="vm__icon" aria-hidden="true"><Telescope :size="18" :stroke-width="1.9" /></span>
-            <h3 id="visi-title" class="ec-h3">Visi</h3>
+            <span class="vm__icon vm__icon--visi" aria-hidden="true">
+              <Telescope :size="20" :stroke-width="2.2" />
+            </span>
+            <div>
+              <span class="vm__label">Arah & Tujuan</span>
+              <h3 id="visi-title" class="vm__title">Visi Kami</h3>
+            </div>
           </div>
-          <ul class="about__list about__list--visi">
-            <li v-for="item in vision" :key="item">{{ item }}</li>
+          <ul class="vm__list">
+            <li v-for="(item, i) in vision" :key="i" class="vm__item">
+              <CheckCircle2 :size="18" :stroke-width="2" class="vm__bullet vm__bullet--visi" aria-hidden="true" />
+              <span>{{ item }}</span>
+            </li>
           </ul>
         </article>
 
         <article class="vm__card vm__card--misi" aria-labelledby="misi-title">
           <div class="vm__head">
-            <span class="vm__icon" aria-hidden="true"><ListChecks :size="18" :stroke-width="1.9" /></span>
-            <h3 id="misi-title" class="ec-h3">Misi</h3>
+            <span class="vm__icon vm__icon--misi" aria-hidden="true">
+              <ListChecks :size="20" :stroke-width="2.2" />
+            </span>
+            <div>
+              <span class="vm__label">Langkah Strategis</span>
+              <h3 id="misi-title" class="vm__title">Misi Kami</h3>
+            </div>
           </div>
-          <ol class="about__list about__list--misi">
-            <li v-for="item in mission" :key="item">{{ item }}</li>
+          <ol class="vm__list">
+            <li v-for="(item, i) in mission" :key="i" class="vm__item">
+              <span class="vm__num" aria-hidden="true">{{ String(i + 1).padStart(2, '0') }}</span>
+              <span>{{ item }}</span>
+            </li>
           </ol>
         </article>
       </div>
@@ -170,59 +206,109 @@ onBeforeUnmount(() => clearTimeout(leaveTimer))
 
 <style scoped>
 .about {
-  margin-inline: calc(-1 * var(--ec-gutter));
-  padding-inline: var(--ec-gutter);
-  background: var(--ec-canvas);
+  width: 100%;
+  padding: clamp(56px, 7vw, 92px) 0;
+  background: var(--ec-canvas, #F8FAFC);
+  border-bottom: 1px solid var(--ec-line);
   scroll-margin-top: 84px;
 }
 
-.about__eyebrow {
-  margin-bottom: var(--ec-space-4);
+.about__inner {
+  width: min(100%, var(--ec-container));
+  margin: 0 auto;
+  padding-inline: var(--ec-gutter);
 }
 
-.about__grid {
+.about__top {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 380px);
-  gap: clamp(24px, 4vw, 56px);
-  align-items: start;
-}
-
-.about__left {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ec-space-4);
-  min-width: 0;
-}
-
-.about__title {
-  margin: 0;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: clamp(32px, 5vw, 64px);
+  align-items: center;
+  margin-bottom: clamp(48px, 6vw, 72px);
 }
 
 .about__who {
   display: flex;
   flex-direction: column;
-  gap: var(--ec-space-3);
+  gap: var(--ec-space-4);
 }
 
-.about__hint {
-  margin-top: var(--ec-space-2);
+.about__badge-org {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  font-size: 0.781rem;
+  font-weight: 700;
+  color: var(--ec-blue);
+  background: var(--ec-blue-050);
+  border: 1px solid rgba(11, 86, 155, 0.14);
+  padding: 5px 14px;
+  border-radius: var(--ec-radius-pill);
 }
 
-/* ---------- Deck foto ---------- */
+.about__badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ec-blue);
+}
+
+.about__headline {
+  font-family: 'Outfit', sans-serif;
+  font-size: clamp(1.6rem, 2.8vw, 2.2rem);
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--ec-ink);
+  margin: 0;
+}
+
+.about__body-text {
+  font-size: 0.94rem;
+  line-height: 1.65;
+  color: var(--ec-ink-soft);
+  margin: 0;
+}
+
+.about__body-text b {
+  color: var(--ec-ink);
+}
+
+.about__features {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.about__feature-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ec-ink);
+}
+
+.about__feature-icon {
+  font-size: 1.1rem;
+}
+
+/* ---------- Deck Foto ---------- */
 .deck {
   display: flex;
   flex-direction: column;
-  gap: var(--ec-space-3);
+  gap: 16px;
   width: 100%;
-  max-width: 380px;
-  justify-self: end;
+  max-width: 440px;
+  justify-self: center;
 }
 
 .deck__stage {
   position: relative;
   width: 100%;
   aspect-ratio: 4 / 3.2;
-  min-height: 240px;
+  min-height: 260px;
 }
 
 .deck__card {
@@ -233,14 +319,13 @@ onBeforeUnmount(() => clearTimeout(leaveTimer))
   background: var(--ec-surface);
   border: 1px solid var(--ec-line);
   border-radius: var(--ec-radius-lg);
-  box-shadow: var(--ec-shadow-md);
-  /* Tumpukan: tiap lapisan sedikit mengecil + turun + miring. */
+  box-shadow: 0 10px 28px -8px rgba(15, 42, 68, 0.16);
   transform:
     translateY(calc(var(--pos) * 12px))
-    scale(calc(1 - var(--pos) * 0.035))
-    rotate(calc(var(--pos) * 1.6deg));
-  transform-origin: 50% 88%;
-  transition: transform 380ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 380ms ease;
+    scale(calc(1 - var(--pos) * 0.04))
+    rotate(calc(var(--pos) * 1.8deg));
+  transform-origin: 50% 90%;
+  transition: transform 360ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 360ms ease;
   pointer-events: none;
 }
 
@@ -253,7 +338,6 @@ onBeforeUnmount(() => clearTimeout(leaveTimer))
   width: 100%;
   height: 100%;
   object-fit: cover;
-  aspect-ratio: 4 / 3.2;
   background: var(--ec-blue-050);
 }
 
@@ -267,6 +351,7 @@ onBeforeUnmount(() => clearTimeout(leaveTimer))
   font: inherit;
   color: inherit;
   cursor: pointer;
+  text-align: left;
 }
 
 .deck__tap:focus-visible {
@@ -286,31 +371,40 @@ onBeforeUnmount(() => clearTimeout(leaveTimer))
   gap: 12px;
   padding: 10px 14px;
   border-radius: var(--ec-radius-md);
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(4px);
-  font-size: 0.813rem;
-  font-weight: 600;
-  color: var(--ec-ink);
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
-.deck__next {
-  flex-shrink: 0;
-  font-size: 0.75rem;
+.deck__caption-title {
+  font-size: 0.813rem;
+  font-weight: 700;
+  color: var(--ec-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deck__caption-action {
+  font-size: 0.72rem;
   font-weight: 700;
   color: var(--ec-blue);
+  flex-shrink: 0;
 }
 
-/* Animasi swap: kartu depan terlempar ke kanan seperti dipilah, lalu ke belakang. */
 .deck__card.is-leaving {
-  transform: translateX(110%) translateY(-14px) rotate(16deg);
+  transform: translateX(115%) translateY(-20px) rotate(18deg);
   opacity: 0;
 }
 
-.deck__meta {
+.deck__controls {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 10px 14px;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 6px;
 }
 
 .deck__dots {
@@ -319,132 +413,171 @@ onBeforeUnmount(() => clearTimeout(leaveTimer))
 }
 
 .deck__dot {
-  width: 22px;
+  width: 18px;
   height: 6px;
-  border-radius: 999px;
+  border-radius: var(--ec-radius-pill);
   background: var(--ec-line);
-  transition: background 180ms ease;
+  transition: all 200ms ease;
 }
 
 .deck__dot.is-active {
+  width: 28px;
   background: var(--ec-blue);
 }
 
-.deck__meta .ec-caption {
-  flex: 1 1 auto;
-  min-width: 160px;
+.deck__counter {
+  font-size: 0.781rem;
+  font-weight: 600;
+  color: var(--ec-ink-soft);
 }
 
 .deck__btn {
-  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background: var(--ec-surface);
+  border: 1px solid var(--ec-line);
+  border-radius: var(--ec-radius-pill);
+  color: var(--ec-blue);
+  font: inherit;
+  font-size: 0.781rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--ec-shadow-sm);
+  transition: all var(--ec-dur) var(--ec-ease);
 }
 
-/* ---------- Visi Misi bawah ---------- */
+.deck__btn:hover {
+  background: var(--ec-blue-050);
+  border-color: var(--ec-blue);
+  transform: translateX(2px);
+}
+
+.deck__btn:focus-visible {
+  outline: none;
+  box-shadow: var(--ec-focus-ring);
+}
+
+/* ---------- Visi & Misi Cards ---------- */
 .vm {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: clamp(16px, 2.5vw, 28px);
-  margin-top: clamp(24px, 4vw, 44px);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(20px, 3vw, 32px);
 }
 
 .vm__card {
-  padding: var(--ec-space-5);
-  background: var(--ec-surface);
-  border: 1px solid var(--ec-line);
+  display: flex;
+  flex-direction: column;
+  padding: clamp(24px, 4vw, 36px);
   border-radius: var(--ec-radius-lg);
-  box-shadow: none;
+  border: 1px solid var(--ec-line);
+  background: var(--ec-surface);
+  box-shadow: var(--ec-shadow-sm);
+  transition: transform 0.24s var(--ec-ease), box-shadow 0.24s var(--ec-ease);
+}
+
+.vm__card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 32px -10px rgba(15, 42, 68, 0.12);
 }
 
 .vm__card--visi {
-  background: var(--ec-blue-050);
-  border-color: #C9DFF5;
+  background: linear-gradient(135deg, #F0F6FC 0%, #FFFFFF 100%);
+  border-color: #D2E4F7;
 }
 
 .vm__head {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: var(--ec-space-3);
+  gap: 14px;
+  margin-bottom: 20px;
 }
 
 .vm__icon {
-  display: inline-grid;
+  display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
-  background: var(--ec-surface);
-  border: 1px solid #C9DFF5;
-  color: var(--ec-blue);
+  width: 44px;
+  height: 44px;
+  border-radius: var(--ec-radius-md);
+  box-shadow: var(--ec-shadow-sm);
 }
 
-.vm__card--misi .vm__icon {
-  background: var(--ec-yellow-soft);
-  color: #7a5b00;
+.vm__icon--visi {
+  background: var(--ec-blue);
+  color: #ffffff;
 }
 
-.about__list {
+.vm__icon--misi {
+  background: #FEF3C7;
+  color: #B45309;
+  border: 1px solid #FDE68A;
+}
+
+.vm__label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ec-ink-soft);
+}
+
+.vm__title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--ec-ink);
+  margin: 2px 0 0;
+}
+
+.vm__list {
   display: flex;
   flex-direction: column;
-  gap: var(--ec-space-2);
+  gap: 14px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.about__list li {
-  position: relative;
-  padding-left: 22px;
+.vm__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
   font-size: 0.875rem;
   line-height: 1.6;
-  color: var(--ec-ink-soft);
+  color: var(--ec-ink);
 }
 
-.about__list--visi li::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0.72em;
-  width: 14px;
-  height: 3px;
-  border-radius: 3px;
-  background: var(--ec-yellow);
+.vm__bullet--visi {
+  flex-shrink: 0;
+  color: var(--ec-blue);
+  margin-top: 3px;
 }
 
-.about__list--misi {
-  counter-reset: misi;
-}
-
-.about__list--misi li {
-  counter-increment: misi;
-  padding-left: 34px;
-}
-
-.about__list--misi li::before {
-  content: '0' counter(misi);
-  position: absolute;
-  left: 0;
-  top: 0.28em;
-  font-family: 'Outfit', sans-serif;
+.vm__num {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--ec-radius-sm);
+  background: #FFFBEB;
+  color: #B45309;
+  border: 1px solid #FDE68A;
   font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: var(--ec-ink-soft);
+  font-weight: 800;
+  margin-top: 2px;
 }
 
-@media (max-width: 860px) {
-  .about__grid {
+@media (max-width: 920px) {
+  .about__top {
     grid-template-columns: 1fr;
+    gap: 28px;
   }
 
   .deck {
-    max-width: 420px;
-    justify-self: start;
-  }
-
-  .deck__stage {
-    aspect-ratio: 4 / 3;
-    min-height: 220px;
+    max-width: 100%;
   }
 
   .vm {
@@ -452,9 +585,66 @@ onBeforeUnmount(() => clearTimeout(leaveTimer))
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .deck__card {
-    transition: none;
+@media (max-width: 640px) {
+  .about {
+    padding: 44px 0;
+    scroll-margin-top: 120px;
+  }
+
+  .about__top {
+    margin-bottom: 36px;
+  }
+
+  .about__headline {
+    font-size: 1.45rem;
+    line-height: 1.3;
+  }
+
+  .about__body-text {
+    font-size: 0.875rem;
+  }
+
+  .deck__stage {
+    min-height: 220px;
+  }
+
+  .deck__caption {
+    padding: 8px 10px;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+  }
+
+  .deck__caption-title {
+    font-size: 0.75rem;
+  }
+
+  .deck__controls {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .deck__btn {
+    width: 100%;
+    min-height: 44px;
+    justify-content: center;
+  }
+
+  .vm__card {
+    padding: 20px 16px;
+  }
+
+  .vm__head {
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .vm__title {
+    font-size: 1.15rem;
+  }
+
+  .vm__item {
+    font-size: 0.813rem;
   }
 }
 </style>

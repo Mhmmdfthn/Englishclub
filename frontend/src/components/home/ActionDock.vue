@@ -1,7 +1,6 @@
 <script setup>
 import { computed } from 'vue'
 import { BookOpen, CalendarCheck, Gamepad2, Home } from 'lucide-vue-next'
-import HorizontalRail from '../ui/HorizontalRail.vue'
 
 /**
  * ActionDock — direct access to the actions that matter, attached to the hero.
@@ -38,41 +37,60 @@ const items = computed(() => [
 </script>
 
 <template>
-  <div class="dock">
-    <HorizontalRail label="Aksi cepat English Club" :fade="false">
-      <div v-for="item in items" :key="item.key" class="ec-rail__item">
-        <button class="dock__item" type="button" @click="emit('action', item.key)">
-          <component :is="item.icon" :size="20" :stroke-width="1.8" aria-hidden="true" />
-          <span class="dock__label">{{ item.label }}</span>
-          <span class="ec-sr-only">{{ item.hint }}</span>
-        </button>
-      </div>
-    </HorizontalRail>
-  </div>
+  <nav class="dock" aria-label="Aksi cepat English Club">
+    <div class="dock__track">
+      <button
+        v-for="item in items"
+        :key="item.key"
+        class="dock__item"
+        :class="{ 'dock__item--special': item.key === 'word-hunt' }"
+        type="button"
+        @click="emit('action', item.key)"
+      >
+        <span class="dock__icon" aria-hidden="true">
+          <component :is="item.icon" :size="18" :stroke-width="2.2" />
+        </span>
+        <span class="dock__label">{{ item.label }}</span>
+        <span class="ec-sr-only">{{ item.hint }}</span>
+      </button>
+    </div>
+  </nav>
 </template>
 
 <style scoped>
 .dock {
   width: fit-content;
   max-width: 100%;
-  padding: 10px 12px;
-  background: var(--ec-surface);
-  border: 1px solid var(--ec-line);
+  padding: 6px;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(11, 86, 155, 0.14);
   border-radius: var(--ec-radius-pill);
-  box-shadow: var(--ec-shadow-md);
+  box-shadow: 0 10px 30px -10px rgba(11, 86, 155, 0.16), 0 2px 6px rgba(0, 0, 0, 0.04);
 }
 
-.dock :deep(.ec-rail__track) {
-  justify-content: center;
+.dock__track {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 2px;
+}
+
+.dock__track::-webkit-scrollbar {
+  display: none;
 }
 
 .dock__item {
   display: inline-flex;
   align-items: center;
-  gap: var(--ec-space-2);
-  min-height: 52px;
-  padding: 12px 22px;
-  border: 0;
+  gap: 8px;
+  min-height: 46px;
+  padding: 10px 18px;
+  border: 1px solid transparent;
   border-radius: var(--ec-radius-pill);
   background: transparent;
   color: var(--ec-ink);
@@ -82,12 +100,45 @@ const items = computed(() => [
   line-height: 1;
   cursor: pointer;
   white-space: nowrap;
-  transition: background var(--ec-dur) var(--ec-ease), color var(--ec-dur) var(--ec-ease);
+  transition: all var(--ec-dur) var(--ec-ease);
+}
+
+.dock__icon {
+  display: grid;
+  place-items: center;
+  color: var(--ec-blue);
+  transition: transform var(--ec-dur) var(--ec-ease), color var(--ec-dur) var(--ec-ease);
 }
 
 .dock__item:hover {
   background: var(--ec-blue-050);
   color: var(--ec-blue);
+  border-color: rgba(11, 86, 155, 0.1);
+  transform: translateY(-1px);
+}
+
+.dock__item:hover .dock__icon {
+  transform: scale(1.12);
+}
+
+.dock__item:active {
+  background: var(--ec-blue-100);
+  transform: translateY(0);
+}
+
+.dock__item--special {
+  background: rgba(255, 230, 0, 0.14);
+  border-color: rgba(255, 230, 0, 0.4);
+}
+
+.dock__item--special:hover {
+  background: rgba(255, 230, 0, 0.26);
+  border-color: rgba(255, 230, 0, 0.7);
+  color: var(--ec-ink);
+}
+
+.dock__item--special .dock__icon {
+  color: #B45309;
 }
 
 .dock__item:focus-visible {
@@ -95,24 +146,28 @@ const items = computed(() => [
   box-shadow: var(--ec-focus-ring);
 }
 
-.dock__item:active {
-  background: var(--ec-blue-100);
-}
-
-@media (max-width: 720px) {
+@media (max-width: 640px) {
   .dock {
-    padding: 6px;
-    border-radius: var(--ec-radius-md);
+    width: 100%;
+    max-width: 100%;
+    border-radius: var(--ec-radius-lg);
+    overflow: hidden;
   }
 
-  .dock :deep(.ec-rail__track) {
+  .dock__track {
     justify-content: flex-start;
+    padding-inline: 4px;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
   }
 
   .dock__item {
-    min-height: 46px;
-    padding: 9px 14px;
-    font-size: 0.844rem;
+    min-height: 44px;
+    padding: 10px 14px;
+    font-size: 0.813rem;
+    scroll-snap-align: start;
+    flex: 0 0 auto;
   }
 }
 </style>

@@ -75,7 +75,7 @@ onBeforeUnmount(() => editor.value?.destroy())
 <style scoped>
 .rte { width: 100%; min-width: 0; max-width: 100%; display: flex; flex-direction: column; background: #fff; border: 3px solid var(--dark-navy); box-shadow: 4px 4px 0 var(--dark-navy); overflow: hidden; }
 .rte-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; width: 100%; min-width: 0; padding: 6px 8px; background: #f0f4f8; border-bottom: 2px solid var(--dark-navy); }
-.rte-toolbar button { flex: 0 0 32px; min-width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0; color: var(--dark-navy); background: #fff; border: 2px solid var(--dark-navy); font-size: 11px; font-weight: 800; cursor: pointer; }
+.rte-toolbar button { flex: 0 0 36px; min-width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; padding: 0; color: var(--dark-navy); background: #fff; border: 2px solid var(--dark-navy); font-size: 11px; font-weight: 800; cursor: pointer; }
 .rte-toolbar button:hover { background: rgba(33,76,122,0.12); }
 .rte-toolbar button.on { color: #fff; background: var(--royal-blue); border-color: var(--royal-blue); }
 .rte-toolbar .ms { font-size: 17px; line-height: 1; }
@@ -96,8 +96,8 @@ onBeforeUnmount(() => editor.value?.destroy())
 .rte-editor :deep(.ProseMirror p.is-editor-empty:first-child::before) { content: attr(data-placeholder); color: rgba(29,43,58,0.4); float: left; height: 0; pointer-events: none; }
 .rte-foot { display: flex; justify-content: flex-end; padding: 4px 8px; background: #f0f4f8; border-top: 2px solid var(--dark-navy); }
 @media (max-width: 680px) {
-  .rte-toolbar { gap: 3px; padding: 4px 6px; }
-  .rte-toolbar button { flex-basis: 28px; min-width: 28px; height: 28px; }
+  .rte-toolbar { gap: 4px; padding: 6px; }
+  .rte-toolbar button { flex-basis: 44px; min-width: 44px; height: 44px; }
   .rte-toolbar .ms { font-size: 16px; }
   .rte-sep { height: 18px; }
   .rte-editor,

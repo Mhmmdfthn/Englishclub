@@ -105,11 +105,12 @@ const display = computed(() => props.word || 'PILIH HURUF')
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  min-width: 0;
 }
 .back-btn {
-  flex: 0 0 34px;
-  width: 34px;
-  height: 34px;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
   display: grid;
   place-items: center;
   padding: 0;
@@ -124,9 +125,9 @@ const display = computed(() => props.word || 'PILIH HURUF')
   background: var(--vibrant-yellow);
 }
 .hud-sound {
-  flex: 0 0 34px;
-  width: 34px;
-  height: 34px;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
   display: grid;
   place-items: center;
   padding: 0;
@@ -143,7 +144,8 @@ const display = computed(() => props.word || 'PILIH HURUF')
 .stat {
   display: flex;
   flex-direction: column;
-  min-width: 70px;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 .stat .label {
   color: var(--text-muted);
@@ -201,6 +203,8 @@ const display = computed(() => props.word || 'PILIH HURUF')
   display: flex;
   flex-direction: column;
   align-items: center;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 .time-badge {
   display: flex;
@@ -208,7 +212,8 @@ const display = computed(() => props.word || 'PILIH HURUF')
   gap: 4px;
   background: rgba(11, 86, 155, 0.1);
   border: 2px solid var(--dark-navy);
-  padding: 4px 14px;
+  padding: 4px 10px;
+  min-height: 44px;
   color: var(--royal-blue);
   box-shadow: 3px 3px 0 var(--dark-navy);
   font-family: 'Outfit', sans-serif;
@@ -267,9 +272,12 @@ const display = computed(() => props.word || 'PILIH HURUF')
 .word-pill {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 7px 18px;
-  min-height: 42px;
+  min-height: 44px;
+  max-width: 100%;
   border-radius: 0;
   background: #f8fafc;
   border: 2px dashed var(--dark-navy);
@@ -279,7 +287,14 @@ const display = computed(() => props.word || 'PILIH HURUF')
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+  text-align: center;
+  overflow-wrap: anywhere;
   transition: all 0.15s ease;
+}
+.word-pill .word-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .word-pill.active {
   border-style: solid;
@@ -306,5 +321,34 @@ const display = computed(() => props.word || 'PILIH HURUF')
   padding: 3px 8px;
   border: 2px solid var(--dark-navy);
   border-radius: 0;
+}
+
+/* 320-360px: keep the whole HUD on one row without overflow. */
+@media (max-width: 400px) {
+  .hud {
+    padding: 10px 10px 12px;
+  }
+  .row {
+    gap: 6px;
+  }
+  .stat .val {
+    font-size: clamp(18px, 5.5vw, 22px);
+  }
+  .combo-val.combo-high {
+    font-size: clamp(20px, 6vw, 24px);
+  }
+  .time-num {
+    font-size: 20px;
+  }
+  .time-badge {
+    padding: 4px 8px;
+  }
+  .fever-tag {
+    display: none;
+  }
+  .word-pill {
+    font-size: 16px;
+    padding: 7px 12px;
+  }
 }
 </style>

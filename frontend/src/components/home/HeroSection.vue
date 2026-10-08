@@ -68,11 +68,11 @@ const emit = defineEmits(['action'])
   isolation: isolate;
   /* Reaching #top must not tuck the eyebrow under the sticky navbar. */
   scroll-margin-top: 84px;
-  /* Full-bleed like AboutSection so background meets sections below edge-to-edge.
-     Content stays in the shared 1180px container via .hero__inner. */
-  margin-inline: calc(-1 * var(--ec-gutter));
-  padding: clamp(42px, 5vw, 72px) var(--ec-gutter) clamp(16px, 2vw, 24px);
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.8) 0%, rgba(245, 249, 252, 0.72) 36%, rgba(233, 242, 248, 0.82) 100%);
+  width: 100%;
+  padding: clamp(48px, 6vw, 84px) 0 clamp(24px, 3vw, 40px);
+  background: linear-gradient(180deg, #FFFFFF 0%, #F5F9FD 55%, #EAF3FB 100%);
+  border-bottom: 1px solid var(--ec-line);
+  overflow: hidden;
 }
 
 /* PRD §7.2 background: detail strongest at the right, fading to the centre-left. */
@@ -81,8 +81,8 @@ const emit = defineEmits(['action'])
   inset: 0;
   z-index: -1;
   background:
-    radial-gradient(58% 82% at 86% 36%, rgba(170, 209, 240, 0.9) 0%, rgba(233, 242, 248, 0.85) 28%, rgba(255, 255, 255, 0) 72%),
-    radial-gradient(44% 54% at 82% 82%, rgba(255, 230, 0, 0.14) 0%, rgba(255, 230, 0, 0) 76%);
+    radial-gradient(56% 75% at 84% 42%, rgba(175, 215, 248, 0.65) 0%, rgba(234, 243, 251, 0.4) 42%, rgba(255, 255, 255, 0) 74%),
+    radial-gradient(40% 50% at 76% 82%, rgba(255, 230, 0, 0.08) 0%, rgba(255, 230, 0, 0) 70%);
   pointer-events: none;
 }
 
@@ -90,20 +90,20 @@ const emit = defineEmits(['action'])
   content: '';
   position: absolute;
   inset: 0;
-  background-image: radial-gradient(circle, rgba(11, 86, 155, 0.14) 1px, transparent 1px);
-  background-size: 18px 18px;
-  /* Strong right-side emphasis, but still keep the left text area clean and readable. */
-  -webkit-mask-image: radial-gradient(72% 88% at 88% 40%, #000 0%, rgba(0, 0, 0, 0.9) 44%, rgba(0, 0, 0, 0) 72%);
-  mask-image: radial-gradient(72% 88% at 88% 40%, #000 0%, rgba(0, 0, 0, 0.9) 44%, rgba(0, 0, 0, 0) 72%);
+  background-image: radial-gradient(circle, rgba(11, 86, 155, 0.12) 1.2px, transparent 1.2px);
+  background-size: 20px 20px;
+  -webkit-mask-image: radial-gradient(72% 88% at 88% 40%, #000 0%, rgba(0, 0, 0, 0.8) 40%, rgba(0, 0, 0, 0) 70%);
+  mask-image: radial-gradient(72% 88% at 88% 40%, #000 0%, rgba(0, 0, 0, 0.8) 40%, rgba(0, 0, 0, 0) 70%);
 }
 
 .hero__inner {
   display: grid;
-  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
   align-items: center;
-  gap: clamp(28px, 4vw, 56px);
+  gap: clamp(32px, 5vw, 64px);
   width: min(100%, var(--ec-container));
   margin: 0 auto;
+  padding-inline: var(--ec-gutter);
 }
 
 .hero__copy {
@@ -119,44 +119,63 @@ const emit = defineEmits(['action'])
   display: inline-flex;
   align-items: center;
   gap: var(--ec-space-3);
-  font-size: 0.75rem;
+  font-size: 0.813rem;
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--ec-blue);
+  background: rgba(11, 86, 155, 0.06);
+  padding: 6px 14px;
+  border-radius: var(--ec-radius-pill);
+  border: 1px solid rgba(11, 86, 155, 0.12);
 }
 
 .hero__rule {
-  width: 28px;
-  height: 3px;
-  border-radius: 3px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
   background: var(--ec-yellow);
+  box-shadow: 0 0 0 2px var(--ec-blue);
 }
 
 .hero__title {
   font-family: 'Outfit', sans-serif;
-  font-size: clamp(3.8rem, 7vw, 7.2rem);
-  font-weight: 700;
+  font-size: clamp(3.2rem, 6.2vw, 6.4rem);
+  font-weight: 800;
   letter-spacing: -0.04em;
-  /* 1.02 clipped the descender of "Grow." at large sizes. */
-  line-height: 0.92;
+  line-height: 0.96;
   color: var(--ec-ink);
   text-wrap: balance;
 }
 
 .hero__title-accent {
   color: var(--ec-blue);
+  position: relative;
 }
 
 .hero__lede {
-  font-size: clamp(1.05rem, 1.8vw, 1.45rem);
-  line-height: 1.55;
+  font-size: clamp(1.05rem, 1.6vw, 1.35rem);
+  line-height: 1.6;
   color: var(--ec-ink-soft);
-  max-width: 60ch;
+  max-width: 54ch;
 }
 
 .hero__cta {
-  margin-top: var(--ec-space-1);
+  margin-top: var(--ec-space-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 28px;
+  font-size: 0.98rem;
+  font-weight: 700;
+  border-radius: var(--ec-radius-pill);
+  box-shadow: 0 6px 20px rgba(11, 86, 155, 0.22);
+  transition: transform var(--ec-dur) var(--ec-ease), box-shadow var(--ec-dur) var(--ec-ease);
+}
+
+.hero__cta:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(11, 86, 155, 0.32);
 }
 
 .hero__art {
@@ -169,37 +188,73 @@ const emit = defineEmits(['action'])
 
 .hero__mascot {
   width: auto;
-  /* Stronger right-side anchor keeps the mascot composition crisp and deliberate. */
-  height: clamp(390px, 54vh, 610px);
-  max-width: min(100%, 560px);
+  height: clamp(360px, 50vh, 560px);
+  max-width: min(100%, 520px);
   object-fit: contain;
-  /* Neutral drop shadow — a brand-blue tint here reads as a glow. */
-  filter: drop-shadow(0 18px 30px rgba(31, 41, 55, 0.14));
+  filter: drop-shadow(0 20px 36px rgba(15, 42, 68, 0.16));
+  transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.hero__mascot:hover {
+  transform: translateY(-4px) scale(1.015);
 }
 
 .hero__dock {
   display: flex;
   justify-content: center;
   width: min(100%, var(--ec-container));
-  margin: clamp(18px, 2vw, 28px) auto 0;
+  margin: clamp(24px, 3.5vw, 42px) auto 0;
+  padding-inline: var(--ec-gutter);
 }
 
 @media (max-width: 860px) {
+  .hero {
+    padding: 36px 0 20px;
+    scroll-margin-top: 120px;
+  }
+
   .hero__inner {
     grid-template-columns: 1fr;
-    gap: var(--ec-space-6);
+    gap: var(--ec-space-5);
   }
 
   .hero__copy {
     max-width: none;
+    align-items: stretch;
+    text-align: left;
+  }
+
+  .hero__title {
+    font-size: clamp(2rem, 10vw, 2.75rem);
+    line-height: 1.02;
+  }
+
+  .hero__lede {
+    font-size: 0.95rem;
+    max-width: 38ch;
+  }
+
+  .hero__cta {
+    width: 100%;
+    max-width: 340px;
+    min-height: 52px;
+    justify-content: center;
   }
 
   .hero__art {
     justify-content: center;
+    order: 2;
   }
 
   .hero__mascot {
-    height: clamp(200px, 34vh, 300px);
+    height: clamp(180px, 52vw, 260px);
+    width: 100%;
+    max-width: 300px;
+  }
+
+  .hero__dock {
+    padding-inline: 0;
+    margin-top: 20px;
   }
 }
 </style>
