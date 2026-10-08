@@ -118,18 +118,34 @@ export async function closeSession(id) {
   return data
 }
 
-export async function recordCheckin(memberId, sessionId, status = 'hadir') {
+export async function recordCheckin(memberId, sessionId, status = 'hadir', win = null) {
+  const QUOTA_PER_QR = 20
   const sb = getSupabase()
   if (!sb) {
+    const inWin = mem.records.filter((r) => r.session_id === sessionId && r.token_win === win)
+    if (win !== null && inWin.length >= QUOTA_PER_QR) {
+      throw fail(429, 'Kuota 20 absen untuk QR ini habis. Pindai QR berikutnya.')
+    }
     const dup = mem.records.find((r) => r.member_id === memberId && r.session_id === sessionId)
-    if (dup) return { ...dup, already: true }
-    const rec = { id: mem.records.length + 1, member_id: memberId, session_id: sessionId, status, scanned_at: new Date().toISOString() }
+    if (dup) return { ...dup, already: true, remainingQuota: Math.max(0, QUOTA_PER_QR - inWin.length) }
+    const rec = { id: mem.records.length + 1, member_id: memberId, session_id: sessionId, status, token_win: win, scanned_at: new Date().toISOString() }
     mem.records.push(rec)
-    return { ...rec, already: false }
+    return { ...rec, already: false, remainingQuota: Math.max(0, QUOTA_PER_QR - inWin.length - 1) }
+  }
+  if (win !== null) {
+    const { count, error: countErr } = await sb
+      .from('ec_attendance_records')
+      .select('id', { count: 'exact', head: true })
+      .eq('session_id', sessionId)
+      .eq('token_win', win)
+    if (countErr) throw fail(503, 'Database sibuk, silakan coba lagi')
+    if ((count ?? 0) >= QUOTA_PER_QR) {
+      throw fail(429, 'Kuota 20 absen untuk QR ini habis. Pindai QR berikutnya.')
+    }
   }
   const { data, error } = await sb
     .from('ec_attendance_records')
-    .insert({ member_id: memberId, session_id: sessionId, status })
+    .insert({ member_id: memberId, session_id: sessionId, status, token_win: win })
     .select('*')
     .single()
   if (error) {

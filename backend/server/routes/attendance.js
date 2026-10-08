@@ -148,11 +148,11 @@ r.post('/checkin', async (req, res) => {
     const s = await getSession(sessionId)
     if (!s.is_active) return res.status(410).json({ detail: 'Sesi sudah ditutup.' })
     verifyQrToken(s.secret, win, hmac)
-    // 3. Catat (idempotent per anggota per sesi).
-    const rec = await recordCheckin(memberId, sessionId, 'hadir')
+    // 3. Catat (idempotent per anggota per sesi; kuota 20 per QR).
+    const rec = await recordCheckin(memberId, sessionId, 'hadir', win)
     resetPwRate(memberId)
     await auditAdmin('Check-in absensi', me.profile.username, { session_id: sessionId, already: !!rec.already })
-    res.json({ ok: true, already: !!rec.already, record: { id: rec.id, status: rec.status, scanned_at: rec.scanned_at } })
+    res.json({ ok: true, already: !!rec.already, remainingQuota: rec.remainingQuota ?? null, record: { id: rec.id, status: rec.status, scanned_at: rec.scanned_at } })
   } catch (e) {
     sendStoreError(res, e, 'Absensi checkin error:')
   }

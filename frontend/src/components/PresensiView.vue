@@ -104,6 +104,13 @@ async function startScan() {
     result.value = { ok: false, message: 'Isi password akun dulu sebelum scan.' }
     return
   }
+  // Kamera web wajib konteks aman: localhost/HTTPS. Via IP HTTP selalu ditolak
+  // browser apa pun isi izin HP-nya — arahkan ke kode manual.
+  if (typeof window !== 'undefined' && window.isSecureContext === false) {
+    result.value = { ok: false, message: 'Kamera web butuh koneksi aman (HTTPS/localhost). Karena dibuka via IP, salin kode dari layar panitia ke kolom manual di bawah.' }
+    document.getElementById('presensi-manual')?.focus?.()
+    return
+  }
   try {
     const Ctor = await getScannerCtor()
     if (!scanner) scanner = new Ctor('presensi-qr-reader')
@@ -120,8 +127,22 @@ async function startScan() {
     )
   } catch (e) {
     scanning.value = false
-    result.value = { ok: false, message: e?.message || 'Kamera tidak dapat dibuka. Izinkan akses kamera atau pakai kode manual di bawah.' }
+    result.value = { ok: false, message: cameraMessage(e) }
   }
+}
+
+function cameraMessage(e) {
+  const name = e?.name || ''
+  if (name === 'NotAllowedError' || name === 'SecurityError') {
+    return 'Akses kamera ditolak browser. Izinkan kamera untuk situs ini di pengaturan browser (bukan pengaturan HP), atau pakai kode manual di bawah.'
+  }
+  if (name === 'NotFoundError' || name === 'OverconstrainedError') {
+    return 'Tidak ada kamera yang bisa dipakai di perangkat ini. Pakai kode manual di bawah.'
+  }
+  if (name === 'NotReadableError') {
+    return 'Kamera sedang dipakai aplikasi lain. Tutup dulu lalu coba lagi, atau pakai kode manual.'
+  }
+  return e?.message || 'Kamera tidak dapat dibuka. Izinkan akses kamera atau pakai kode manual di bawah.'
 }
 
 async function stopScan() {

@@ -21,3 +21,10 @@ create table if not exists ec_attendance_records (
 );
 create index if not exists idx_attendance_records_session on ec_attendance_records(session_id, scanned_at desc);
 create index if not exists idx_attendance_records_member on ec_attendance_records(member_id, scanned_at desc);
+
+-- Kuota 20 user per QR: catat window 7-detik tiap record.
+-- Baris lama (win null) tidak dihitung kuota. Idempoten bila dijalankan ulang.
+alter table if exists ec_attendance_records
+  add column if not exists token_win bigint;
+create index if not exists idx_attendance_records_session_win
+  on ec_attendance_records(session_id, token_win);
