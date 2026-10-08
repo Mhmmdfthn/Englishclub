@@ -6,12 +6,12 @@ import { displayTime, todayWIB, wibDay } from '../utils/time.js'
 import RichTextEditor from './RichTextEditor.vue'
 import ProkerMediaInput from './ProkerMediaInput.vue'
 
-const props = defineProps({ isModal: Boolean, embedded: Boolean })
+const props = defineProps({ isModal: Boolean })
 const emit = defineEmits(['back'])
 const router = useRouter()
 
 function goBack() {
-  if (props.isModal || props.embedded) emit('back')
+  if (props.isModal) emit('back')
   else router.push('/')
 }
 function textOnly(html) { return (html || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() }
@@ -20,25 +20,6 @@ const username = ref('')
 const password = ref('')
 const authed = ref(false)
 const authedUser = ref('')
-const adminRole = ref('superadmin')
-const adminMenus = ref([])
-const isSuper = computed(() => adminRole.value === 'superadmin')
-function can(menu) { return isSuper.value || adminMenus.value.includes(menu) }
-const MENU_LABELS = { pendaftar: 'Pendaftar', proker: 'Proker', spinner: 'Spinner', akun: 'Akun EC' }
-const activeBlocked = computed(() => {
-  if (activeTab.value === 'admins') return !isSuper.value
-  const map = { members: 'pendaftar', proker: 'proker', spinner: 'spinner', accounts: 'akun' }
-  const m = map[activeTab.value]
-  return m ? !can(m) : false
-})
-function ensureTab() {
-  if (activeBlocked.value) {
-    const order = ['members', 'proker', 'spinner', 'accounts']
-    const map = { members: 'pendaftar', proker: 'proker', spinner: 'spinner', accounts: 'akun' }
-    const first = order.find((t) => can(map[t]))
-    activeTab.value = first || 'members'
-  }
-}
 const error = ref('')
 const success = ref('')
 const confirmState = ref(null)
@@ -81,9 +62,6 @@ async function checkAuth() {
     const r = await api.verifyAdmin(t)
     authed.value = true
     authedUser.value = r.username || 'admin'
-    adminRole.value = r.role || 'superadmin'
-    adminMenus.value = Array.isArray(r.menus) ? r.menus : []
-    ensureTab()
   } catch {
     localStorage.removeItem('admin_token')
     authed.value = false
@@ -99,19 +77,13 @@ async function login() {
   try {
     const r = await api.loginAdmin(u, p)
     localStorage.setItem('admin_token', r.token)
+    authed.value = true
+    authedUser.value = r.username
     username.value = ''
     password.value = ''
-    await checkAuth()
-    if (!authed.value) return
-    await Promise.all([
-      can('pendaftar') ? fetchMembers() : null,
-      can('proker') ? loadProker() : null,
-      loadGroups(),
-      can('akun') ? fetchWhitelist() : null,
-      can('akun') ? fetchAccounts() : null,
-    ])
+    await Promise.all([fetchMembers(), loadProker(), loadGroups(), fetchWhitelist(), fetchAccounts()])
   } catch (e) {
-    error.value = e?.status === 401 ? 'Username atau password salah.' : (e?.message || 'Login belum berhasil.')
+    error.value = e?.message?.includes('401') ? 'Username atau password salah.' : 'Login belum berhasil.'
   } finally { loading.value = false }
 }
 
@@ -120,8 +92,6 @@ function logout() {
   if (t) fetch('/api/admin/logout', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ token: t }) }).catch(()=>{})
   localStorage.removeItem('admin_token')
   authed.value = false
-  adminRole.value = 'superadmin'
-  adminMenus.value = []
   members.value = []
   proker.value = []
   whitelist.value = []
@@ -360,20 +330,6 @@ const accountsSearch = ref('')
 const resetPw = ref({})
 const resettingPw = ref({})
 
-// ---- Kelola Admin: allowlist username (hak akses login) ----
-const allowlist = ref([])
-const allowlistLoading = ref(false)
-const allowlistSearch = ref('')
-const allowlistNew = ref('')
-const allowlistAdding = ref(false)
-const roleDraft = ref({})
-
-const filteredAllowlist = computed(() => {
-  const q = allowlistSearch.value.trim().toLowerCase()
-  if (!q) return allowlist.value
-  return allowlist.value.filter(a => (a.username || '').toLowerCase().includes(q))
-})
-
 const filteredWhitelist = computed(() => {
   const q = whitelistSearch.value.trim().toLowerCase()
   if (!q) return whitelist.value
@@ -469,54 +425,6 @@ async function fetchAccounts() {
   finally { accountsLoading.value = false }
 }
 
-// ---- Kelola Admin: allowlist username ----
-async function fetchAllowlist() {
-  allowlistLoading.value = true
-  try {
-    const data = await api.adminAllowlist(adminToken())
-    allowlist.value = data.allowlist || []
-    const d = {}
-    for (const a of allowlist.value) {
-      d[a.username] = { role: a.role || 'superadmin', menus: Array.isArray(a.menus) ? [...a.menus] : [] }
-    }
-    roleDraft.value = d
-  } catch (e) { handleError(e, 'Daftar admin belum dapat dimuat.') }
-  finally { allowlistLoading.value = false }
-}
-
-async function addAllowlist() {
-  const u = allowlistNew.value.trim()
-  if (!u || allowlistAdding.value) return
-  allowlistAdding.value = true
-  error.value = ''
-  try {
-    await api.adminAllowlistAdd(u, adminToken())
-    showSuccess(`@${u.toLowerCase()} diberi hak akses admin`)
-    allowlistNew.value = ''
-    await fetchAllowlist()
-  } catch (e) { handleError(e, 'Gagal menambah hak akses.') }
-  finally { allowlistAdding.value = false }
-}
-
-async function removeAllowlist(username) {
-  if (!confirm(`Cabut hak akses admin "@${username}"?`)) return
-  try {
-    await api.adminAllowlistRemove(username, adminToken())
-    showSuccess(`Hak akses @${username} dicabut`)
-    await fetchAllowlist()
-  } catch (e) { handleError(e, 'Gagal mencabut hak akses.') }
-}
-
-async function saveRole(username) {
-  const d = roleDraft.value[username]
-  if (!d) return
-  try {
-    await api.adminSetRole(username, d.role, d.role === 'superadmin' ? [] : d.menus, adminToken())
-    showSuccess(`Peran @${username} diperbarui`)
-    await fetchAllowlist()
-  } catch (e) { handleError(e, 'Gagal mengubah peran.') }
-}
-
 async function doResetPassword(id, username) {
   const pw = (resetPw.value[id] || '').trim()
   if (pw.length < 6 || resettingPw.value[id]) {
@@ -536,22 +444,14 @@ async function doResetPassword(id, username) {
 
 onMounted(async () => {
   await checkAuth()
-  if (authed.value) {
-    await Promise.all([
-      can('pendaftar') ? fetchMembers() : null,
-      can('proker') ? loadProker() : null,
-      loadGroups(),
-      can('akun') ? fetchWhitelist() : null,
-      can('akun') ? fetchAccounts() : null,
-    ])
-  }
+  if (authed.value) { await Promise.all([fetchMembers(), loadProker(), loadGroups(), fetchWhitelist(), fetchAccounts()]) }
 })
 </script>
 
 <template>
-  <section class="admin-shell" :class="{ 'is-embedded': embedded }">
-    <!-- Top nav (disembunyikan dalam mode tertanam: header dashboard yang pegang) -->
-    <nav v-if="!embedded" class="admin-topbar">
+  <section class="admin-shell">
+    <!-- Top nav -->
+    <nav class="admin-topbar">
       <div class="topbar-left">
         <img src="/Logo_ec.jpg" alt="EC" class="topbar-logo" />
         <span class="topbar-title">ADMIN <b>EC UPB</b></span>
@@ -581,25 +481,21 @@ onMounted(async () => {
     <!-- Dashboard -->
     <div v-else class="dashboard">
       <aside class="sidebar">
-        <button v-if="can('pendaftar')" class="side-item" :class="{active: activeTab==='members'}" @click="activeTab='members'">
+        <button class="side-item" :class="{active: activeTab==='members'}" @click="activeTab='members'">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           <span>Pendaftar</span><b class="count">{{ filtered.length }}</b>
         </button>
-        <button v-if="can('proker')" class="side-item" :class="{active: activeTab==='proker'}" @click="activeTab='proker'">
+        <button class="side-item" :class="{active: activeTab==='proker'}" @click="activeTab='proker'">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
           <span>Proker</span><b class="count">{{ proker.length }}</b>
         </button>
-        <button v-if="can('spinner')" class="side-item" :class="{active: activeTab==='spinner'}" @click="activeTab='spinner'; loadSpinner()">
+        <button class="side-item" :class="{active: activeTab==='spinner'}" @click="activeTab='spinner'; loadSpinner()">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
           <span>Spinner</span>
         </button>
-        <button v-if="can('akun')" class="side-item" :class="{active: activeTab==='accounts'}" @click="activeTab='accounts'; fetchWhitelist(); fetchAccounts()">
+        <button class="side-item" :class="{active: activeTab==='accounts'}" @click="activeTab='accounts'; fetchWhitelist(); fetchAccounts()">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>
           <span>Akun EC</span><b class="count">{{ accounts.length }}</b>
-        </button>
-        <button v-if="isSuper" class="side-item" :class="{active: activeTab==='admins'}" @click="activeTab='admins'; fetchAllowlist()">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          <span>Kelola Admin</span><b class="count">{{ allowlist.length }}</b>
         </button>
         <div class="side-spacer"></div>
         <button class="side-item logout" @click="logout">
@@ -610,7 +506,7 @@ onMounted(async () => {
 
       <main class="main">
         <!-- Members -->
-        <div v-if="activeTab==='members' && can('pendaftar')">
+        <div v-if="activeTab==='members'">
           <div class="stats-row">
             <div class="stat-card"><span class="stat-label">Total Pendaftar</span><b class="stat-value">{{ stats.total }}</b><span class="stat-sub">{{ stats.byJurusan }} jurusan</span></div>
             <div class="stat-card accent"><span class="stat-label">Hari Ini</span><b class="stat-value">{{ stats.today }}</b><span class="stat-sub">baru daftar</span></div>
@@ -664,7 +560,7 @@ onMounted(async () => {
         </div>
 
         <!-- Proker -->
-        <div v-else-if="activeTab==='proker' && can('proker')">
+        <div v-else>
           <div class="toolbar">
             <h2 class="tab-title">Kelola Proker</h2>
             <span class="tiny muted">Data tersimpan di KV saat env cloud aktif</span>
@@ -726,7 +622,7 @@ onMounted(async () => {
         </div>
 
         <!-- Spinner -->
-        <div v-if="activeTab==='spinner' && can('spinner')">
+        <div v-if="activeTab==='spinner'">
           <h2 class="section-title">Lucky Spinner</h2>
           <p class="tiny muted" style="margin-bottom:16px;">Kelola item hadiah roda keberuntungan untuk pengunjung stand.</p>
           <div class="spinner-admin-card">
@@ -760,7 +656,7 @@ onMounted(async () => {
         </div>
 
         <!-- Akun EC: whitelist + akun anggota -->
-        <div v-if="activeTab==='accounts' && can('akun')">
+        <div v-if="activeTab==='accounts'">
           <h2 class="section-title">Akun Anggota EC</h2>
           <p class="tiny muted" style="margin-bottom:16px;">Hanya nama di whitelist yang bisa buat akun. Password anggota lupa? Reset dari sini.</p>
           <p v-if="error" class="error">{{ error }}</p>
@@ -824,24 +720,6 @@ onMounted(async () => {
             </div>
           </div>
 
-          <!-- Mobile cards: whitelist (pengganti tabel di HP) -->
-          <div class="whitelist-cards">
-            <article v-for="w in filteredWhitelist" :key="'w-'+w.id" class="wl-card">
-              <div class="member-top">
-                <b class="member-name">{{ w.fullname }}</b>
-                <span class="jurusan-badge sm">{{ w.is_registered ? 'Sudah buat akun' : 'Belum daftar' }}</span>
-              </div>
-              <div class="wl-row">
-                <select :value="w.group_name || ''" class="field sm group-select" @change="changeGroup(w.id, $event.target.value)" :aria-label="'Kelompok ' + w.fullname">
-                  <option value="">—</option>
-                  <option v-for="g in groupOptions" :key="g" :value="g">{{ g }}</option>
-                </select>
-                <button class="btn-icon danger" @click="removeWhitelist(w.id, w.fullname)" title="Hapus" :aria-label="'Hapus ' + w.fullname">&times;</button>
-              </div>
-            </article>
-            <p v-if="!filteredWhitelist.length" class="empty">Whitelist kosong — tambah nama anggota dulu</p>
-          </div>
-
           <h3 class="subsection-title" style="margin-top:28px;">Akun Terdaftar ({{ filteredAccounts.length }})</h3>
           <div class="toolbar">
             <div class="search-wrap">
@@ -871,115 +749,6 @@ onMounted(async () => {
               </table>
             </div>
           </div>
-          <!-- Mobile cards: akun terdaftar (pengganti tabel di HP) -->
-          <div class="accounts-cards">
-            <article v-for="a in filteredAccounts" :key="'a-'+a.id" class="wl-card">
-              <div class="member-top">
-                <b class="member-name">@{{ a.username }}</b>
-                <span v-if="a.group_name" class="jurusan-badge sm">{{ a.group_name }}</span>
-              </div>
-              <p class="tiny muted">{{ a.fullname }}</p>
-              <div class="reset-row">
-                <input v-model="resetPw[a.id]" type="password" class="field sm reset-input" placeholder="Password baru (min 6)" :aria-label="'Password baru ' + a.username" />
-                <button class="btn ghost sm" @click="doResetPassword(a.id, a.username)" :disabled="resettingPw[a.id]">{{ resettingPw[a.id] ? '...' : 'Reset' }}</button>
-              </div>
-            </article>
-            <p v-if="!filteredAccounts.length" class="empty">Belum ada akun anggota</p>
-          </div>
-        </div>
-
-        <!-- Kelola Admin: allowlist hak akses login -->
-        <div v-if="activeTab==='admins' && isSuper">
-          <h2 class="section-title">Kelola Admin</h2>
-          <p class="tiny muted" style="margin-bottom:16px;">Hanya username di daftar ini yang bisa login sebagai admin. Daftar kosong = belum dikunci (semua kredensial valid bisa masuk).</p>
-          <p v-if="error" class="error">{{ error }}</p>
-          <p v-if="success" class="success-msg">{{ success }}</p>
-
-          <div class="toolbar">
-            <div class="search-wrap">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg>
-              <input v-model="allowlistSearch" class="search" placeholder="Cari username..." />
-            </div>
-            <button class="btn ghost sm" @click="fetchAllowlist" :disabled="allowlistLoading">{{ allowlistLoading ? 'Memuat...' : 'Refresh' }}</button>
-          </div>
-          <div class="whitelist-add">
-            <div class="whitelist-add-row">
-              <input v-model="allowlistNew" class="field sm" placeholder="Username baru (mis. ketua_ec)" @keyup.enter="addAllowlist" />
-              <button class="btn sm" @click="addAllowlist" :disabled="allowlistAdding || !allowlistNew.trim()">{{ allowlistAdding ? 'Menambah...' : 'Beri Hak Akses' }}</button>
-            </div>
-          </div>
-          <div class="table-card">
-            <div class="table-head">
-              <span>{{ filteredAllowlist.length }} admin berhak</span>
-              <span class="tiny muted">Login di luar daftar ditolak</span>
-            </div>
-            <div class="table-wrap">
-              <table class="admin-table">
-                <thead><tr><th>Username</th><th>Peran</th><th>Menu</th><th>Anggota</th><th>Diberi oleh</th><th></th></tr></thead>
-                <tbody>
-                  <tr v-for="a in filteredAllowlist" :key="a.username">
-                    <td><b>@{{ a.username }}</b><span v-if="a.username === authedUser" class="jurusan-badge sm" style="margin-left:8px;">kamu</span></td>
-                    <td>
-                      <select v-model="roleDraft[a.username].role" class="field sm group-select" :disabled="a.username === authedUser" :aria-label="'Peran ' + a.username">
-                        <option value="superadmin">Superadmin</option>
-                        <option value="operator">Operator</option>
-                      </select>
-                    </td>
-                    <td>
-                      <div v-if="roleDraft[a.username].role === 'operator'" class="role-menus">
-                        <label v-for="(label, m) in MENU_LABELS" :key="m" class="role-check">
-                          <input type="checkbox" :value="m" v-model="roleDraft[a.username].menus" :disabled="a.username === authedUser" />
-                          <span class="tiny">{{ label }}</span>
-                        </label>
-                      </div>
-                      <span v-else class="tiny muted">Semua menu</span>
-                    </td>
-                    <td>
-                      <span v-if="a.member" class="tiny"><b>@{{ a.member.username }}</b> · {{ a.member.fullname }}<span v-if="a.member.group_name" class="jurusan-badge sm" style="margin-left:6px;">{{ a.member.group_name }}</span></span>
-                      <span v-else class="tiny muted">— bukan anggota</span>
-                    </td>
-                    <td class="tiny">{{ a.created_by || '—' }}</td>
-                    <td class="tiny role-actions">
-                      <button class="btn ghost sm" @click="saveRole(a.username)" :disabled="a.username === authedUser" title="Simpan peran">Simpan</button>
-                      <button class="btn-icon danger" @click="removeAllowlist(a.username)" title="Cabut akses" :aria-label="'Cabut akses ' + a.username">&times;</button>
-                    </td>
-                  </tr>
-                  <tr v-if="!filteredAllowlist.length"><td colspan="6" class="empty">Daftar kosong — belum dikunci, semua kredensial valid bisa login</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <!-- Mobile cards -->
-          <div class="admins-cards">
-            <article v-for="a in filteredAllowlist" :key="'al-'+a.username" class="wl-card">
-              <div class="member-top">
-                <b class="member-name">@{{ a.username }}</b>
-                <span v-if="a.username === authedUser" class="jurusan-badge sm">kamu</span>
-              </div>
-              <p v-if="a.member" class="tiny">@{{ a.member.username }} · {{ a.member.fullname }}<span v-if="a.member.group_name" class="jurusan-badge sm" style="margin-left:6px;">{{ a.member.group_name }}</span></p>
-              <p v-else class="tiny muted">Bukan anggota</p>
-              <div class="wl-row">
-                <select v-model="roleDraft[a.username].role" class="field sm group-select" :disabled="a.username === authedUser" :aria-label="'Peran ' + a.username">
-                  <option value="superadmin">Superadmin</option>
-                  <option value="operator">Operator</option>
-                </select>
-                <button class="btn ghost sm" @click="saveRole(a.username)" :disabled="a.username === authedUser">Simpan</button>
-                <button class="btn-icon danger" @click="removeAllowlist(a.username)" title="Cabut akses" :aria-label="'Cabut akses ' + a.username">&times;</button>
-              </div>
-              <div v-if="roleDraft[a.username].role === 'operator'" class="role-menus">
-                <label v-for="(label, m) in MENU_LABELS" :key="m" class="role-check">
-                  <input type="checkbox" :value="m" v-model="roleDraft[a.username].menus" :disabled="a.username === authedUser" />
-                  <span class="tiny">{{ label }}</span>
-                </label>
-              </div>
-            </article>
-            <p v-if="!filteredAllowlist.length" class="empty">Daftar kosong — belum dikunci</p>
-          </div>
-        </div>
-        <!-- Tab tanpa hak akses -->
-        <div v-if="activeBlocked" class="proker-state" role="status">
-          <p><b>Tidak punya hak akses menu ini.</b></p>
-          <p class="tiny muted">Hubungi superadmin untuk meminta akses.</p>
         </div>
       </main>
     </div>
@@ -1001,7 +770,6 @@ onMounted(async () => {
 
 <style scoped>
 .admin-shell { width: 100%; min-height: 100dvh; background: var(--bg-secondary, #F1F5F9); }
-.admin-shell.is-embedded { min-height: 0; border-radius: var(--radius-lg, 20px); overflow: hidden; }
 .admin-topbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 18px; background: #fff; border-bottom: 3px solid var(--dark-navy); box-shadow: 0 2px 0 var(--vibrant-yellow); }
 .topbar-left { display: flex; align-items: center; gap: 10px; }
 .topbar-logo { width: 32px; height: 32px; object-fit: contain; mix-blend-mode: multiply; }
@@ -1040,7 +808,7 @@ onMounted(async () => {
 .btn.sm { padding: 9px 14px; font-size: 12px; }
 .table-card { background: #fff; border: 3px solid var(--dark-navy); box-shadow: 6px 6px 0 var(--dark-navy); overflow: hidden; }
 .table-head { display: flex; justify-content: space-between; padding: 10px 14px; background: #f8fafc; border-bottom: 2px solid var(--dark-navy); font-size: 12px; font-weight: 800; }
-.table-wrap { overflow: auto; max-height: 60vh; -webkit-overflow-scrolling: touch; }
+.table-wrap { overflow: auto; max-height: 60vh; }
 .admin-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .admin-table th { position: sticky; top: 0; background: #f8fafc; padding: 10px 12px; text-align: left; font-size: 11px; letter-spacing: 0.06em; border-bottom: 2px solid var(--dark-navy); z-index: 1; }
 .admin-table td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
@@ -1052,12 +820,6 @@ onMounted(async () => {
 .jurusan-badge.sm { font-size: 10px; padding: 2px 6px; }
 .empty { text-align: center; padding: 18px; color: var(--text-muted); }
 .members-cards { display: none; }
-.whitelist-cards, .accounts-cards, .admins-cards { display: none; }
-.wl-card { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; background: #fff; border: 2px solid var(--dark-navy); box-shadow: 3px 3px 0 var(--dark-navy); min-width: 0; }
-.wl-card .member-top { display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: wrap; }
-.wl-card .member-name { overflow-wrap: anywhere; min-width: 0; }
-.wl-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.wl-row .group-select { flex: 1; min-width: 140px; }
 .proker-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
 .proker-create { display: grid; gap: 4px; margin: 14px 0 18px; padding: 16px; background: #fff; border: 3px solid var(--dark-navy); box-shadow: 6px 6px 0 var(--dark-navy); }
 .form-heading { font-size: 18px; font-weight: 900; margin-bottom: 6px; }
@@ -1100,9 +862,9 @@ onMounted(async () => {
   .side-item { flex: 0 0 auto; min-width: 132px; min-height: 46px; white-space: nowrap; padding: 10px 14px; justify-content: center; }
   .side-item.logout { margin-top: 0; flex: 0 0 auto; }
   .side-spacer { display: none; }
-  .stats-row { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-  .stat-card { padding: 12px; }
-  .stat-value { font-size: 20px; }
+  .stats-row { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .stat-card { padding: 14px; }
+  .stat-value { font-size: 22px; }
   .proker-grid { grid-template-columns: 1fr; gap: 12px; }
   .proker-form-row { flex-direction: column; align-items: stretch; gap: 0; }
   .proker-create { gap: 2px; }
@@ -1113,8 +875,8 @@ onMounted(async () => {
   .topbar-left { flex: 1; min-width: 0; gap: 8px; }
   .topbar-title { font-size: 12px; }
   .user-chip { max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; }
-  .page-back { padding: 10px 12px; font-size: 12px; min-height: 44px; flex-shrink: 0; }
-  .main { padding: 14px 12px calc(40px + env(safe-area-inset-bottom, 0px)); }
+  .page-back { padding: 8px 10px; font-size: 11px; min-height: 40px; flex-shrink: 0; }
+  .main { padding: 14px 12px 40px; }
   .stats-row { grid-template-columns: 1fr; gap: 10px; }
   .stat-card { padding: 14px; }
   .stat-value { font-size: 22px; }
@@ -1123,7 +885,6 @@ onMounted(async () => {
   .toolbar .btn { width: 100%; min-height: 44px; font-size: 13px; }
   .table-card { display: none; }
   .members-cards { display: grid; gap: 10px; margin-top: 12px; }
-  .whitelist-cards, .accounts-cards, .admins-cards { display: grid; gap: 10px; margin-top: 12px; }
   .member-card { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; min-height: 54px; background: #fff; border: 2px solid var(--dark-navy); box-shadow: 3px 3px 0 var(--dark-navy); }
   .member-top { display: flex; align-items: center; gap: 10px; min-width: 0; }
   .member-name { font-size: 14px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
@@ -1133,52 +894,42 @@ onMounted(async () => {
   .gallery { gap: 10px; }
   .gallery-url { flex-direction: column; gap: 8px; }
   .gallery-url .btn { width: 100%; justify-content: center; min-height: 44px; }
-  .gallery-item .del { width: 36px; height: 36px; font-size: 18px; top: 4px; right: 4px; }
+  .gallery-item .del { width: 28px; height: 28px; font-size: 16px; top: 4px; right: 4px; }
   .card-actions { justify-content: stretch; }
   .action-group { width: 100%; gap: 10px; }
   .action-group .btn { flex: 1; justify-content: center; min-height: 44px; }
   .btn.sm { min-height: 44px; padding: 10px 14px; font-size: 13px; }
   .confirm-card { padding: 18px 16px; }
   .confirm-actions .btn { min-height: 44px; }
-  .btn-icon { width: 44px; height: 44px; min-width: 44px; min-height: 44px; }
-  .wl-row .btn-icon { flex: 0 0 auto; }
   .login-card { padding: 20px 16px; box-shadow: 6px 6px 0 var(--dark-navy); }
 }
 .spinner-admin-card { background: #fff; border: 3px solid var(--dark-navy); box-shadow: 6px 6px 0 var(--dark-navy); padding: 20px; }
 .spinner-item-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
-.spinner-item-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: #f8fafc; border: 2px solid #e2e8f0; flex-wrap: wrap; }
+.spinner-item-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: #f8fafc; border: 2px solid #e2e8f0; }
 .spinner-item-num { font-size: 12px; font-weight: 900; color: var(--royal-blue); min-width: 20px; }
 .spinner-item-input { flex: 1; border: 2px solid #e2e8f0; background: #fff; padding: 6px 8px; font: inherit; font-size: 14px; font-weight: 700; }
 .spinner-item-input:focus { outline: none; border-color: var(--royal-blue); box-shadow: 2px 2px 0 var(--vibrant-yellow); }
 .spinner-count-wrap { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 50px; }
 .spinner-count-input { width: 50px; padding: 6px 4px; border: 2px solid #e2e8f0; background: #fff; text-align: center; font: inherit; font-size: 14px; font-weight: 700; }
 .spinner-count-input:focus { outline: none; border-color: var(--royal-blue); box-shadow: 2px 2px 0 var(--vibrant-yellow); }
-.btn-icon { display: grid; place-items: center; width: 36px; height: 36px; min-width: 36px; min-height: 36px; border: 2px solid transparent; background: transparent; font-size: 20px; font-weight: 900; cursor: pointer; }
+.btn-icon { display: grid; place-items: center; width: 28px; height: 28px; border: 2px solid transparent; background: transparent; font-size: 18px; font-weight: 900; cursor: pointer; }
 .btn-icon.danger { color: #E74C3C; }
 .btn-icon.danger:hover { background: #fef2f2; border-color: #E74C3C; }
-.spinner-add-row { display: flex; gap: 8px; margin-bottom: 10px; align-items: end; flex-wrap: wrap; }
+.spinner-add-row { display: flex; gap: 8px; margin-bottom: 10px; align-items: end; }
 .spinner-add-name { flex: 1; }
-.spinner-save-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding-top: 10px; border-top: 2px solid #e2e8f0; }
-.spinner-save-row .btn { min-width: 100px; min-height: 44px; }
+.spinner-save-row { display: flex; justify-content: space-between; align-items: center; padding-top: 10px; border-top: 2px solid #e2e8f0; }
+.spinner-save-row .btn { min-width: 100px; }
 .subsection-title { margin: 4px 0 12px; font-size: 16px; font-weight: 900; color: var(--ink, #132238); }
 .success-msg { color: #1a9e54; font-size: 13px; font-weight: 700; }
 .whitelist-add { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
 .whitelist-add .btn { align-self: flex-start; }
-.whitelist-add-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.whitelist-add-row .btn { min-height: 44px; }
+.whitelist-add-row { display: flex; gap: 8px; align-items: center; }
 .group-select { width: auto; padding: 6px 8px; }
 .import-card { border: 2px solid #e2e8f0; background: #f8fafc; padding: 12px; margin-bottom: 16px; }
 .import-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-.import-row { display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+.import-row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
 .import-result { margin-top: 8px; }
 .import-errors { margin: 6px 0 0; padding-left: 18px; color: #b45309; }
-.reset-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-.reset-input { flex: 1; min-width: 140px; max-width: 100%; width: auto; padding: 6px 8px; min-height: 44px; }
-.reset-row .btn { min-height: 44px; }
-/* Peran admin per menu */
-.role-menus { display: flex; gap: 6px 12px; flex-wrap: wrap; align-items: center; }
-.role-check { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; white-space: nowrap; }
-.role-check input { width: 16px; height: 16px; accent-color: var(--royal-blue); cursor: pointer; }
-.role-actions { white-space: nowrap; }
-.role-actions .btn { margin-right: 6px; }
+.reset-row { display: flex; gap: 6px; align-items: center; }
+.reset-input { width: 170px; padding: 6px 8px; }
 </style>

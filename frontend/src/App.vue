@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from './api.js'
 import { loadDictionary } from './dictionary.js'
@@ -17,10 +17,16 @@ import SoonView from './components/SoonView.vue'
 import ProgramArticle from './components/ProgramArticle.vue'
 import FoundWords from './components/FoundWords.vue'
 
+const AdminView = defineAsyncComponent(() => import('./components/AdminView.vue'))
+
 const route = useRoute()
 const router = useRouter()
 const screen = ref('landing')
 const loading = ref(true)
+const isHiddenAdminRoute = computed(() => route.path === '/ec-admin-2026')
+const showAdminModal = ref(false)
+function openAdminModal() { showAdminModal.value = true; document.body.style.overflow = 'hidden' }
+function closeAdminModal() { showAdminModal.value = false; document.body.style.overflow = '' }
 
 const routeToScreen = { '/': 'landing', '/board': 'board', '/main': 'form', '/buat-akun': 'signup', '/masuk': 'login', '/dashboard': 'dashboard' }
 const screenToRoute = { landing: '/', board: '/board', form: '/main', signup: '/buat-akun', login: '/masuk', dashboard: '/dashboard' }
@@ -28,6 +34,7 @@ const screenToRoute = { landing: '/', board: '/board', form: '/main', signup: '/
 const MEMBER_AUTH_ON = import.meta.env.VITE_MEMBER_AUTH_ENABLED !== 'false'
 
 function syncScreenFromRoute() {
+  if (isHiddenAdminRoute.value) return
   if (route.path.startsWith('/program/')) {
     screen.value = 'article'
     return
@@ -119,12 +126,20 @@ function tick() {
   timeLeft.value = Math.max(0, timeLeft.value - 0.1)
   if (timeLeft.value <= 0) endGame()
 }
+function handleAdminKey(e) {
+  if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'a') {
+    e.preventDefault()
+    openAdminModal()
+  }
+  if (e.key === 'Escape' && showAdminModal.value) closeAdminModal()
+}
 onMounted(() => {
   syncScreenFromRoute()
   validateMemberSession()
   loadDictionary(api.dictionary)
     .then((words) => { wordSet.value = words; dictionaryReady.value = true })
     .catch(() => { dictionaryError.value = 'Kamus belum dapat dimuat. Periksa koneksi lalu coba lagi.' })
+  window.addEventListener('keydown', handleAdminKey)
   greetingTimer = setInterval(() => {
     greetingIndex.value = (greetingIndex.value + 1) % greetings.length
   }, 2000)
@@ -156,6 +171,7 @@ onBeforeUnmount(() => {
   clearInterval(greetingTimer)
   clearTimeout(loadingTimer)
   stopTimer()
+  window.removeEventListener('keydown', handleAdminKey)
 })
 
 function beginSwipe(event) {
@@ -337,8 +353,9 @@ function areAdjacent(a, b) {
     </div>
   </transition>
 
-  <template>
-    <LandingView v-if="screen === 'landing'" :member-name="memberSession?.fullname || memberSession?.username || ''" @goPlay="navigate('form')" @goBoard="navigate('board')" @goLogin="navigate('login')" @goSignup="navigate('signup')" @goDashboard="navigate('dashboard')" @memberLogout="handleMemberLogout" @goArticle="openArticle" />
+  <router-view v-if="isHiddenAdminRoute" />
+  <template v-else>
+    <LandingView v-if="screen === 'landing'" :member-name="memberSession?.fullname || memberSession?.username || ''" @goPlay="navigate('form')" @goBoard="navigate('board')" @goLogin="navigate('login')" @goSignup="navigate('signup')" @goDashboard="navigate('dashboard')" @memberLogout="handleMemberLogout" @openAdmin="openAdminModal" @goArticle="openArticle" />
     <ProgramArticle v-else-if="screen === 'article'" />
     <PlayFormView v-else-if="screen === 'form'" :best="bestScore" :error="boardError || dictionaryError" :retriable="connectError" :dictionary-ready="dictionaryReady" @play="startGame" @back="goLanding" />
     <LeaderboardPage v-else-if="screen === 'board'" @back="goLanding" />
@@ -372,6 +389,14 @@ function areAdjacent(a, b) {
       <button class="btn ghost" type="button" @click="goLanding">Kembali ke Beranda</button>
     </section>
   </template>
+  <Transition name="admin-modal">
+    <div v-if="showAdminModal" class="admin-modal-overlay" @click.self="closeAdminModal">
+      <div class="admin-modal-card">
+        <button class="modal-close" aria-label="Tutup" @click="closeAdminModal">×</button>
+        <AdminView is-modal @back="closeAdminModal" />
+      </div>
+    </div>
+  </Transition>
 </template>
 
 <style scoped>
