@@ -4,7 +4,7 @@ import { join, dirname, extname } from 'path'
 import { fileURLToPath } from 'url'
 import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'fs'
 import { getAll, getById, addProker, deleteProker, updateProker, addPhotos, removePhoto } from '../utils/prokerStore.js'
-import { requireMenu } from '../utils/auth.js'
+import { verifyTokenAsync } from '../utils/auth.js'
 import { auditAdmin, auditTech, auditTechThrottled } from '../utils/audit.js'
 import { getSupabase, isSupabaseEnabled, uploadToProkerBucket, removeFromProkerBucket, storagePathFromUrl } from '../utils/supabase.js'
 
@@ -94,7 +94,12 @@ async function destroyCover(publicIdOrUrl) {
   return false
 }
 
-const requireAdmin = requireMenu('proker')
+async function requireAdmin(req, res, next) {
+  const token = (req.header('authorization') || '').replace(/^Bearer\s+/i, '')
+  const username = await verifyTokenAsync(token)
+  if (username) { req.admin = { username }; return next() }
+  return res.status(401).json({ detail: 'Unauthorized' })
+}
 
 const r = Router()
 

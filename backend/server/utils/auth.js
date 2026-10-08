@@ -7,7 +7,6 @@ import { fileURLToPath } from 'url'
 import { randomBytes } from 'crypto'
 import bcrypt from 'bcrypt'
 import { getSupabase, getSupabaseAuth, isSupabaseEnabled } from './supabase.js'
-import { isAllowed, getRole } from './adminAllowlist.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const dataDir = join(__dirname, '../data')
@@ -92,50 +91,6 @@ export async function verifyTokenAsync(token) {
 export function verifyToken(token) {
   if (isSupabaseEnabled()) return null // async path wajib dipakai
   return verifyLocalToken(token)
-}
-
-// Verifikasi KHUSUS admin: menolak token member (anggota) dan username di luar
-// allowlist. Wajib dipakai semua endpoint admin (bukan verifyTokenAsync).
-export async function verifyAdminTokenAsync(token) {
-  if (!token) return null
-  let username = null
-  if (isSupabaseEnabled()) {
-    const sb = getSupabaseAuth()
-    const { data, error } = await sb.auth.getUser(token)
-    if (error || !data?.user) return null
-    const email = data.user.email || ''
-    // Token anggota tidak boleh lolos sebagai admin.
-    if (email.endsWith('@members.englishclub.local')) return null
-    username = email.includes('@englishclub.local')
-      ? email.replace('@englishclub.local', '')
-      : email
-  } else {
-    username = verifyLocalToken(token)
-  }
-  if (!username) return null
-  if (!(await isAllowed(username))) return null
-  return username
-}
-
-// Guard per menu untuk endpoint admin. Menu: pendaftar | proker | spinner | akun.
-// Superadmin lolos semua; operator wajib punya menu tersebut.
-export function requireMenu(menu) {
-  return async (req, res, next) => {
-    try {
-      const token = (req.header('authorization') || '').replace(/^Bearer\s+/i, '') || req.header('x-admin-token')
-      const username = await verifyAdminTokenAsync(token)
-      if (!username) return res.status(401).json({ detail: 'Unauthorized' })
-      const r = await getRole(username)
-      if (!r) return res.status(401).json({ detail: 'Unauthorized' })
-      if (r.role !== 'superadmin' && !r.menus.includes(menu)) {
-        return res.status(403).json({ detail: 'Tidak punya hak akses menu ini' })
-      }
-      req.admin = { username, role: r.role, menus: r.menus }
-      return next()
-    } catch (e) {
-      return res.status(503).json({ error: 'Database sibuk, silakan coba lagi' })
-    }
-  }
 }
 
 export async function revokeToken(token) {
