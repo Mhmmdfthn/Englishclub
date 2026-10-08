@@ -29,6 +29,15 @@ function requireSupabaseDb(req, res) {
   return true
 }
 
+// Flag deploy: ATTENDANCE_ENABLED=false (Vercel production) -> endpoint anggota
+// jawab "segera hadir". Endpoint panitia/admin tidak kena flag (mirror MEMBER_AUTH).
+function requireAttendanceOn(req, res, next) {
+  if (process.env.ATTENDANCE_ENABLED === 'false') {
+    return res.status(503).json({ error: 'Fitur absensi segera hadir' })
+  }
+  return next()
+}
+
 async function requireMember(req, res) {
   if (!requireSupabaseDb(req, res)) return null
   const token = (req.header('authorization') || '').replace(/^Bearer\s+/i, '')
@@ -54,7 +63,7 @@ async function requireMember(req, res) {
 }
 
 // ---- Sesi aktif (tanpa auto-create): untuk anggota maupun panitia ----
-r.get('/active', async (req, res) => {
+r.get('/active', requireAttendanceOn, async (req, res) => {
   try {
     if (!requireSupabaseDb(req, res)) return
     const token = (req.header('authorization') || '').replace(/^Bearer\s+/i, '')
@@ -124,7 +133,7 @@ r.get('/display-token', requireAdmin, async (req, res) => {
 })
 
 // ---- Anggota: check-in via QR + password ----
-r.post('/checkin', async (req, res) => {
+r.post('/checkin', requireAttendanceOn, async (req, res) => {
   const me = await requireMember(req, res)
   if (!me) return
   const memberId = me.profile.id
@@ -159,7 +168,7 @@ r.post('/checkin', async (req, res) => {
 })
 
 // ---- Anggota: daftar hadir sesi berjalan ----
-r.get('/list', async (req, res) => {
+r.get('/list', requireAttendanceOn, async (req, res) => {
   const me = await requireMember(req, res)
   if (!me) return
   try {
@@ -172,7 +181,7 @@ r.get('/list', async (req, res) => {
 })
 
 // ---- Anggota: recent absensi milik sendiri ----
-r.get('/mine', async (req, res) => {
+r.get('/mine', requireAttendanceOn, async (req, res) => {
   const me = await requireMember(req, res)
   if (!me) return
   try {

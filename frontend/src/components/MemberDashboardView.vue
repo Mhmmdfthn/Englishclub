@@ -8,6 +8,10 @@ const AdminView = defineAsyncComponent(() => import('./AdminView.vue'))
 // Presensi QR: chunk terpisah, hanya diunduh saat tab Absensi dibuka.
 const PresensiView = defineAsyncComponent(() => import('./PresensiView.vue'))
 
+// Flag deploy: VITE_ATTENDANCE_ENABLED=false -> tab Absensi jadi "Segera Hadir".
+// Dibake saat build; perlu rebuild + redeploy setelah ubah (mirror MEMBER_AUTH).
+const ATTENDANCE_ON = import.meta.env.VITE_ATTENDANCE_ENABLED !== 'false'
+
 const emit = defineEmits(['back', 'logout'])
 
 const dashTab = ref('dashboard')
@@ -238,6 +242,7 @@ onBeforeUnmount(() => {
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><polyline points="9 14 11 16 15 12"/></svg>
               <span>Absensi</span>
+              <span v-if="!ATTENDANCE_ON" class="dash__soon">Segera</span>
             </button>
             <button
               class="dash__menu-item"
@@ -431,7 +436,15 @@ onBeforeUnmount(() => {
 
       <!-- Absensi: presensi QR + password + list + recent -->
       <div v-else-if="dashTab === 'absensi'">
-        <PresensiView :can-display="isSuperAdmin" />
+        <PresensiView v-if="ATTENDANCE_ON" :can-display="isSuperAdmin" />
+        <div v-else class="ec-state ec-state--notice dash__soon-card" role="status">
+          <span class="ec-state__title">Absensi segera hadir</span>
+          <p class="ec-state__body">Fitur presensi QR belum dibuka. Pantau pengumuman komunitas.</p>
+          <div class="dash__soon-actions">
+            <button class="ec-btn ec-btn--secondary ec-btn--sm" type="button" @click="dashTab = 'dashboard'">Kembali ke Dashboard</button>
+            <button class="ec-btn ec-btn--ghost ec-btn--sm" type="button" @click="goHome">Ke Beranda</button>
+          </div>
+        </div>
       </div>
 
       <!-- Materi: belum ada kontrak backend, tampilkan status -->
