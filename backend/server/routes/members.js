@@ -1,17 +1,12 @@
 import { Router } from 'express'
 import { addMember, allMembers, highlight } from '../utils/membersStore.js'
-import { verifyTokenAsync } from '../utils/auth.js'
+import { requireMenu, verifyAdminTokenAsync } from '../utils/auth.js'
 import { auditAdmin, auditTech } from '../utils/audit.js'
 
 const r = Router()
 const ALLOWED = new Set(['Ilmu Komputer','Manajemen','Akuntansi','Bisnis Digital','Sains Data','Agribisnis','Lainnya'])
 
-async function requireAdmin(req, res, next) {
-  const token = (req.header('authorization') || '').replace(/^Bearer\s+/i, '')
-  const username = await verifyTokenAsync(token)
-  if (username) { req.admin = { username }; return next() }
-  return res.status(401).json({ detail: 'Unauthorized' })
-}
+const requireAdmin = requireMenu('pendaftar')
 
 // public highlight
 r.get('/highlight', async (req, res) => {
@@ -54,7 +49,7 @@ r.get('/sync', async (req, res) => {
   const expected = process.env.SUPABASE_SYNC_TOKEN
   let allowed = false
   if (expected && syncToken === expected) allowed = true
-  else if (bearer && await verifyTokenAsync(bearer)) allowed = true
+  else if (bearer && await verifyAdminTokenAsync(bearer)) allowed = true
   if (!allowed) {
     return res.status(401).json({ detail: 'Unauthorized. Invalid or missing x-sync-token.' })
   }
