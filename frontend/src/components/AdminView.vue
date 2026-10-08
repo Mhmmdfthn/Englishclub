@@ -605,7 +605,7 @@ onMounted(async () => {
         </div>
 
         <!-- Proker -->
-        <div v-else>
+        <div v-else-if="activeTab==='proker'">
           <div class="toolbar">
             <h2 class="tab-title">Kelola Proker</h2>
             <span class="tiny muted">Data tersimpan di KV saat env cloud aktif</span>
