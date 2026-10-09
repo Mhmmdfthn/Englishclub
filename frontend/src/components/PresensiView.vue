@@ -112,6 +112,24 @@ async function refreshMine(showSpin = true) {
   finally { mineLoading.value = false }
 }
 
+// Group recent per sesi: key = session_title + session_date.
+// Urut sesi terbaru (scanned_at terbesar) di atas.
+const groupedMine = computed(() => {
+  const map = new Map()
+  for (const r of mine.value) {
+    const key = `${r.session_title || 'Sesi'}|${r.session_date || ''}`
+    if (!map.has(key)) {
+      map.set(key, { session_title: r.session_title || 'Sesi', session_date: r.session_date || '', records: [] })
+    }
+    map.get(key).records.push(r)
+  }
+  return [...map.values()].sort((a, b) => {
+    const ta = a.records[0]?.scanned_at || ''
+    const tb = b.records[0]?.scanned_at || ''
+    return tb.localeCompare(ta)
+  })
+})
+
 async function startScan() {
   result.value = null
   // Alur: boleh pindai dulu, password diminta saat konfirmasi (submit).
@@ -345,7 +363,7 @@ onBeforeUnmount(async () => {
         <p v-else class="ec-body">Belum ada yang check-in di sesi ini.</p>
       </div>
 
-      <!-- Recent milik sendiri -->
+      <!-- Recent milik sendiri: card per sesi -->
       <div class="ec-card presensi__card">
         <div class="presensi__sechead">
           <h2 class="presensi__sectitle">Recent Absensi</h2>
@@ -353,13 +371,18 @@ onBeforeUnmount(async () => {
             {{ mineLoading ? 'Memuat...' : 'Refresh' }}
           </button>
         </div>
-        <ul v-if="mine.length" class="presensi__list">
-          <li v-for="r in mine" :key="r.id" class="presensi__row">
-            <span class="ec-badge" :class="r.status === 'hadir' ? 'ec-badge--completed' : 'ec-badge--warning'">{{ r.status }}</span>
-            <span class="presensi__name">{{ r.session_title || 'Sesi' }}<small>{{ r.session_date }}</small></span>
-            <span class="ec-caption">{{ fmtTime(r.scanned_at) }}</span>
-          </li>
-        </ul>
+        <div v-if="groupedMine.length" class="presensi__session-cards">
+          <div v-for="g in groupedMine" :key="`${g.session_title}|${g.session_date}`" class="presensi__session-card">
+            <div class="presensi__session-head">
+              <span class="presensi__session-title">{{ g.session_title }}</span>
+              <span class="presensi__session-date">{{ g.session_date }}</span>
+            </div>
+            <div v-for="r in g.records" :key="r.id" class="presensi__session-record">
+              <span class="ec-badge" :class="r.status === 'hadir' ? 'ec-badge--completed' : 'ec-badge--warning'">{{ r.status }}</span>
+              <span class="presensi__session-time">{{ fmtTime(r.scanned_at) }}</span>
+            </div>
+          </div>
+        </div>
         <p v-else class="ec-body">Belum ada riwayat kehadiran.</p>
       </div>
     </template>
@@ -427,5 +450,14 @@ onBeforeUnmount(async () => {
 .presensi__avatar { width: 32px; height: 32px; font-size: 13px; flex-shrink: 0; border-radius: 50%; background: var(--ec-blue); color: #fff; font-family: 'Outfit', sans-serif; font-weight: 700; display: grid; place-items: center; }
 .presensi__name { flex: 1; min-width: 0; font-size: 0.875rem; font-weight: 700; color: var(--ec-ink); display: flex; flex-direction: column; }
 .presensi__name small { font-weight: 500; color: var(--ec-ink-soft); }
+
+/* Recent absensi: card per sesi */
+.presensi__session-cards { display: flex; flex-direction: column; gap: 10px; }
+.presensi__session-card { border: 1px solid var(--ec-line); border-radius: var(--ec-radius-md); padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; background: var(--ec-canvas); }
+.presensi__session-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--ec-line); }
+.presensi__session-title { font-family: 'Outfit', sans-serif; font-size: 0.9375rem; font-weight: 700; color: var(--ec-ink); }
+.presensi__session-date { font-size: 0.75rem; font-weight: 600; color: var(--ec-ink-soft); white-space: nowrap; }
+.presensi__session-record { display: flex; align-items: center; gap: 8px; }
+.presensi__session-time { font-size: 0.8125rem; color: var(--ec-ink-soft); margin-left: auto; }
 </style>
 
