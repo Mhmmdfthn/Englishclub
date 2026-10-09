@@ -55,6 +55,14 @@ body {
   padding: 0;
   height: 100%;
   overscroll-behavior: none;
+  /* Safari iOS mengabaikan overflow-x di body saja: kunci di html juga,
+     pakai clip agar sticky nav tetap jalan. */
+  overflow-x: clip;
+  width: 100%;
+}
+
+body {
+  position: relative;
 }
 
 body {
@@ -71,7 +79,8 @@ body {
   text-rendering: optimizeLegibility;
   user-select: none;
   -webkit-user-select: none;
-  overflow-x: hidden;
+  overflow-x: clip;
+  overscroll-behavior-x: none;
 }
 
 #app {
@@ -81,6 +90,8 @@ body {
   align-items: center;
   justify-content: flex-start;
   width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
 }
 
 /* Screen Layout */
@@ -367,6 +378,33 @@ textarea:focus-visible {
 
 img, svg, video {
   max-width: 100%;
+}
+
+/* iPhone: Safari auto-zoom tiap fokus input <16px sehingga halaman terasa
+   "mengambang" dan bisa di-pan. Naikkan ke 16px khusus perangkat sentuh.
+   Sengaja TANPA maximum-scale=1 agar pinch-zoom tetap bisa (aksesibilitas). */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea,
+  .field {
+    font-size: max(16px, 1em);
+  }
+  /* .ec-field hidup di design-system.css (dimuat setelah file ini),
+     jadi versi 16px-nya ditaruh di sana agar menang cascade. */
+  input.ec-field,
+  select.ec-field,
+  textarea.ec-field {
+    font-size: max(16px, 1em);
+  }
+}
+
+/* iOS buggy dengan background-attachment: fixed (repaint goyang).
+   Matikan khusus sentuh; desktop tidak berubah. */
+@media (hover: none) {
+  body {
+    background-attachment: scroll;
+  }
 }
 
 /* Respect users who prefer reduced motion */

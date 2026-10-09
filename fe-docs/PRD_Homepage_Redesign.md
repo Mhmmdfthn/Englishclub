@@ -643,6 +643,7 @@ These are intentionally left open for visual/UX review:
 | Action Dock is not a second navbar | Locked |
 | Action Dock items = Home, Absen, Materi, Word Hunt | Locked for current iteration |
 | Action Dock supports horizontal interaction | Locked |
+| Homepage inspiration = Playful Edu modern (see `FE-INSPIRATION-HOMEPAGE.md`) | Locked for current iteration |
 | Learning/progress section removed from homepage | Locked |
 | What's Happening section retained | Locked |
 | Section title = `What's Happening at English Club?` | Locked for current iteration |

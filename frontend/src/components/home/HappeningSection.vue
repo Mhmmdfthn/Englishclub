@@ -264,6 +264,7 @@ onMounted(load)
 .happening__card {
   display: flex;
   flex-direction: column;
+  min-width: 0;
   background: var(--ec-surface);
   border: 1px solid var(--ec-line);
   border-radius: var(--ec-radius-lg);
@@ -466,12 +467,15 @@ onMounted(load)
   .happening__filters {
     flex-wrap: nowrap;
     overflow-x: auto;
+    /* Tahan rambatan swipe diagonal ke halaman (Safari iPhone). */
+    overscroll-behavior-x: contain;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
     margin-bottom: var(--ec-space-4);
     padding-bottom: 4px;
     margin-inline: calc(-1 * var(--ec-gutter));
     padding-inline: var(--ec-gutter);
+    max-width: calc(100% + var(--ec-gutter) * 2);
   }
 
   .happening__filters::-webkit-scrollbar {

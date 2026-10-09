@@ -1,5 +1,5 @@
 <script setup>
-import { defineAsyncComponent, onBeforeUnmount, ref } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, ref } from 'vue'
 import { api } from '../api.js'
 import { formatWIB } from '../utils/time.js'
 
@@ -46,7 +46,12 @@ const session = ref(null)
 const loading = ref(true)
 const loadError = ref('')
 const password = ref('')
+const showPassword = ref(false)
 const qrText = ref('')
+// Username cache untuk autofill password manager (hidden field).
+// Tidak dikirim ke API; API tetap pakai Bearer token + password seperti semula.
+const cachedUsername = ref('')
+try { cachedUsername.value = localStorage.getItem('member_username') || '' } catch { /* abaikan */ }
 const scanning = ref(false)
 const submitting = ref(false)
 const result = ref(null) // { ok, message }
@@ -54,6 +59,11 @@ const list = ref([])
 const listLoading = ref(false)
 const mine = ref([])
 const mineLoading = ref(false)
+// Banner "sudah hadir" untuk sesi aktif saat ini (FE-only, dari data mine yang sudah ada).
+const alreadyCheckedIn = computed(() => {
+  if (!session.value || !Array.isArray(mine.value)) return false
+  return mine.value.some((r) => String(r.session_id || r.sessionId || '') === String(session.value.id) || (r.session_title && session.value.title && r.session_title === session.value.title && r.session_date === session.value.date))
+})
 let scanner = null
 let pollTimer = null
 
@@ -100,10 +110,8 @@ async function refreshMine(showSpin = true) {
 
 async function startScan() {
   result.value = null
-  if (!password.value) {
-    result.value = { ok: false, message: 'Isi password akun dulu sebelum scan.' }
-    return
-  }
+  // Alur: boleh pindai dulu, password diminta saat konfirmasi (submit).
+  // Gate password di sini sengaja dilepas agar QR 7-detik tidak kedaluwarsa saat user mengetik.
   // Kamera web wajib konteks aman: localhost/HTTPS. Via IP HTTP selalu ditolak
   // browser apa pun isi izin HP-nya — arahkan ke kode manual.
   if (typeof window !== 'undefined' && window.isSecureContext === false) {
@@ -121,6 +129,12 @@ async function startScan() {
       async (decoded) => {
         await stopScan()
         qrText.value = String(decoded || '').trim()
+        if (!qrText.value) return
+        if (!password.value) {
+          result.value = { ok: false, message: 'QR terbaca. Isi password akun lalu tekan Catat Kehadiran.' }
+          document.getElementById('presensi-pw')?.focus?.()
+          return
+        }
         await submit()
       },
       () => { /* frame tanpa QR: abaikan */ },
@@ -203,8 +217,12 @@ onBeforeUnmount(async () => {
     <div class="presensi__head">
       <span class="presensi__eyebrow">Absensi</span>
       <h1 class="presensi__title">Presensi Kehadiran</h1>
-      <p class="presensi__sub" v-if="session">{{ session.title }} &middot; {{ session.date }}</p>
+      <p class="presensi__sub" v-if="session">
+        <span v-if="session.is_active !== false" class="ec-badge ec-badge--completed presensi__live"><span class="presensi__dot" aria-hidden="true"></span>Live</span>
+        {{ session.title }} &middot; {{ session.date }}
+      </p>
       <p class="presensi__sub" v-else>Belum ada sesi aktif hari ini.</p>
+      <p v-if="alreadyCheckedIn" class="presensi__result presensi__result--ok" role="status">Kamu sudah tercatat hadir di sesi ini.</p>
     </div>
 
     <div v-if="loading" class="presensi__skel">
@@ -240,38 +258,69 @@ onBeforeUnmount(async () => {
       <!-- Check-in -->
       <div v-show="!canDisplay || presensiMode === 'scan'" class="ec-card presensi__card">
         <h2 class="presensi__sectitle">Check-in QR</h2>
-        <p class="ec-body">Ketik password akunmu, lalu pindai QR yang tampil di layar panitia (berganti tiap 7 detik).</p>
-        <label class="ec-label" for="presensi-pw">Password akun</label>
-        <input
-          id="presensi-pw"
-          v-model="password"
-          type="password"
-          class="ec-field"
-          placeholder="••••••••"
-          autocomplete="current-password"
-        />
-        <div class="presensi__actions" style="margin-top:10px">
-          <button v-if="!scanning" class="ec-btn ec-btn--primary ec-btn--sm" type="button" @click="startScan">
-            Buka Kamera &amp; Scan QR
+        <p class="ec-body">Pindai QR di layar panitia (berganti tiap 7 detik), lalu konfirmasi dengan password akunmu.</p>
+        <form class="presensi__form" autocomplete="on" @submit.prevent="submit">
+          <!-- Hidden username: syarat password manager agar mau autofill. Tidak dikirim ke API. -->
+          <input
+            type="text"
+            name="username"
+            autocomplete="username"
+            :value="cachedUsername"
+            readonly
+            tabindex="-1"
+            aria-hidden="true"
+            class="ec-sr-only"
+          />
+          <div class="ec-field-group">
+            <label class="ec-label" for="presensi-pw">Password akun</label>
+            <div class="presensi__password">
+              <input
+                id="presensi-pw"
+                v-model="password"
+                :type="showPassword ? 'text' : 'password'"
+                name="password"
+                class="ec-field"
+                placeholder="••••••••"
+                autocomplete="current-password"
+              />
+              <button
+                class="presensi__toggle"
+                type="button"
+                :aria-pressed="showPassword ? 'true' : 'false'"
+                :aria-label="showPassword ? 'Sembunyikan password' : 'Tampilkan password'"
+                @click="showPassword = !showPassword"
+              >{{ showPassword ? 'Sembunyi' : 'Lihat' }}</button>
+            </div>
+            <p class="ec-helper">Sama seperti password saat masuk. Bisa tersimpan otomatis di browser.</p>
+          </div>
+          <div class="presensi__actions">
+            <button v-if="!scanning" class="ec-btn ec-btn--primary ec-btn--sm" type="button" @click="startScan">
+              Buka Kamera &amp; Scan QR
+            </button>
+            <button v-else class="ec-btn ec-btn--secondary ec-btn--sm" type="button" @click="stopScan">
+              Tutup Kamera
+            </button>
+          </div>
+          <div v-show="scanning" id="presensi-qr-reader" class="presensi__reader"></div>
+          <details class="presensi__manual">
+            <summary>Kamera bermasalah? Pakai kode manual</summary>
+            <label class="ec-label" for="presensi-manual">Kode manual</label>
+            <input
+              id="presensi-manual"
+              v-model="qrText"
+              class="ec-field ec-field--mono"
+              placeholder="ECA1:... (salin dari layar panitia)"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </details>
+          <button class="ec-btn ec-btn--secondary ec-btn--block" type="submit" :disabled="submitting || !qrText.trim()">
+            {{ submitting ? 'Memproses...' : 'Catat Kehadiran' }}
           </button>
-          <button v-else class="ec-btn ec-btn--secondary ec-btn--sm" type="button" @click="stopScan">
-            Tutup Kamera
-          </button>
-        </div>
-        <div v-show="scanning" id="presensi-qr-reader" class="presensi__reader"></div>
-        <label class="ec-label" for="presensi-manual" style="margin-top:10px">Atau tempel kode manual</label>
-        <input
-          id="presensi-manual"
-          v-model="qrText"
-          class="ec-field ec-field--mono"
-          placeholder="ECA1:... (bila kamera bermasalah)"
-        />
-        <button class="ec-btn ec-btn--accent ec-btn--block" type="button" :disabled="submitting" style="margin-top:12px" @click="submit">
-          {{ submitting ? 'Memproses...' : 'Catat Kehadiran' }}
-        </button>
-        <p v-if="result" class="presensi__result" :class="{ 'presensi__result--ok': result.ok, 'presensi__result--err': !result.ok }" role="status">
-          {{ result.message }}
-        </p>
+          <p v-if="result" class="presensi__result" :class="{ 'presensi__result--ok': result.ok, 'presensi__result--err': !result.ok }" role="status" aria-live="polite">
+            {{ result.message }}
+          </p>
+        </form>
       </div>
 
       <!-- List absensi sesi ini -->
@@ -314,7 +363,11 @@ onBeforeUnmount(async () => {
 </template>
 
 <style scoped>
-.presensi { display: flex; flex-direction: column; gap: 16px; }
+.presensi { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+/* Tombol global nowrap: di layar 320-375px label panjang ("Buka Kamera &
+   Scan QR") bisa lebih lebar dari kartu dan mendorong halaman. Di sini saja
+   boleh wrap, tanpa ubah .ec-btn global. */
+.presensi .ec-btn { white-space: normal; max-width: 100%; text-align: center; }
 .presensi__modes { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; background: var(--ec-canvas); border: 1px solid var(--ec-line); border-radius: var(--ec-radius-pill); }
 .presensi__mode { min-height: 44px; border: 0; border-radius: var(--ec-radius-pill); background: transparent; color: var(--ec-ink-soft); font-family: inherit; font-size: 0.875rem; font-weight: 700; cursor: pointer; }
 .presensi__mode.active { background: var(--ec-surface); color: var(--ec-ink); box-shadow: var(--ec-shadow-sm); }
@@ -327,18 +380,44 @@ onBeforeUnmount(async () => {
 .presensi__sectitle { font-family: 'Outfit', sans-serif; font-size: 17px; font-weight: 700; color: var(--ec-ink); margin: 0; }
 .presensi__seeall { background: none; border: 0; color: var(--ec-blue); font-size: 13px; font-weight: 700; cursor: pointer; opacity: 0.75; min-height: 44px; padding: 8px 4px; }
 .presensi__seeall:hover { opacity: 1; }
-.presensi__actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.presensi__form { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.presensi__password { position: relative; }
+.presensi__password .ec-field { padding-right: 92px; }
+.presensi__toggle { position: absolute; top: 50%; right: 8px; transform: translateY(-50%); min-height: 36px; padding: 6px 12px; border: 0; border-radius: var(--ec-radius-pill); background: transparent; color: var(--ec-blue); font-size: 13px; font-weight: 700; cursor: pointer; }
+.presensi__toggle:hover { background: var(--ec-blue-050); }
+.presensi__toggle:focus-visible { outline: none; box-shadow: var(--ec-focus-ring); }
+.presensi__actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
+.presensi__manual { border: 1px solid var(--ec-line); border-radius: var(--ec-radius-md); padding: 10px 14px; background: var(--ec-canvas); }
+.presensi__manual summary { font-size: 0.875rem; font-weight: 700; color: var(--ec-ink); cursor: pointer; min-height: 44px; display: flex; align-items: center; }
+.presensi__manual summary:focus-visible { outline: none; box-shadow: var(--ec-focus-ring); border-radius: 8px; }
+.presensi__manual .ec-label { margin-top: 8px; display: block; }
+.presensi__live { gap: 6px; margin-right: 6px; }
+.presensi__dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; display: inline-block; animation: presensi-pulse 1.6s ease-in-out infinite; }
+@keyframes presensi-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 .presensi__skel { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
 @media (max-width: 400px) { .presensi__skel { grid-template-columns: 1fr; } }
-.presensi__card { padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+.presensi__card { padding: 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.presensi__row .ec-caption { overflow-wrap: anywhere; flex-shrink: 0; }
 .presensi__card .presensi__sechead { padding-top: 0; }
 .ec-field--mono { font-family: ui-monospace, monospace; font-size: 0.8rem; }
-.presensi__reader { overflow: hidden; border-radius: var(--ec-radius-md); border: 1px solid var(--ec-line); margin-top: 10px; }
+/* html5-qrcode menyuntik div/canvas/select/tombol ber-width fix: kekang
+   semuanya agar tidak mendorong halaman di layar kecil. */
+.presensi__reader { overflow: hidden; border-radius: var(--ec-radius-md); border: 1px solid var(--ec-line); margin-top: 10px; max-width: 100%; }
+.presensi__reader, .presensi__reader * { max-width: 100%; }
 .presensi__reader video { width: 100% !important; border-radius: var(--ec-radius-md); }
+/* Scoped .ec-field--mono menang atas aturan 16px global (cascade): ulangi
+   khusus mono agar Safari tidak auto-zoom di kolom kode manual. */
+@media (pointer: coarse) {
+  .ec-field--mono { font-size: max(16px, 0.8rem); }
+}
+@media (max-width: 400px) {
+  .presensi__actions .ec-btn { flex: 1 1 100%; }
+}
 .presensi__result { font-size: 0.875rem; font-weight: 700; padding: 10px 14px; border-radius: var(--ec-radius-md); }
 .presensi__result--ok { background: var(--ec-success-bg); color: var(--ec-success); border: 1px solid var(--ec-success-line); }
 .presensi__result--err { background: var(--ec-danger-bg); color: var(--ec-danger); border: 1px solid var(--ec-danger-line); }
-.presensi__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.presensi__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; max-height: 320px; overflow-y: auto; }
+@media (prefers-reduced-motion: reduce) { .presensi__dot { animation: none; } }
 .presensi__row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--ec-line); }
 .presensi__row:last-child { border-bottom: 0; }
 .presensi__avatar { width: 32px; height: 32px; font-size: 13px; flex-shrink: 0; border-radius: 50%; background: var(--ec-blue); color: #fff; font-family: 'Outfit', sans-serif; font-weight: 700; display: grid; place-items: center; }

@@ -433,6 +433,15 @@ textarea.ec-field {
   resize: vertical;
 }
 
+/* iPhone: Safari auto-zoom tiap fokus input <16px sehingga halaman terasa
+   "mengambang" dan bisa di-pan kanan-kiri. Naikkan ke 16px khusus perangkat
+   sentuh. Sengaja TANPA maximum-scale=1 agar pinch-zoom tetap bisa. */
+@media (pointer: coarse) {
+  .ec-field {
+    font-size: max(16px, 1em);
+  }
+}
+
 .ec-helper {
   font-size: 0.781rem;
   color: var(--ec-ink-soft);

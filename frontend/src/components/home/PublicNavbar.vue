@@ -230,10 +230,14 @@ onBeforeUnmount(() => {
   .ec-nav__links {
     order: 3;
     flex: 0 0 100%;
+    min-width: 0;
     justify-content: flex-start;
     gap: 4px;
     margin-left: 0;
     overflow-x: auto;
+    /* Tahan rambatan swipe diagonal ke halaman (miring dikit = halaman ikut
+       geser di Safari iPhone). Pola sama seperti .ec-rail__track. */
+    overscroll-behavior-x: contain;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
     padding-bottom: 2px;

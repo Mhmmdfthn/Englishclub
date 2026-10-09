@@ -77,6 +77,8 @@ bila tidak membantu hierarchy atau usability.
 # 2B. Homepage Rules (per PRD)
 
 Berlaku untuk homepage publik. Detail lengkap ada di `PRD_Homepage_Redesign.md`.
+Referensi visual homepage ada di `FE-INSPIRATION-HOMEPAGE.md` (arah Locked: Playful Edu modern).
+Urutan baca semua dokumen ada di `00-INDEX.md`.
 
 - Warna tetap Royal Blue + Yellow. Boleh dilembutkan lewat tint, surface,
   spacing, dan typography, bukan diganti palette baru.

@@ -636,6 +636,10 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 16px;
   padding: 20px 16px 56px;
+  /* Rantai min-width putus di sini = anak lebar (kartu absensi, nama panjang)
+     mendorong halaman di Safari iPhone. */
+  min-width: 0;
+  overflow-x: clip;
 }
 
 /* ── Head / greeting ──────────────────────────────────────── */

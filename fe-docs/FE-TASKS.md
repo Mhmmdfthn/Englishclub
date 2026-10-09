@@ -462,10 +462,11 @@ Check:
 
 ---
 
-# 13A. Homepage Track (per PRD)
+# 13A. Homepage Track (per PRD + FE-INSPIRATION-HOMEPAGE.md)
 
 > Prioritas track ini terhadap P0 member flow belum diputuskan.
 > PRD menyebut langkah berikutnya adalah visual mockup, lalu implementasi.
+> Referensi visual: `FE-INSPIRATION-HOMEPAGE.md` (Playful Edu modern). PRD Locked tetap menang.
 
 ### Objective
 

@@ -74,7 +74,10 @@ const items = computed(() => [
   display: flex;
   align-items: center;
   gap: 4px;
+  min-width: 0;
   overflow-x: auto;
+  /* Tahan rambatan swipe diagonal ke halaman (Safari iPhone). */
+  overscroll-behavior-x: contain;
   scrollbar-width: none;
   -ms-overflow-style: none;
   padding: 2px;
