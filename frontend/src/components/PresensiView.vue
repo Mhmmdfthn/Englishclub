@@ -130,6 +130,26 @@ const groupedMine = computed(() => {
   })
 })
 
+// Accordion ringkas: semua tertutup default; klik buka/tutup (boleh banyak terbuka).
+const expandedSessions = ref(new Set())
+
+function sessionKey(g) {
+  return `${g.session_title}|${g.session_date}`
+}
+function isExpanded(g) {
+  return expandedSessions.value.has(sessionKey(g))
+}
+function toggleSession(g) {
+  const k = sessionKey(g)
+  const next = new Set(expandedSessions.value)
+  if (next.has(k)) next.delete(k)
+  else next.add(k)
+  expandedSessions.value = next
+}
+function badgeClass(status) {
+  return status === 'hadir' ? 'ec-badge--completed' : 'ec-badge--warning'
+}
+
 async function startScan() {
   result.value = null
   // Alur: boleh pindai dulu, password diminta saat konfirmasi (submit).
@@ -372,14 +392,28 @@ onBeforeUnmount(async () => {
           </button>
         </div>
         <div v-if="groupedMine.length" class="presensi__session-cards">
-          <div v-for="g in groupedMine" :key="`${g.session_title}|${g.session_date}`" class="presensi__session-card">
-            <div class="presensi__session-head">
-              <span class="presensi__session-title">{{ g.session_title }}</span>
-              <span class="presensi__session-date">{{ g.session_date }}</span>
-            </div>
-            <div v-for="r in g.records" :key="r.id" class="presensi__session-record">
-              <span class="ec-badge" :class="r.status === 'hadir' ? 'ec-badge--completed' : 'ec-badge--warning'">{{ r.status }}</span>
-              <span class="presensi__session-time">{{ fmtTime(r.scanned_at) }}</span>
+          <div v-for="g in groupedMine" :key="sessionKey(g)" class="presensi__session-card">
+            <button
+              type="button"
+              class="presensi__session-head"
+              :aria-expanded="isExpanded(g) ? 'true' : 'false'"
+              @click="toggleSession(g)"
+            >
+              <span class="presensi__session-summary">
+                <span class="presensi__session-title">{{ g.session_title }}</span>
+                <span class="presensi__session-date">{{ g.session_date }}</span>
+              </span>
+              <span class="presensi__session-preview">
+                <span class="ec-badge" :class="badgeClass(g.records[0]?.status)">{{ g.records[0]?.status }}</span>
+                <span class="presensi__record-count">{{ g.records.length }}</span>
+              </span>
+              <svg class="presensi__chevron" :class="{ 'presensi__chevron--open': isExpanded(g) }" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div v-show="isExpanded(g)" class="presensi__session-body">
+              <div v-for="r in g.records" :key="r.id" class="presensi__session-record">
+                <span class="ec-badge" :class="badgeClass(r.status)">{{ r.status }}</span>
+                <span class="presensi__session-time">{{ fmtTime(r.scanned_at) }}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -451,12 +485,47 @@ onBeforeUnmount(async () => {
 .presensi__name { flex: 1; min-width: 0; font-size: 0.875rem; font-weight: 700; color: var(--ec-ink); display: flex; flex-direction: column; }
 .presensi__name small { font-weight: 500; color: var(--ec-ink-soft); }
 
-/* Recent absensi: card per sesi */
+/* Recent absensi: card per sesi (ringkas, tap untuk expand) */
 .presensi__session-cards { display: flex; flex-direction: column; gap: 10px; }
-.presensi__session-card { border: 1px solid var(--ec-line); border-radius: var(--ec-radius-md); padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; background: var(--ec-canvas); }
-.presensi__session-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--ec-line); }
-.presensi__session-title { font-family: 'Outfit', sans-serif; font-size: 0.9375rem; font-weight: 700; color: var(--ec-ink); }
-.presensi__session-date { font-size: 0.75rem; font-weight: 600; color: var(--ec-ink-soft); white-space: nowrap; }
+.presensi__session-card { border: 1px solid var(--ec-line); border-radius: var(--ec-radius-md); background: var(--ec-canvas); overflow: hidden; }
+.presensi__session-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.presensi__session-head:hover { background: var(--ec-surface); }
+.presensi__session-head:focus-visible { outline: none; box-shadow: var(--ec-focus-ring); }
+.presensi__session-summary { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.presensi__session-title { font-family: 'Outfit', sans-serif; font-size: 0.9375rem; font-weight: 700; color: var(--ec-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.presensi__session-date { font-size: 0.75rem; font-weight: 600; color: var(--ec-ink-soft); }
+.presensi__session-preview { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.presensi__record-count { font-size: 0.7rem; font-weight: 700; color: var(--ec-ink-soft); background: var(--ec-surface); border: 1px solid var(--ec-line); border-radius: 99px; padding: 2px 7px; }
+.presensi__chevron { color: var(--ec-ink-soft); flex-shrink: 0; transition: transform 220ms var(--ec-ease); }
+.presensi__chevron--open { transform: rotate(180deg); }
+.presensi__session-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px 12px;
+  border-top: 1px dashed var(--ec-line);
+  background: var(--ec-surface);
+  animation: presensi-body-in 220ms var(--ec-ease);
+}
+@keyframes presensi-body-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .presensi__chevron { transition: none; }
+  .presensi__session-body { animation: none; }
+}
 .presensi__session-record { display: flex; align-items: center; gap: 8px; }
 .presensi__session-time { font-size: 0.8125rem; color: var(--ec-ink-soft); margin-left: auto; }
 </style>
