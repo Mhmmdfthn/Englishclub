@@ -21,6 +21,10 @@ async function getScannerCtor() {
 // Display QR: chunk terpisah, hanya diunduh saat mode display dibuka.
 const QrDisplayView = defineAsyncComponent(() => import('./QrDisplayView.vue'))
 
+// Masa berlaku QR dari BE (sinkron dengan copy + polling display).
+// Satu sumber agar copy tidak basi bila BE ubah TTL.
+const QR_ROTATE_SECONDS = 7
+
 const props = defineProps({
   canDisplay: { type: Boolean, default: false },
 })
@@ -258,7 +262,7 @@ onBeforeUnmount(async () => {
       <!-- Check-in -->
       <div v-show="!canDisplay || presensiMode === 'scan'" class="ec-card presensi__card">
         <h2 class="presensi__sectitle">Check-in QR</h2>
-        <p class="ec-body">Pindai QR di layar panitia (berganti tiap 7 detik), lalu konfirmasi dengan password akunmu.</p>
+        <p class="ec-body">Pindai QR di layar panitia (berganti tiap {{ QR_ROTATE_SECONDS }} detik), lalu konfirmasi dengan password akunmu.</p>
         <form class="presensi__form" autocomplete="on" @submit.prevent="submit">
           <!-- Hidden username: syarat password manager agar mau autofill. Tidak dikirim ke API. -->
           <input

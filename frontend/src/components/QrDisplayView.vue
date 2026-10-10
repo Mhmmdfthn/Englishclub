@@ -7,6 +7,12 @@ const props = defineProps({
   token: { type: String, required: true },
 })
 
+// Satu sumber TTL QR (detik). Harus sama dengan BE + copy PresensiView.
+// Refresh sengaja < TTL (6s < 7s) agar QR tidak sempat kedaluwarsa di layar.
+const QR_ROTATE_SECONDS = 7
+const QR_REFRESH_MS = 6000
+const LIST_REFRESH_MS = 3000
+
 const session = ref(null)
 const qrUrl = ref('')
 const expiresIn = ref(0)
@@ -39,8 +45,8 @@ async function createSession() {
     newTitle.value = ''
     await Promise.all([refreshQr(), refreshList()])
     stopTimers()
-    qrTimer = setInterval(refreshQr, 2500)
-    listTimer = setInterval(refreshList, 3000)
+    qrTimer = setInterval(refreshQr, QR_REFRESH_MS)
+    listTimer = setInterval(refreshList, LIST_REFRESH_MS)
     countTimer = setInterval(() => { expiresIn.value = Math.max(0, expiresIn.value - 1) }, 1000)
   } catch (e) {
     loadError.value = e?.message || 'Gagal membuat sesi.'
@@ -90,8 +96,8 @@ async function start() {
     })(), timeout])
     if (!session.value) return
     stopTimers()
-    qrTimer = setInterval(refreshQr, 2500)
-    listTimer = setInterval(refreshList, 3000)
+    qrTimer = setInterval(refreshQr, QR_REFRESH_MS)
+    listTimer = setInterval(refreshList, LIST_REFRESH_MS)
     countTimer = setInterval(() => { expiresIn.value = Math.max(0, expiresIn.value - 1) }, 1000)
   } catch (e) {
     loadError.value = e?.message || 'Gagal memuat display absensi.'
@@ -154,7 +160,7 @@ onBeforeUnmount(() => stopTimers())
       <div class="qr-display__head">
         <div>
           <h3 class="qr-display__title">{{ session.title }}</h3>
-          <p class="ec-caption">{{ session.date }} &middot; {{ session.is_active ? `QR baru tiap 7 detik (ganti dalam ${expiresIn}s)` : 'Sesi ditutup' }}</p>
+          <p class="ec-caption">{{ session.date }} &middot; {{ session.is_active ? `QR baru tiap ${QR_ROTATE_SECONDS} detik (ganti dalam ${expiresIn}s)` : 'Sesi ditutup' }}</p>
         </div>
         <button v-if="session.is_active" class="ec-btn ec-btn--danger ec-btn--sm" type="button" :disabled="closing" @click="closeSession">
           {{ closing ? 'Menutup...' : 'Tutup Sesi' }}

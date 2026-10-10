@@ -509,7 +509,6 @@ onMounted(async () => {
         <input v-model="password" type="password" class="field" placeholder="••••••••" :disabled="loading" @keyup.enter="login" />
         <button class="btn login-btn" :disabled="loading" @click="login">{{ loading ? 'Memeriksa...' : 'Masuk' }}</button>
         <p v-if="error" class="error" style="margin-top:12px;">{{ error }}</p>
-        <p class="tiny muted" style="margin-top:10px; text-align:center;">Default: <code>admin / ec2026onlyblue</code></p>
       </div>
     </div>
 
@@ -674,7 +673,7 @@ onMounted(async () => {
         </div>
 
         <!-- Spinner -->
-        <div v-if="activeTab==='spinner'">
+        <div v-else-if="activeTab==='spinner'">
           <h2 class="section-title">Lucky Spinner</h2>
           <p class="tiny muted" style="margin-bottom:16px;">Kelola item hadiah roda keberuntungan untuk pengunjung stand.</p>
           <div class="spinner-admin-card">
@@ -708,7 +707,7 @@ onMounted(async () => {
         </div>
 
         <!-- Akun EC: whitelist + akun anggota -->
-        <div v-if="activeTab==='accounts'">
+        <div v-else-if="activeTab==='accounts'">
           <h2 class="section-title">Akun Anggota EC</h2>
           <p class="tiny muted" style="margin-bottom:16px;">Hanya nama di whitelist yang bisa buat akun. Password anggota lupa? Reset dari sini.</p>
           <p v-if="error" class="error">{{ error }}</p>
@@ -771,6 +770,24 @@ onMounted(async () => {
               </table>
             </div>
           </div>
+          <!-- Mobile: kartu whitelist (tabel disembunyikan <680px) -->
+          <div class="whitelist-cards">
+            <article v-for="w in filteredWhitelist" :key="'w-'+w.id" class="whitelist-card">
+              <div class="member-top">
+                <span class="avatar sm">{{ (w.fullname || '?').charAt(0).toUpperCase() }}</span>
+                <b class="member-name">{{ w.fullname }}</b>
+                <button class="btn-icon danger" @click="removeWhitelist(w.id, w.fullname)" title="Hapus">&times;</button>
+              </div>
+              <div class="whitelist-card-row">
+                <select :value="w.group_name || ''" class="field sm group-select" @change="changeGroup(w.id, $event.target.value)" :aria-label="'Kelompok ' + w.fullname">
+                  <option value="">Tanpa kelompok</option>
+                  <option v-for="g in groupOptions" :key="g" :value="g">{{ g }}</option>
+                </select>
+                <span class="jurusan-badge sm">{{ w.is_registered ? 'Sudah buat akun' : 'Belum daftar' }}</span>
+              </div>
+            </article>
+            <p v-if="!filteredWhitelist.length" class="empty">Whitelist kosong — tambah nama anggota dulu</p>
+          </div>
 
           <h3 class="subsection-title" style="margin-top:28px;">Akun Terdaftar ({{ filteredAccounts.length }})</h3>
           <div class="toolbar">
@@ -800,6 +817,24 @@ onMounted(async () => {
                 </tbody>
               </table>
             </div>
+          </div>
+          <!-- Mobile: kartu akun (tabel disembunyikan <680px) -->
+          <div class="accounts-cards">
+            <article v-for="a in filteredAccounts" :key="'a-'+a.id" class="account-card">
+              <div class="member-top">
+                <span class="avatar sm">{{ (a.fullname || a.username || '?').charAt(0).toUpperCase() }}</span>
+                <div class="account-id">
+                  <b class="member-name">@{{ a.username }}</b>
+                  <span class="tiny muted">{{ a.fullname }}</span>
+                </div>
+                <span v-if="a.group_name" class="jurusan-badge sm">{{ a.group_name }}</span>
+              </div>
+              <div class="reset-row">
+                <input v-model="resetPw[a.id]" type="password" class="field sm reset-input" placeholder="Password baru (min 6)" :aria-label="'Password baru ' + a.username" />
+                <button class="btn ghost sm" @click="doResetPassword(a.id, a.username)" :disabled="resettingPw[a.id]">{{ resettingPw[a.id] ? '...' : 'Reset' }}</button>
+              </div>
+            </article>
+            <p v-if="!filteredAccounts.length" class="empty">Belum ada akun anggota</p>
           </div>
         </div>
         <!-- Absensi QR: display + live list (lazy, hanya saat tab dibuka) -->
@@ -909,6 +944,11 @@ onMounted(async () => {
 .jurusan-badge.sm { font-size: 10px; padding: 2px 8px; }
 .empty { text-align: center; padding: 18px; color: var(--ec-ink-soft, #6B7280); font-size: 13px; }
 .members-cards { display: none; }
+.whitelist-cards, .accounts-cards { display: none; }
+.whitelist-card, .account-card { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; background: var(--ec-surface, #fff); border: 1px solid var(--ec-line, #E5E7EB); border-radius: var(--ec-radius-lg, 18px); box-shadow: var(--ec-shadow-sm, 0 1px 2px rgba(31,41,55,0.06)); min-width: 0; }
+.whitelist-card-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.whitelist-card-row .group-select { flex: 1; min-width: 140px; }
+.account-id { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .member-card { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; min-height: 54px; background: var(--ec-surface, #fff); border: 1px solid var(--ec-line, #E5E7EB); border-radius: var(--ec-radius-lg, 18px); box-shadow: var(--ec-shadow-sm, 0 1px 2px rgba(31,41,55,0.06)); }
 .member-top { display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: wrap; }
 .member-name { font-size: 14px; font-weight: 800; color: var(--ec-ink, #1F2937); overflow-wrap: anywhere; min-width: 0; }
@@ -982,6 +1022,7 @@ onMounted(async () => {
   .toolbar .btn { width: 100%; min-height: 44px; font-size: 13px; }
   .table-card { display: none; }
   .members-cards { display: grid; gap: 10px; margin-top: 12px; }
+  .whitelist-cards, .accounts-cards { display: grid; gap: 10px; margin-top: 12px; }
   .proker-card { padding: 14px; }
   .proker-create { padding: 14px; }
   .form-heading { font-size: 16px; }

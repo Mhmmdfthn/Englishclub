@@ -278,6 +278,17 @@ onBeforeUnmount(() => {
             </button>
           </nav>
 
+          <div class="dash__menu-sep" aria-hidden="true"></div>
+          <button
+            class="dash__menu-item dash__menu-home"
+            type="button"
+            @click="goHome"
+            aria-label="Kembali ke beranda"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>
+            <span>Beranda</span>
+          </button>
+
           <button class="dash__logout dash__menu-logout" type="button" @click="doLogout">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
             Keluar dari akun
@@ -471,20 +482,10 @@ onBeforeUnmount(() => {
 
     </div>
 
-    <!-- ── Footer: watermark EC + aksi ─────────────────────── -->
+    <!-- ── Footer: logo + copyright ─────────────────────────── -->
     <footer class="dash__footer" aria-label="Footer dashboard">
       <div class="dash__footer-inner">
         <img class="dash__footer-mark" src="/logo-ec.png" alt="" width="44" height="44" loading="lazy" />
-        <div class="dash__footer-actions">
-          <button class="dash__footer-btn" type="button" @click="goHome">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>
-            <span>Beranda</span>
-          </button>
-          <button class="dash__footer-btn" type="button" @click="goTab('profil')">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-            <span>Profil</span>
-          </button>
-        </div>
         <p class="dash__footer-copy">&copy; 2026 <b>English Club UPB</b> &bull; Practice Makes Progress</p>
       </div>
     </footer>
@@ -1085,7 +1086,9 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
 }
 
-.dash__menu-logout { margin-top: auto; }
+.dash__menu-sep { height: 1px; background: var(--ec-line); margin: 6px 2px; }
+.dash__menu-home { margin-top: auto; }
+.dash__menu-logout { margin-top: 0; }
 
 @media (prefers-reduced-motion: reduce) {
   .dash-menu-enter-active .dash__menu { animation: none; }
@@ -1139,32 +1142,6 @@ onBeforeUnmount(() => {
   height: 44px;
   object-fit: contain;
 }
-
-.dash__footer-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-
-.dash__footer-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 44px;
-  padding: 10px 18px;
-  border: 1px solid var(--ec-line);
-  border-radius: 999px;
-  background: var(--ec-surface);
-  color: var(--ec-ink);
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: border-color 160ms, background 160ms, color 160ms;
-}
-.dash__footer-btn:hover { border-color: var(--ec-info-line); background: var(--ec-blue-050); color: var(--ec-blue); }
-.dash__footer-btn:focus-visible { outline: none; box-shadow: var(--ec-focus-ring); }
 
 .dash__footer-copy {
   margin: 0;
