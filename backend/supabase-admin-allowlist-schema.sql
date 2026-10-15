@@ -4,7 +4,7 @@
 -- tanpa FK ke member_profiles).
 create table if not exists ec_admin_allowlist (
   username citext primary key,
-  role text not null default 'operator' check (role in ('superadmin', 'operator')),
+  role text not null default 'operator' check (role in ('superadmin', 'operator', 'so')),
   created_by text not null default '',
   created_at timestamptz not null default now()
 );

@@ -199,4 +199,69 @@ r.post('/accounts/:id/reset-password', requireAdmin, async (req, res) => {
   }
 })
 
+// ---- Superadmin: kelola role Display QR (hanya biasa <-> so) ----
+// Disengaja terpisah dari allowlist generik agar tak bisa menyentuh
+// superadmin/operator. Dipakai subseksi "Role Display QR (SO)" di tab Akun EC.
+async function requireSuperadmin(req, res) {
+  const { verifyAdminOrSuperMemberToken } = await import('../utils/auth.js')
+  const { getAdminRole } = await import('../utils/adminAllowlist.js')
+  const token = (req.header('authorization') || '').replace(/^Bearer\s+/i, '')
+  const username = await verifyAdminOrSuperMemberToken(token)
+  if (!username) {
+    res.status(401).json({ detail: 'Unauthorized' })
+    return null
+  }
+  if ((await getAdminRole(username)) !== 'superadmin') {
+    res.status(403).json({ detail: 'Hanya superadmin yang bisa mengatur role SO' })
+    return null
+  }
+  return username
+}
+
+r.get('/roles', requireAdmin, async (req, res) => {
+  try {
+    const caller = await requireSuperadmin(req, res)
+    if (!caller) return
+    const { listAllowed } = await import('../utils/adminAllowlist.js')
+    const [profiles, allowed] = await Promise.all([
+      listMemberProfiles(req.query.q || '', 200),
+      listAllowed(),
+    ])
+    const roleByUsername = new Map(
+      (allowed || []).map((a) => [String(a.username || '').toLowerCase(), String(a.role || '').toLowerCase()]),
+    )
+    const members = (profiles || [])
+      .map((p) => {
+        const role = roleByUsername.get(String(p.username || '').toLowerCase())
+        if (role === 'superadmin' || role === 'operator') return null
+        return { ...p, display_role: role === 'so' ? 'so' : 'biasa' }
+      })
+      .filter(Boolean)
+    res.json({ ok: true, members })
+  } catch (e) {
+    sendStoreError(res, e, 'Roles GET error:')
+  }
+})
+
+r.patch('/roles/:username', requireAdmin, async (req, res) => {
+  try {
+    const caller = await requireSuperadmin(req, res)
+    if (!caller) return
+    const { setMemberSoRole } = await import('../utils/adminAllowlist.js')
+    const username = String(req.params.username || '').trim()
+    const role = String(req.body?.role || '').trim().toLowerCase()
+    if (!username) return res.status(422).json({ detail: 'username required' })
+    if (role !== 'biasa' && role !== 'so') {
+      return res.status(422).json({ detail: "role harus 'biasa' atau 'so'" })
+    }
+    const profile = await findProfileByUsername(username)
+    if (!profile) return res.status(404).json({ detail: 'Anggota tidak ditemukan' })
+    const updated = await setMemberSoRole(profile.username, role, caller)
+    await auditAdmin('Role Display QR diubah', caller, { username: profile.username, role: updated.role })
+    res.json({ ok: true, username: profile.username, display_role: updated.role })
+  } catch (e) {
+    sendStoreError(res, e, 'Roles PATCH error:')
+  }
+})
+
 export default r

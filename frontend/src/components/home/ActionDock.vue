@@ -158,19 +158,30 @@ const items = computed(() => [
   }
 
   .dock__track {
-    justify-content: flex-start;
-    padding-inline: 4px;
-    overflow-x: auto;
-    scroll-snap-type: x proximity;
-    -webkit-overflow-scrolling: touch;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 2px;
+    overflow: visible;
   }
 
   .dock__item {
-    min-height: 44px;
-    padding: 10px 14px;
-    font-size: 0.813rem;
-    scroll-snap-align: start;
-    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    width: 100%;
+    min-width: 0;
+    min-height: 58px;
+    padding: 6px 2px;
+    font-size: 0.6875rem;
+    line-height: 1.15;
+    white-space: normal;
+  }
+
+  .dock__label {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    text-align: center;
   }
 }
 </style>

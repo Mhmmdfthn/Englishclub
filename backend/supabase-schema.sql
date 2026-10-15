@@ -55,3 +55,18 @@ insert into proker (id, title, description, "order") values
   ('debate-clinic','Debate Clinic','Program pembinaan debate dan public speaking untuk mengasah kemampuan argumentasi dan presentasi.',3),
   ('toefl-prep','TOEFL Prep','Persiapan ujian TOEFL dengan strategi dan tips dari mentor berpengalaman untuk hasil maksimal.',4)
 on conflict (id) do nothing;
+
+-- announcements (pengumuman dashboard, pengganti Kegiatan Sorotan)
+create table if not exists announcements (
+  id text primary key,
+  title varchar(80) not null check (char_length(title) between 3 and 80),
+  body text not null check (char_length(body) between 5 and 500),
+  pinned boolean not null default false,
+  created_at timestamptz default now() not null,
+  updated_at timestamptz default now() not null
+);
+create index if not exists idx_announcements_pin_created on announcements(pinned desc, created_at desc);
+
+insert into announcements (id, title, body, pinned) values
+  ('selamat-datang-ec','Selamat datang di English Club UPB','Pantau pengumuman ini untuk info absensi, materi, dan agenda terbaru. Praktik rutin bikin progres.',true)
+on conflict (id) do nothing;

@@ -121,7 +121,7 @@ export async function verifyAdminOrSuperMemberToken(token) {
           try {
             const list = await listAllowed()
             const hit = list.find((a) => String(a.username || '').toLowerCase() === username.toLowerCase())
-            if (hit && hit.role !== 'operator') return username
+            if (hit && String(hit.role || '').toLowerCase() === 'superadmin') return username
           } catch {
             return null
           }
@@ -139,13 +139,56 @@ export async function verifyAdminOrSuperMemberToken(token) {
   }
 }
 
+// Verifikasi token untuk jalur Display QR (read-only): lolos bila SALAH SATU
+// terpenuhi: (a) JWT admin valid, atau (b) JWT member yang allowlist-nya
+// ber-role superadmin ATAU so. Operator / member biasa / tak dikenal → null.
+export async function verifyDisplayToken(token) {
+  if (!token) return null
+  try {
+    if (isSupabaseEnabled()) {
+      const { data, error } = await getSupabaseAuth().auth.getUser(token)
+      if (!error && data?.user) {
+        const email = data.user.email || ''
+        if (email.endsWith('@members.englishclub.local')) {
+          const username = email.split('@')[0] || ''
+          try {
+            const list = await listAllowed()
+            const hit = list.find((a) => String(a.username || '').toLowerCase() === username.toLowerCase())
+            const role = String(hit?.role || '').toLowerCase()
+            if (hit && (role === 'so' || role === 'superadmin')) return username
+          } catch {
+            return null
+          }
+          return null
+        }
+      }
+    }
+    const adminUser = await verifyTokenAsync(token)
+    if (adminUser && !String(adminUser).includes('@')) return adminUser
+    return null
+  } catch {
+    return null
+  }
+}
 // Guard brankas: lolos bila SALAH SATU terpenuhi —
 // (a) JWT admin valid (jalur kredensial /ec-admin-2026), atau
 // (b) JWT member valid yang username-nya terdaftar sebagai SUPERADMIN.
-// Token member biasa / operator / tak dikenal → 401. Tanpa bocorkan daftar.
+// Token member biasa / operator / so / tak dikenal → 401. Tanpa bocorkan daftar.
 export async function requireAdminOrSuperMember(req, res, next) {
   const token = (req.header('authorization') || '').replace(/^Bearer\s+/i, '') || req.header('x-admin-token')
   const username = await verifyAdminOrSuperMemberToken(token)
+  if (username) {
+    req.admin = { username }
+    return next()
+  }
+  return res.status(401).json({ detail: 'Unauthorized' })
+}
+
+// Guard Display QR (read-only): lolos bila admin valid, superadmin, atau so.
+// Dipakai HANYA untuk GET /display-token. Endpoint tulis tetap superadmin-only.
+export async function requireCanDisplay(req, res, next) {
+  const token = (req.header('authorization') || '').replace(/^Bearer\s+/i, '') || req.header('x-admin-token')
+  const username = await verifyDisplayToken(token)
   if (username) {
     req.admin = { username }
     return next()

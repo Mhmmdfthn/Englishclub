@@ -1,12 +1,12 @@
 import { Router } from 'express'
-import { requireAdminOrSuperMember as requireAdmin } from '../utils/auth.js'
+import { requireAdminOrSuperMember as requireAdmin, requireCanDisplay } from '../utils/auth.js'
 import { getSupabaseAuth, isSupabaseEnabled } from '../utils/supabase.js'
 import { loginWithPassword } from '../utils/auth.js'
 import { emailFor, findProfileById } from '../utils/memberAuthStore.js'
 import { auditAdmin } from '../utils/audit.js'
 import {
-  getActiveSession, createSession, getSession, closeSession, recordCheckin, listRecords, myRecords,
-  buildQrPayload, parseQrPayload, verifyQrToken,
+  getActiveSession, createSession, getSession, closeSession, recordCheckin, listRecords, myRecords, sessionsForMember, getOverview,
+  listSessionRoster, upsertSessionMemberStatus, buildQrPayload, parseQrPayload, verifyQrToken,
   checkPwRate, recordPwFail, resetPwRate,
 } from '../utils/attendanceStore.js'
 
@@ -89,6 +89,24 @@ r.get('/active', requireAttendanceOn, async (req, res) => {
   }
 })
 
+// ---- Panitia: daftar sesi untuk pengelolaan manual per sesi ----
+r.get('/sessions', requireAdmin, async (req, res) => {
+  try {
+    if (!requireSupabaseDb(req, res)) return
+    const { getSupabase } = await import('../utils/supabase.js')
+    const sb = getSupabase()
+    const { data, error } = await sb
+      .from('ec_attendance_sessions')
+      .select('id, title, date, is_active, created_at')
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: false })
+    if (error) throw Object.assign(new Error('Database sibuk, silakan coba lagi'), { status: 503 })
+    res.json({ ok: true, sessions: data || [] })
+  } catch (e) {
+    sendStoreError(res, e, 'Absensi list sessions error:')
+  }
+})
+
 // ---- Panitia: buat sesi baru (otomatis tutup sesi aktif lain; maks 1 aktif) ----
 r.post('/sessions', requireAdmin, async (req, res) => {
   try {
@@ -116,8 +134,8 @@ r.post('/sessions/:id/close', requireAdmin, async (req, res) => {
   }
 })
 
-// ---- Panitia: token QR saat ini (di-refresh tiap 7 detik oleh display) ----
-r.get('/display-token', requireAdmin, async (req, res) => {
+// ---- Display QR read-only (superadmin + SO). Endpoint tulis tetap superadmin-only. ----
+r.get('/display-token', requireCanDisplay, async (req, res) => {
   try {
     if (!requireSupabaseDb(req, res)) return
     const { session } = req.query
@@ -191,7 +209,55 @@ r.get('/mine', requireAttendanceOn, async (req, res) => {
   }
 })
 
+r.get('/sessions/mine', requireAttendanceOn, async (req, res) => {
+  const me = await requireMember(req, res)
+  if (!me) return
+  try {
+    res.json({ ok: true, sessions: await sessionsForMember(me.profile.id) })
+  } catch (e) {
+    sendStoreError(res, e, 'Absensi sessions error:')
+  }
+})
+
+// ---- Anggota: gabungan sesi + aktif + daftar hadir sekali jalan ----
+r.get('/overview', requireAttendanceOn, async (req, res) => {
+  const me = await requireMember(req, res)
+  if (!me) return
+  try {
+    const { sessions, active, list } = await getOverview(me.profile.id)
+    res.json({ ok: true, sessions, active, list })
+  } catch (e) {
+    sendStoreError(res, e, 'Absensi overview error:')
+  }
+})
+
 // ---- Panitia: koreksi status (hadir/izin/alpa) ----
+r.get('/sessions/:id/roster', requireAdmin, async (req, res) => {
+  try {
+    if (!requireSupabaseDb(req, res)) return
+    const roster = await listSessionRoster(req.params.id)
+    res.json({ ok: true, members: roster })
+  } catch (e) {
+    sendStoreError(res, e, 'Absensi roster error:')
+  }
+})
+
+r.patch('/sessions/:id/roster/:memberId', requireAdmin, async (req, res) => {
+  try {
+    if (!requireSupabaseDb(req, res)) return
+    const { status } = req.body ?? {}
+    const rec = await upsertSessionMemberStatus(req.params.memberId, req.params.id, status)
+    await auditAdmin('Koreksi roster absensi', req.admin?.username || 'admin', {
+      session_id: req.params.id,
+      member_id: req.params.memberId,
+      status: rec.status,
+    })
+    res.json({ ok: true, record: rec })
+  } catch (e) {
+    sendStoreError(res, e, 'Absensi roster patch error:')
+  }
+})
+
 r.patch('/records/:id', requireAdmin, async (req, res) => {
   try {
     if (!requireSupabaseDb(req, res)) return

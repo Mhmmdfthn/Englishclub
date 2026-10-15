@@ -52,6 +52,8 @@ backend/global-config.json
 # Skrip debug lokal sekali pakai
 __dbg*.mjs
 __dbg*.js
+tmp-*.mjs
+backend/tmp-*.mjs
 
 # IDE & OS
 .vscode/

@@ -29,6 +29,8 @@ import memberAuth from './routes/memberAuth.js'
 import proker from './routes/proker.js'
 import spinner from './routes/spinner.js'
 import attendance from './routes/attendance.js'
+import announcements from './routes/announcements.js'
+import materials from './routes/materials.js'
 
 app.use('/api/ping', ping)
 app.use('/api/game', game)
@@ -40,6 +42,8 @@ app.use('/api/members-auth', memberAuth)
 app.use('/api/proker', proker)
 app.use('/api/spinner', spinner)
 app.use('/api/attendance', attendance)
+app.use('/api/announcements', announcements)
+app.use('/api/materials', materials)
 
 // serve uploads for gallery (Vercel: /tmp writable only)
 import { existsSync as existsUpload } from 'fs'

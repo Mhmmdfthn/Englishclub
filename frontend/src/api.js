@@ -136,6 +136,50 @@ export const api = {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ prizes }),
     }, 10000),
+  announcements: () => req('/api/announcements'),
+  announcementDetail: (id) => req(`/api/announcements/${encodeURIComponent(id)}`),
+  createAnnouncement: (data, token) =>
+    req('/api/announcements', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(data),
+    }, 10000),
+  updateAnnouncement: (id, data, token) =>
+    req(`/api/announcements/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(data),
+    }, 10000),
+  deleteAnnouncement: (id, token) =>
+    req(`/api/announcements/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    }),
+  materials: (token) =>
+    req('/api/materials', {
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    }),
+  materialDetail: (id, token) =>
+    req(`/api/materials/${encodeURIComponent(id)}`, {
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    }),
+  createMaterial: (data, token) =>
+    req('/api/materials', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(data),
+    }, 10000),
+  updateMaterial: (id, data, token) =>
+    req(`/api/materials/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(data),
+    }, 10000),
+  deleteMaterial: (id, token) =>
+    req(`/api/materials/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    }),
   claimPrize: (storyId, prize_won) =>
     req(`/api/stories/${storyId}/prize`, {
       method: 'PATCH',
@@ -222,6 +266,18 @@ export const api = {
       body: JSON.stringify({ newPassword }),
     }),
 
+  memberRoles: (token, q = '') =>
+    req(`/api/members-auth/roles${q ? `?q=${encodeURIComponent(q)}` : ''}`, {
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    }),
+
+  memberSetRole: (username, role, token) =>
+    req(`/api/members-auth/roles/${encodeURIComponent(username)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ role }),
+    }),
+
   // True/false apakah username member ini terdaftar di allowlist admin.
   adminCheckMember: (token) =>
     req('/api/admin/check-member', {
@@ -250,11 +306,38 @@ export const api = {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     }),
 
+  attendanceOverview: (token) =>
+    req('/api/attendance/overview', {
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    }, 10000),
+
+  attendanceSessionsMine: (token) =>
+    req('/api/attendance/sessions/mine', {
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    }),
+
+  attendanceSessions: (token) =>
+    req('/api/attendance/sessions', {
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    }),
+
   attendanceSession: (title, token) =>
     req('/api/attendance/sessions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ title }),
+    }),
+
+  attendanceSessionRoster: (session, token) =>
+    req(`/api/attendance/sessions/${encodeURIComponent(session)}/roster`, {
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    }),
+
+  attendanceSessionSetStatus: (session, memberId, status, token) =>
+    req(`/api/attendance/sessions/${encodeURIComponent(session)}/roster/${encodeURIComponent(memberId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ status }),
     }),
 
   attendanceDisplayToken: (session, token) =>

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, defineAsyncComponent, onBeforeUnmount, ref } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, ref } from 'vue'
 import { api } from '../api.js'
 import { formatWIB } from '../utils/time.js'
 
@@ -27,6 +27,7 @@ const QR_ROTATE_SECONDS = 7
 
 const props = defineProps({
   canDisplay: { type: Boolean, default: false },
+  displayReadOnly: { type: Boolean, default: false },
 })
 
 const presensiMode = ref('scan') // 'scan' | 'display'
@@ -46,6 +47,9 @@ function fmtTime(iso) {
   } catch { return '—' }
 }
 
+// Cache overview terakhir: tab tampil instan, refresh jalan di background.
+const OVERVIEW_CACHE_KEY = 'presensi_overview_cache'
+
 const session = ref(null)
 const loading = ref(true)
 const loadError = ref('')
@@ -57,34 +61,58 @@ const qrText = ref('')
 const cachedUsername = ref('')
 try { cachedUsername.value = localStorage.getItem('member_username') || '' } catch { /* abaikan */ }
 const scanning = ref(false)
+const cameraOpen = ref(false)
+const successNotice = ref(null)
+const cameraTriggerButton = ref(null)
+const cameraCloseButton = ref(null)
+const successCloseButton = ref(null)
 const submitting = ref(false)
 const result = ref(null) // { ok, message }
 const list = ref([])
 const listLoading = ref(false)
-const mine = ref([])
-const mineLoading = ref(false)
-// Banner "sudah hadir" untuk sesi aktif saat ini (FE-only, dari data mine yang sudah ada).
+const attendanceSessions = ref([])
+const sessionsLoading = ref(false)
+const sessionsError = ref('')
+const expandedSessionIds = ref(new Set())
+let drawerStateInitialized = false
 const alreadyCheckedIn = computed(() => {
-  if (!session.value || !Array.isArray(mine.value)) return false
-  return mine.value.some((r) => String(r.session_id || r.sessionId || '') === String(session.value.id) || (r.session_title && session.value.title && r.session_title === session.value.title && r.session_date === session.value.date))
+  if (!session.value) return false
+  return attendanceSessions.value.some((item) => String(item.id) === String(session.value.id) && item.attendance?.status === 'hadir')
 })
 let scanner = null
 let pollTimer = null
+let scanAttempt = 0
 
 async function loadAll() {
-  loading.value = true
   loadError.value = ''
-  // Pagar timeout: skeleton tak boleh selamanya bila jaringan macet total.
+  // Cache dulu: tab tampil instan (<50ms), data segar menyusul di background.
+  // Skeleton full-tab hanya bila belum pernah ada cache.
+  const cached = readOverviewCache()
+  if (cached) {
+    applyOverview(cached)
+    loading.value = false
+  } else {
+    loading.value = true
+  }
+  // Pagar timeout: refresh background tak boleh gantung selamanya.
   const timeout = new Promise((_, reject) =>
     setTimeout(() => reject(new Error('Koneksi lambat. Periksa jaringan lalu coba lagi.')), 20000),
   )
   try {
     await Promise.race([(async () => {
-      const t = memberToken()
-      if (!t) throw { status: 401, message: 'Sesi habis. Masuk lagi.' }
-      const a = await api.attendanceActive(t)
-      session.value = a.session || null
-      await Promise.all([refreshList(false), refreshMine(false)])
+      const token = memberToken()
+      if (!token) throw { status: 401, message: 'Sesi habis. Masuk lagi.' }
+      try {
+        const data = await api.attendanceOverview(token)
+        applyOverview(data)
+        saveOverviewCache(data)
+      } catch (e) {
+        // Backend lama (belum ada /overview): pakai jalur 3-request.
+        if (e?.status === 404) { await loadLegacy(token); return }
+        // Ada cache tampil: kegagalan refresh diam-diam, coba lagi berikutnya.
+        if (cached) return
+        throw e
+      }
     })(), timeout])
   } catch (e) {
     loadError.value = e?.message || 'Gagal memuat absensi.'
@@ -93,83 +121,122 @@ async function loadAll() {
   }
 }
 
+async function loadLegacy(token) {
+  const active = await api.attendanceActive(token)
+  session.value = active.session || null
+  await Promise.all([refreshList(false), refreshSessions(false)])
+  saveOverviewCache({ sessions: attendanceSessions.value, active: session.value, list: list.value })
+}
+
+function readOverviewCache() {
+  try {
+    const raw = localStorage.getItem(OVERVIEW_CACHE_KEY)
+    if (!raw) return null
+    const data = JSON.parse(raw)
+    if (!data || !Array.isArray(data.sessions)) return null
+    return data
+  } catch { return null }
+}
+
+function saveOverviewCache(data) {
+  try {
+    localStorage.setItem(OVERVIEW_CACHE_KEY, JSON.stringify({
+      sessions: data.sessions || [],
+      active: data.active || null,
+      list: data.list || [],
+      cached_at: Date.now(),
+    }))
+  } catch { /* storage diblokir: abaikan */ }
+}
+
+function applyOverview(data) {
+  session.value = data.active || null
+  list.value = data.list || []
+  applySessions(data.sessions || [])
+}
+
+function applySessions(nextSessions) {
+  const currentExpanded = new Set(expandedSessionIds.value)
+  const activeUnattended = nextSessions.find((item) => item.is_active && !item.attendance)
+  if (activeUnattended && !drawerStateInitialized) currentExpanded.add(String(activeUnattended.id))
+  attendanceSessions.value = nextSessions
+  expandedSessionIds.value = currentExpanded
+  drawerStateInitialized = true
+}
+
 async function refreshList(showSpin = true) {
   if (!session.value) return
   if (showSpin) listLoading.value = true
   try {
-    const r = await api.attendanceList(session.value.id, memberToken())
-    list.value = r.records || []
+    const response = await api.attendanceList(session.value.id, memberToken())
+    list.value = response.records || []
   } catch { /* polling diam-diam gagal: abaikan, coba lagi berikutnya */ }
   finally { listLoading.value = false }
 }
 
-async function refreshMine(showSpin = true) {
-  if (showSpin) mineLoading.value = true
+async function refreshSessions(showSpin = true) {
+  if (showSpin) sessionsLoading.value = true
+  sessionsError.value = ''
   try {
-    const r = await api.attendanceMine(memberToken())
-    mine.value = r.records || []
-  } catch { /* abaikan */ }
-  finally { mineLoading.value = false }
-}
-
-// Group recent per sesi: key = session_title + session_date.
-// Urut sesi terbaru (scanned_at terbesar) di atas.
-const groupedMine = computed(() => {
-  const map = new Map()
-  for (const r of mine.value) {
-    const key = `${r.session_title || 'Sesi'}|${r.session_date || ''}`
-    if (!map.has(key)) {
-      map.set(key, { session_title: r.session_title || 'Sesi', session_date: r.session_date || '', records: [] })
-    }
-    map.get(key).records.push(r)
+    const response = await api.attendanceSessionsMine(memberToken())
+    applySessions(response.sessions || [])
+  } catch (e) {
+    sessionsError.value = e?.message || 'Gagal memuat riwayat absensi.'
+  } finally {
+    sessionsLoading.value = false
   }
-  return [...map.values()].sort((a, b) => {
-    const ta = a.records[0]?.scanned_at || ''
-    const tb = b.records[0]?.scanned_at || ''
-    return tb.localeCompare(ta)
-  })
-})
+}
 
-// Accordion ringkas: semua tertutup default; klik buka/tutup (boleh banyak terbuka).
-const expandedSessions = ref(new Set())
+function isExpanded(item) {
+  return expandedSessionIds.value.has(String(item.id))
+}
 
-function sessionKey(g) {
-  return `${g.session_title}|${g.session_date}`
+function syncExpandedState(item, event) {
+  const next = new Set(expandedSessionIds.value)
+  const key = String(item.id)
+  if (event.target.open) next.add(key)
+  else {
+    next.delete(key)
+    if (String(session.value?.id) === key) closeCamera()
+  }
+  expandedSessionIds.value = next
 }
-function isExpanded(g) {
-  return expandedSessions.value.has(sessionKey(g))
+
+function fmtSessionDate(date) {
+  if (!date) return 'Tanggal tidak tersedia'
+  const parsed = new Date(`${date}T00:00:00`)
+  return Number.isNaN(parsed.getTime())
+    ? date
+    : parsed.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 }
-function toggleSession(g) {
-  const k = sessionKey(g)
-  const next = new Set(expandedSessions.value)
-  if (next.has(k)) next.delete(k)
-  else next.add(k)
-  expandedSessions.value = next
-}
+
 function badgeClass(status) {
-  return status === 'hadir' ? 'ec-badge--completed' : 'ec-badge--warning'
+  if (!status || status === 'izin') return 'ec-badge--warning'
+  return status === 'hadir' ? 'ec-badge--completed' : 'ec-badge--danger'
 }
 
 async function startScan() {
   result.value = null
-  // Alur: boleh pindai dulu, password diminta saat konfirmasi (submit).
-  // Gate password di sini sengaja dilepas agar QR 7-detik tidak kedaluwarsa saat user mengetik.
-  // Kamera web wajib konteks aman: localhost/HTTPS. Via IP HTTP selalu ditolak
-  // browser apa pun isi izin HP-nya — arahkan ke kode manual.
   if (typeof window !== 'undefined' && window.isSecureContext === false) {
     result.value = { ok: false, message: 'Kamera web butuh koneksi aman (HTTPS/localhost). Karena dibuka via IP, salin kode dari layar panitia ke kolom manual di bawah.' }
     document.getElementById('presensi-manual')?.focus?.()
     return
   }
+  const attempt = ++scanAttempt
+  cameraOpen.value = true
+  await nextTick()
+  cameraCloseButton.value?.focus?.()
   try {
     const Ctor = await getScannerCtor()
+    if (attempt !== scanAttempt || !cameraOpen.value) return
     if (!scanner) scanner = new Ctor('presensi-qr-reader')
     scanning.value = true
     await scanner.start(
       { facingMode: 'environment' },
       { fps: 10, qrbox: { width: 250, height: 250 } },
       async (decoded) => {
-        await stopScan()
+        if (attempt !== scanAttempt || !cameraOpen.value) return
+        await closeCamera()
         qrText.value = String(decoded || '').trim()
         if (!qrText.value) return
         if (!password.value) {
@@ -181,9 +248,15 @@ async function startScan() {
       },
       () => { /* frame tanpa QR: abaikan */ },
     )
+    if (attempt !== scanAttempt || !cameraOpen.value) await stopScan()
   } catch (e) {
-    scanning.value = false
-    result.value = { ok: false, message: cameraMessage(e) }
+    if (attempt === scanAttempt) {
+      await stopScan()
+      cameraOpen.value = false
+      result.value = { ok: false, message: cameraMessage(e) }
+      await nextTick()
+      cameraTriggerButton.value?.focus?.()
+    }
   }
 }
 
@@ -213,6 +286,14 @@ async function stopScan() {
   finally { scanning.value = false }
 }
 
+async function closeCamera() {
+  scanAttempt += 1
+  await stopScan()
+  cameraOpen.value = false
+  await nextTick()
+  cameraTriggerButton.value?.focus?.()
+}
+
 async function submit() {
   result.value = null
   if (!password.value) {
@@ -229,9 +310,15 @@ async function submit() {
     result.value = r.already
       ? { ok: true, message: 'Kamu sudah tercatat hadir di sesi ini.' }
       : { ok: true, message: 'Hadir tercatat. Terima kasih!' }
+    successNotice.value = {
+      title: session.value?.title || 'Sesi absensi',
+      date: fmtSessionDate(session.value?.date),
+    }
+    await nextTick()
+    successCloseButton.value?.focus?.()
     password.value = ''
     qrText.value = ''
-    await Promise.all([refreshList(false), refreshMine(false)])
+    await Promise.all([refreshList(false), refreshSessions(false)])
   } catch (e) {
     if (e?.status === 410) result.value = { ok: false, message: 'QR kedaluwarsa. Pindai ulang kode terbaru di layar.' }
     else if (e?.status === 401) result.value = { ok: false, message: e?.message === 'Password salah.' ? 'Password salah.' : 'Sesi habis. Masuk lagi.' }
@@ -248,6 +335,8 @@ pollTimer = setInterval(() => {
 }, 5000)
 
 onBeforeUnmount(async () => {
+  scanAttempt += 1
+  cameraOpen.value = false
   if (pollTimer) clearInterval(pollTimer)
   await stopScan()
   try { if (scanner) await scanner.clear() } catch { /* abaikan */ }
@@ -288,138 +377,136 @@ onBeforeUnmount(async () => {
         <button
           type="button" role="tab" :aria-selected="presensiMode === 'display'"
           class="presensi__mode" :class="{ active: presensiMode === 'display' }"
-          @click="presensiMode = 'display'; stopScan()"
+          @click="presensiMode = 'display'; closeCamera()"
         >Display QR</button>
       </div>
 
-      <!-- Display QR untuk layar/proyektor (superadmin) -->
+      <!-- Display QR untuk layar/proyektor (superadmin penuh, SO read-only) -->
       <div v-if="canDisplay && presensiMode === 'display'" class="ec-card presensi__card">
-        <QrDisplayView :token="memberToken()" :key="'qr-absensi'" />
+        <QrDisplayView :token="memberToken()" :read-only="displayReadOnly" :key="'qr-absensi'" />
       </div>
 
-      <!-- Check-in -->
-      <div v-show="!canDisplay || presensiMode === 'scan'" class="ec-card presensi__card">
-        <h2 class="presensi__sectitle">Check-in QR</h2>
-        <p class="ec-body">Pindai QR di layar panitia (berganti tiap {{ QR_ROTATE_SECONDS }} detik), lalu konfirmasi dengan password akunmu.</p>
-        <form class="presensi__form" autocomplete="on" @submit.prevent="submit">
-          <!-- Hidden username: syarat password manager agar mau autofill. Tidak dikirim ke API. -->
-          <input
-            type="text"
-            name="username"
-            autocomplete="username"
-            :value="cachedUsername"
-            readonly
-            tabindex="-1"
-            aria-hidden="true"
-            class="ec-sr-only"
-          />
-          <div class="ec-field-group">
-            <label class="ec-label" for="presensi-pw">Password akun</label>
-            <div class="presensi__password">
-              <input
-                id="presensi-pw"
-                v-model="password"
-                :type="showPassword ? 'text' : 'password'"
-                name="password"
-                class="ec-field"
-                placeholder="••••••••"
-                autocomplete="current-password"
-              />
-              <button
-                class="presensi__toggle"
-                type="button"
-                :aria-pressed="showPassword ? 'true' : 'false'"
-                :aria-label="showPassword ? 'Sembunyikan password' : 'Tampilkan password'"
-                @click="showPassword = !showPassword"
-              >{{ showPassword ? 'Sembunyi' : 'Lihat' }}</button>
-            </div>
-            <p class="ec-helper">Sama seperti password saat masuk. Bisa tersimpan otomatis di browser.</p>
-          </div>
-          <div class="presensi__actions">
-            <button v-if="!scanning" class="ec-btn ec-btn--primary ec-btn--sm" type="button" @click="startScan">
-              Buka Kamera &amp; Scan QR
-            </button>
-            <button v-else class="ec-btn ec-btn--secondary ec-btn--sm" type="button" @click="stopScan">
-              Tutup Kamera
-            </button>
-          </div>
-          <div v-show="scanning" id="presensi-qr-reader" class="presensi__reader"></div>
-          <details class="presensi__manual">
-            <summary>Kamera bermasalah? Pakai kode manual</summary>
-            <label class="ec-label" for="presensi-manual">Kode manual</label>
-            <input
-              id="presensi-manual"
-              v-model="qrText"
-              class="ec-field ec-field--mono"
-              placeholder="ECA1:... (salin dari layar panitia)"
-              autocomplete="off"
-              spellcheck="false"
-            />
-          </details>
-          <button class="ec-btn ec-btn--secondary ec-btn--block" type="submit" :disabled="submitting || !qrText.trim()">
-            {{ submitting ? 'Memproses...' : 'Catat Kehadiran' }}
-          </button>
-          <p v-if="result" class="presensi__result" :class="{ 'presensi__result--ok': result.ok, 'presensi__result--err': !result.ok }" role="status" aria-live="polite">
-            {{ result.message }}
-          </p>
-        </form>
-      </div>
-
-      <!-- List absensi sesi ini -->
       <div class="ec-card presensi__card">
         <div class="presensi__sechead">
-          <h2 class="presensi__sectitle">Hadir ({{ list.length }})</h2>
-          <button class="presensi__seeall" type="button" :disabled="listLoading" @click="refreshList(true)">
-            {{ listLoading ? 'Memuat...' : 'Refresh' }}
+          <h2 class="presensi__sectitle">Riwayat &amp; sesi absensi</h2>
+          <button class="presensi__seeall" type="button" :disabled="sessionsLoading" @click="refreshSessions(true)">
+            {{ sessionsLoading ? 'Memuat...' : 'Refresh' }}
           </button>
         </div>
-        <ul v-if="list.length" class="presensi__list">
-          <li v-for="r in list" :key="r.id" class="presensi__row">
-            <span class="presensi__avatar">{{ (r.fullname || r.username || '?').charAt(0).toUpperCase() }}</span>
-            <span class="presensi__name">{{ r.fullname || r.username }}<small>@{{ r.username }}</small></span>
-            <span class="ec-caption">{{ fmtTime(r.scanned_at) }}</span>
-          </li>
-        </ul>
-        <p v-else class="ec-body">Belum ada yang check-in di sesi ini.</p>
-      </div>
+        <p v-if="sessionsError" class="presensi__result presensi__result--err" role="alert">{{ sessionsError }}</p>
+        <div v-else-if="attendanceSessions.length" class="presensi__session-cards">
+          <details
+            v-for="item in attendanceSessions"
+            :key="item.id"
+            class="presensi__session-card"
+            :class="{ 'presensi__session-card--open': isExpanded(item), 'presensi__session-card--active': item.is_active }"
+            :open="isExpanded(item)"
+            @toggle="syncExpandedState(item, $event)"
+          >
+            <summary class="presensi__session-summary">
+              <span class="presensi__session-date">
+                <span class="presensi__session-date-label">{{ item.is_active ? 'Sesi aktif' : 'Tanggal' }}</span>
+                <time>{{ fmtSessionDate(item.date) }}</time>
+              </span>
+              <span class="presensi__session-summary-main">
+                <span class="presensi__session-title">{{ item.title || 'Sesi absensi' }}</span>
+                <span class="presensi__session-preview">
+                  <span v-if="item.is_active" class="ec-badge ec-badge--completed">Berlangsung</span>
+                  <span class="ec-badge" :class="badgeClass(item.attendance?.status)">{{ item.attendance?.status || 'Belum absen' }}</span>
+                </span>
+              </span>
+              <svg class="presensi__chevron" :class="{ 'presensi__chevron--open': isExpanded(item) }" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+            </summary>
+            <div class="presensi__session-body">
+              <div class="presensi__session-details">
+                <h3 class="presensi__session-title">{{ item.title || 'Sesi absensi' }}</h3>
+                <p v-if="item.attendance?.scanned_at" class="presensi__session-time">Check-in {{ fmtTime(item.attendance.scanned_at) }}</p>
+                <p v-else-if="item.attendance" class="presensi__session-time">Status kehadiran: {{ item.attendance.status }}</p>
+                <p v-else-if="item.is_active" class="ec-body">Kamu belum absen di sesi ini. Pindai QR panitia untuk mencatat kehadiran.</p>
+                <p v-else class="ec-body">Sesi sudah ditutup dan kamu belum tercatat hadir.</p>
+              </div>
 
-      <!-- Recent milik sendiri: card per sesi -->
-      <div class="ec-card presensi__card">
-        <div class="presensi__sechead">
-          <h2 class="presensi__sectitle">Recent Absensi</h2>
-          <button class="presensi__seeall" type="button" :disabled="mineLoading" @click="refreshMine(true)">
-            {{ mineLoading ? 'Memuat...' : 'Refresh' }}
-          </button>
-        </div>
-        <div v-if="groupedMine.length" class="presensi__session-cards">
-          <div v-for="g in groupedMine" :key="sessionKey(g)" class="presensi__session-card">
-            <button
-              type="button"
-              class="presensi__session-head"
-              :aria-expanded="isExpanded(g) ? 'true' : 'false'"
-              @click="toggleSession(g)"
-            >
-              <span class="presensi__session-summary">
-                <span class="presensi__session-title">{{ g.session_title }}</span>
-                <span class="presensi__session-date">{{ g.session_date }}</span>
-              </span>
-              <span class="presensi__session-preview">
-                <span class="ec-badge" :class="badgeClass(g.records[0]?.status)">{{ g.records[0]?.status }}</span>
-                <span class="presensi__record-count">{{ g.records.length }}</span>
-              </span>
-              <svg class="presensi__chevron" :class="{ 'presensi__chevron--open': isExpanded(g) }" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
-            </button>
-            <div v-show="isExpanded(g)" class="presensi__session-body">
-              <div v-for="r in g.records" :key="r.id" class="presensi__session-record">
-                <span class="ec-badge" :class="badgeClass(r.status)">{{ r.status }}</span>
-                <span class="presensi__session-time">{{ fmtTime(r.scanned_at) }}</span>
+              <form
+                v-if="item.is_active && !item.attendance && (!canDisplay || presensiMode === 'scan')"
+                class="presensi__form"
+                autocomplete="on"
+                @submit.prevent="submit"
+              >
+                <input type="text" name="username" autocomplete="username" :value="cachedUsername" readonly tabindex="-1" aria-hidden="true" class="ec-sr-only" />
+                <div class="ec-field-group">
+                  <label class="ec-label" for="presensi-pw">Password akun</label>
+                  <div class="presensi__password">
+                    <input id="presensi-pw" v-model="password" :type="showPassword ? 'text' : 'password'" name="password" class="ec-field" placeholder="••••••••" autocomplete="current-password" />
+                    <button class="presensi__toggle" type="button" :aria-pressed="showPassword ? 'true' : 'false'" :aria-label="showPassword ? 'Sembunyikan password' : 'Tampilkan password'" @click="showPassword = !showPassword">{{ showPassword ? 'Sembunyi' : 'Lihat' }}</button>
+                  </div>
+                  <p class="ec-helper">Konfirmasi dengan password akunmu.</p>
+                </div>
+                <div class="presensi__actions">
+                  <button v-if="!cameraOpen" ref="cameraTriggerButton" class="ec-btn ec-btn--primary ec-btn--sm" type="button" @click="startScan">Buka Kamera &amp; Scan QR</button>
+                </div>
+                <details class="presensi__manual">
+                  <summary>Kamera bermasalah? Pakai kode manual</summary>
+                  <label class="ec-label" for="presensi-manual">Kode manual</label>
+                  <input id="presensi-manual" v-model="qrText" class="ec-field ec-field--mono" placeholder="ECA1:... (salin dari layar panitia)" autocomplete="off" spellcheck="false" />
+                </details>
+                <button class="ec-btn ec-btn--secondary ec-btn--block" type="submit" :disabled="submitting || !qrText.trim()">
+                  {{ submitting ? 'Memproses...' : 'Catat Kehadiran' }}
+                </button>
+                <p v-if="result" class="presensi__result" :class="{ 'presensi__result--ok': result.ok, 'presensi__result--err': !result.ok }" role="status" aria-live="polite">{{ result.message }}</p>
+              </form>
+
+              <div v-if="item.is_active" class="presensi__attendees">
+                <div class="presensi__sechead">
+                  <h4 class="presensi__attendees-title">Hadir ({{ list.length }})</h4>
+                  <button class="presensi__seeall" type="button" :disabled="listLoading" @click="refreshList(true)">{{ listLoading ? 'Memuat...' : 'Refresh' }}</button>
+                </div>
+                <ul v-if="list.length" class="presensi__list">
+                  <li v-for="r in list" :key="r.id" class="presensi__row">
+                    <span class="presensi__avatar">{{ (r.fullname || r.username || '?').charAt(0).toUpperCase() }}</span>
+                    <span class="presensi__name">{{ r.fullname || r.username }}<small>@{{ r.username }}</small></span>
+                    <span class="ec-caption">{{ fmtTime(r.scanned_at) }}</span>
+                  </li>
+                </ul>
+                <p v-else class="ec-body">Belum ada yang check-in di sesi ini.</p>
               </div>
             </div>
-          </div>
+          </details>
         </div>
-        <p v-else class="ec-body">Belum ada riwayat kehadiran.</p>
+        <p v-else class="ec-body">Belum ada sesi absensi.</p>
       </div>
     </template>
+    <div
+      v-if="cameraOpen"
+      class="presensi__popup-backdrop"
+      @click.self="closeCamera"
+      @keydown.esc.stop.prevent="closeCamera"
+    >
+      <section class="presensi__popup" role="dialog" aria-modal="true" aria-labelledby="presensi-camera-title">
+        <header class="presensi__popup-head">
+          <div>
+            <h2 id="presensi-camera-title" class="presensi__popup-title">Pindai QR presensi</h2>
+            <p class="ec-caption">Arahkan kamera ke QR di layar panitia.</p>
+          </div>
+          <button ref="cameraCloseButton" class="presensi__popup-close" type="button" aria-label="Tutup kamera" @click="closeCamera">×</button>
+        </header>
+        <div id="presensi-qr-reader" class="presensi__reader"></div>
+        <p class="ec-caption">Pastikan QR terlihat jelas dan berada di dalam bingkai kamera.</p>
+      </section>
+    </div>
+    <div
+      v-if="successNotice"
+      class="presensi__popup-backdrop"
+      @click.self="successNotice = null"
+      @keydown.esc.stop.prevent="successNotice = null"
+    >
+      <section class="presensi__popup presensi__popup--success" role="dialog" aria-modal="true" aria-labelledby="presensi-success-title">
+        <span class="presensi__success-mark" aria-hidden="true">✓</span>
+        <h2 id="presensi-success-title" class="presensi__popup-title">Presensi berhasil</h2>
+        <p class="presensi__success-session">{{ successNotice.title }}</p>
+        <p class="ec-caption">{{ successNotice.date }}</p>
+        <button ref="successCloseButton" class="ec-btn ec-btn--primary" type="button" @click="successNotice = null">Tutup</button>
+      </section>
+    </div>
   </div>
 </template>
 
@@ -458,7 +545,7 @@ onBeforeUnmount(async () => {
 .presensi__skel { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
 @media (max-width: 400px) { .presensi__skel { grid-template-columns: 1fr; } }
 .presensi__card { padding: 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
-.presensi__row .ec-caption { overflow-wrap: anywhere; flex-shrink: 0; }
+.presensi__row .ec-caption { min-width: 0; overflow-wrap: anywhere; flex-shrink: 0; }
 .presensi__card .presensi__sechead { padding-top: 0; }
 .ec-field--mono { font-family: ui-monospace, monospace; font-size: 0.8rem; }
 /* html5-qrcode menyuntik div/canvas/select/tombol ber-width fix: kekang
@@ -466,6 +553,18 @@ onBeforeUnmount(async () => {
 .presensi__reader { overflow: hidden; border-radius: var(--ec-radius-md); border: 1px solid var(--ec-line); margin-top: 10px; max-width: 100%; }
 .presensi__reader, .presensi__reader * { max-width: 100%; }
 .presensi__reader video { width: 100% !important; border-radius: var(--ec-radius-md); }
+.presensi__popup-backdrop { position: fixed; z-index: 80; inset: 0; display: grid; place-items: center; overflow-y: auto; padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); background: rgba(15, 23, 42, 0.68); }
+.presensi__popup { display: flex; flex-direction: column; gap: 14px; width: min(100%, 520px); max-height: calc(100vh - 24px); max-height: min(calc(100dvh - 24px), 760px); overflow-y: auto; padding: 18px; border: 1px solid var(--ec-line); border-radius: var(--ec-radius-lg); background: var(--ec-surface); box-shadow: var(--ec-shadow-lg); overscroll-behavior: contain; }
+.presensi__popup-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.presensi__popup-title { margin: 0; color: var(--ec-ink); font-family: 'Outfit', sans-serif; font-size: 1.2rem; font-weight: 800; }
+.presensi__popup-close { display: grid; place-items: center; flex: 0 0 40px; width: 40px; height: 40px; border: 1px solid var(--ec-line); border-radius: 50%; background: var(--ec-canvas); color: var(--ec-ink); font: inherit; font-size: 1.4rem; cursor: pointer; }
+.presensi__popup .presensi__reader { width: 100%; min-width: 0; margin-top: 0; }
+.presensi__popup .presensi__reader > div { min-width: 0 !important; width: 100% !important; }
+.presensi__popup .presensi__reader video,
+.presensi__popup .presensi__reader canvas { display: block; max-width: 100% !important; height: auto !important; }
+.presensi__popup--success { align-items: center; width: min(100%, 380px); text-align: center; padding: 26px 22px; }
+.presensi__success-mark { display: grid; place-items: center; width: 54px; height: 54px; border-radius: 50%; background: var(--ec-success-bg); color: var(--ec-success); font-size: 1.8rem; font-weight: 800; }
+.presensi__success-session { margin: 0; color: var(--ec-ink); font-weight: 700; }
 /* Scoped .ec-field--mono menang atas aturan 16px global (cascade): ulangi
    khusus mono agar Safari tidak auto-zoom di kolom kode manual. */
 @media (pointer: coarse) {
@@ -473,6 +572,23 @@ onBeforeUnmount(async () => {
 }
 @media (max-width: 400px) {
   .presensi__actions .ec-btn { flex: 1 1 100%; }
+}
+@media (max-width: 420px) {
+  .presensi__popup-backdrop { padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); }
+  .presensi__popup { gap: 12px; padding: 14px; border-radius: var(--ec-radius-md); max-height: calc(100vh - 16px); max-height: min(calc(100dvh - 16px), 760px); }
+  .presensi__popup--success { padding: 22px 16px; }
+  .presensi__popup--success .ec-btn { width: 100%; }
+  .presensi__row { align-items: flex-start; flex-wrap: wrap; column-gap: 8px; row-gap: 4px; }
+  .presensi__row .presensi__name { flex: 1 1 calc(100% - 48px); }
+  .presensi__row .ec-caption { margin-left: 40px; }
+  .presensi__session-summary { flex-wrap: wrap; }
+  .presensi__session-date { flex-basis: 88px; }
+  .presensi__session-summary-main { flex-basis: calc(100% - 126px); }
+}
+@media (max-height: 520px) and (orientation: landscape) {
+  .presensi__popup-backdrop { place-items: start center; }
+  .presensi__popup { max-height: calc(100vh - 16px); max-height: calc(100dvh - 16px); }
+  .presensi__popup--success { align-self: center; }
 }
 .presensi__result { font-size: 0.875rem; font-weight: 700; padding: 10px 14px; border-radius: var(--ec-radius-md); }
 .presensi__result--ok { background: var(--ec-success-bg); color: var(--ec-success); border: 1px solid var(--ec-success-line); }
@@ -485,48 +601,47 @@ onBeforeUnmount(async () => {
 .presensi__name { flex: 1; min-width: 0; font-size: 0.875rem; font-weight: 700; color: var(--ec-ink); display: flex; flex-direction: column; }
 .presensi__name small { font-weight: 500; color: var(--ec-ink-soft); }
 
-/* Recent absensi: card per sesi (ringkas, tap untuk expand) */
+/* Drawer sesi: ringkasan dan detail tetap berada dalam satu kartu */
 .presensi__session-cards { display: flex; flex-direction: column; gap: 10px; }
-.presensi__session-card { border: 1px solid var(--ec-line); border-radius: var(--ec-radius-md); background: var(--ec-canvas); overflow: hidden; }
-.presensi__session-head {
+.presensi__session-card {
+  display: block;
+  border: 1px solid var(--ec-line);
+  border-radius: var(--ec-radius-sm);
+  background: var(--ec-surface);
+  overflow: hidden;
+}
+.presensi__session-card--active { border-color: var(--ec-info-line); }
+.presensi__session-summary {
   display: flex;
   align-items: center;
-  gap: 10px;
-  width: 100%;
+  gap: 16px;
+  min-height: 76px;
   padding: 12px 14px;
-  border: 0;
-  background: transparent;
-  font-family: inherit;
-  text-align: left;
   cursor: pointer;
+  list-style: none;
 }
-.presensi__session-head:hover { background: var(--ec-surface); }
-.presensi__session-head:focus-visible { outline: none; box-shadow: var(--ec-focus-ring); }
-.presensi__session-summary { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.presensi__session-title { font-family: 'Outfit', sans-serif; font-size: 0.9375rem; font-weight: 700; color: var(--ec-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.presensi__session-date { font-size: 0.75rem; font-weight: 600; color: var(--ec-ink-soft); }
-.presensi__session-preview { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-.presensi__record-count { font-size: 0.7rem; font-weight: 700; color: var(--ec-ink-soft); background: var(--ec-surface); border: 1px solid var(--ec-line); border-radius: 99px; padding: 2px 7px; }
-.presensi__chevron { color: var(--ec-ink-soft); flex-shrink: 0; transition: transform 220ms var(--ec-ease); }
+.presensi__session-summary::-webkit-details-marker { display: none; }
+.presensi__session-summary:focus-visible { outline: none; box-shadow: inset var(--ec-focus-ring); }
+.presensi__session-date { display: flex; flex: 0 0 180px; flex-direction: column; justify-content: center; gap: 4px; min-width: 0; padding-right: 16px; border-right: 1px solid var(--ec-line); }
+.presensi__session-date-label { font-size: 0.688rem; font-weight: 700; text-transform: uppercase; color: var(--ec-ink-soft); }
+.presensi__session-date time { font-size: 0.875rem; font-weight: 700; line-height: 1.45; color: var(--ec-ink); }
+.presensi__session-summary-main { display: flex; flex: 1; min-width: 0; flex-direction: column; justify-content: center; gap: 8px; }
+.presensi__session-title { margin: 0; font-family: 'Outfit', sans-serif; font-size: 0.9375rem; font-weight: 700; line-height: 1.4; color: var(--ec-ink); overflow-wrap: anywhere; }
+.presensi__session-preview { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.presensi__chevron { flex: 0 0 auto; color: var(--ec-ink-soft); transition: transform 180ms var(--ec-ease); }
 .presensi__chevron--open { transform: rotate(180deg); }
-.presensi__session-body {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 10px 14px 12px;
-  border-top: 1px dashed var(--ec-line);
-  background: var(--ec-surface);
-  animation: presensi-body-in 220ms var(--ec-ease);
+.presensi__session-body { display: flex; flex-direction: column; gap: 14px; padding: 14px; border-top: 1px solid var(--ec-line); background: var(--ec-canvas); }
+.presensi__session-details { display: flex; flex-direction: column; gap: 6px; }
+.presensi__session-time { font-size: 0.8125rem; color: var(--ec-ink-soft); }
+.presensi__session-details .ec-body { margin: 0; }
+.presensi__attendees { padding-top: 12px; border-top: 1px solid var(--ec-line); }
+.presensi__attendees-title { margin: 0; font-size: 0.875rem; font-weight: 700; color: var(--ec-ink); }
+@media (max-width: 520px) {
+  .presensi__session-summary { align-items: flex-start; gap: 10px; padding: 12px; }
+  .presensi__session-date { flex: 0 0 104px; padding-right: 10px; }
+  .presensi__session-date time { font-size: 0.8125rem; }
+  .presensi__session-body { padding: 12px; }
 }
-@keyframes presensi-body-in {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .presensi__chevron { transition: none; }
-  .presensi__session-body { animation: none; }
-}
-.presensi__session-record { display: flex; align-items: center; gap: 8px; }
-.presensi__session-time { font-size: 0.8125rem; color: var(--ec-ink-soft); margin-left: auto; }
+@media (prefers-reduced-motion: reduce) { .presensi__chevron { transition: none; } }
 </style>
 

@@ -57,6 +57,12 @@ const newCover = ref(null)
 const mediaDraft = ref({})
 const creating = ref(false)
 const savingProker = ref({})
+const announcements = ref([])
+const announcementsLoading = ref(false)
+const newAnnouncement = ref({ title: '', body: '', pinned: false })
+const announcementDraft = ref({})
+const creatingAnnouncement = ref(false)
+const savingAnnouncement = ref({})
 
 async function checkAuth() {
   // Mode tertanam: tidak ada form login, validasi sesi member sebagai superadmin.
@@ -100,7 +106,7 @@ async function login() {
     authedUser.value = r.username
     username.value = ''
     password.value = ''
-    await Promise.all([fetchMembers(), loadProker(), loadGroups(), fetchWhitelist(), fetchAccounts()])
+    await Promise.all([fetchMembers(), loadProker(), loadAnnouncements(), loadGroups(), fetchWhitelist(), fetchAccounts(), fetchSoRoles()])
   } catch (e) {
     error.value = e?.message?.includes('401') ? 'Username atau password salah.' : 'Login belum berhasil.'
   } finally { loading.value = false }
@@ -120,8 +126,10 @@ function logout() {
   authed.value = false
   members.value = []
   proker.value = []
+  announcements.value = []
   whitelist.value = []
   accounts.value = []
+  soMembers.value = []
   error.value = ''
 }
 
@@ -239,6 +247,7 @@ async function createProker() {
 
 function confirmDeleteProker(p) { confirmState.value = { type: 'proker', id: p.id } }
 function confirmDeletePhoto(p, idx) { confirmState.value = { type: 'photo', id: p.id, idx } }
+function confirmDeleteAnnouncement(a) { confirmState.value = { type: 'announcement', id: a.id } }
 function cancelConfirm() { confirmState.value = null }
 async function doConfirmedDelete() {
   const c = confirmState.value
@@ -248,6 +257,11 @@ async function doConfirmedDelete() {
   try {
     if (c.type === 'proker') {
       await api.deleteProker(c.id, t)
+    } else if (c.type === 'announcement') {
+      await api.deleteAnnouncement(c.id, t)
+      await loadAnnouncements()
+      showSuccess('Pengumuman berhasil dihapus.')
+      return
     } else {
       const res = await fetch(`/api/proker/${c.id}/photos/${c.idx}`, { method: 'DELETE', headers: { Authorization: `Bearer ${t}`, 'x-admin-token': t } })
       if (!res.ok) { const j = await res.json().catch(()=>({})); throw Object.assign(new Error(j.detail || `HTTP ${res.status}`), { status: res.status }) }
@@ -285,6 +299,60 @@ async function addGalleryUrl(p) {
     await loadProker()
   } catch (e) { handleError(e, 'Foto belum ditambahkan.') }
   finally { galleryAdding.value[p.id] = false }
+}
+
+// ---- Pengumuman dashboard ----
+async function loadAnnouncements() {
+  announcementsLoading.value = true
+  try {
+    const data = await api.announcements()
+    announcements.value = data.announcements || []
+    announcements.value.forEach(a => {
+      announcementDraft.value[a.id] = { title: a.title, body: a.body, pinned: Boolean(a.pinned) }
+    })
+  } catch (e) { handleError(e, 'Pengumuman belum dapat dimuat.') }
+  finally { announcementsLoading.value = false }
+}
+
+async function createAnnouncement() {
+  const d = newAnnouncement.value
+  if (d.title.trim().length < 3 || d.title.trim().length > 80) { error.value = 'Judul 3-80 karakter'; return }
+  if (d.body.trim().length < 5 || d.body.trim().length > 500) { error.value = 'Isi 5-500 karakter'; return }
+  creatingAnnouncement.value = true
+  try {
+    await api.createAnnouncement({ title: d.title.trim(), body: d.body.trim(), pinned: d.pinned }, adminToken() || '')
+    newAnnouncement.value = { title: '', body: '', pinned: false }
+    await loadAnnouncements()
+    error.value = ''
+    showSuccess('Pengumuman berhasil ditambahkan.')
+  } catch (e) { handleError(e, 'Pengumuman belum ditambahkan.') }
+  finally { creatingAnnouncement.value = false }
+}
+
+async function saveAnnouncement(a) {
+  const d = announcementDraft.value[a.id]
+  if (!d) { error.value = 'Data pengumuman belum siap.'; return }
+  if (d.title.trim().length < 3 || d.title.trim().length > 80) { error.value = 'Judul 3-80 karakter'; return }
+  if (d.body.trim().length < 5 || d.body.trim().length > 500) { error.value = 'Isi 5-500 karakter'; return }
+  savingAnnouncement.value[a.id] = true
+  try {
+    await api.updateAnnouncement(a.id, { title: d.title.trim(), body: d.body.trim(), pinned: Boolean(d.pinned) }, adminToken() || '')
+    await loadAnnouncements()
+    error.value = ''
+    showSuccess('Pengumuman berhasil disimpan.')
+  } catch (e) { handleError(e, 'Pengumuman belum tersimpan.') }
+  finally { savingAnnouncement.value[a.id] = false }
+}
+
+async function togglePinAnnouncement(a) {
+  savingAnnouncement.value[a.id] = true
+  try {
+    await api.updateAnnouncement(a.id, { pinned: !a.pinned }, adminToken() || '')
+    await loadAnnouncements()
+    error.value = ''
+    showSuccess(a.pinned ? 'Pin dilepas.' : 'Pengumuman di-pin ke atas.')
+  } catch (e) { handleError(e, 'Pin belum diubah.') }
+  finally { savingAnnouncement.value[a.id] = false }
 }
 
 const filtered = computed(() => {
@@ -477,9 +545,49 @@ async function doResetPassword(id, username) {
   finally { resettingPw.value[id] = false }
 }
 
+// ---- Role Display QR: hanya biasa <-> SO (superadmin/operator disembunyikan BE) ----
+const soMembers = ref([])
+const soLoading = ref(false)
+const soSearch = ref('')
+const soSaving = ref({})
+const filteredSoMembers = computed(() => {
+  const q = soSearch.value.trim().toLowerCase()
+  if (!q) return soMembers.value
+  return soMembers.value.filter((m) =>
+    (m.username || '').toLowerCase().includes(q) || (m.fullname || '').toLowerCase().includes(q),
+  )
+})
+const soCount = computed(() => soMembers.value.filter((m) => m.display_role === 'so').length)
+
+async function fetchSoRoles() {
+  soLoading.value = true
+  try {
+    const data = await api.memberRoles(adminToken())
+    soMembers.value = data.members || []
+  } catch (e) { handleError(e, 'Role Display QR belum dapat dimuat.') }
+  finally { soLoading.value = false }
+}
+
+async function setSoRole(username, role) {
+  if (!username || soSaving.value[username]) return
+  const label = role === 'so' ? 'jadikan SO (bisa Display QR)' : 'kembalikan jadi anggota biasa'
+  if (!confirm(`@${username} ${label}?`)) {
+    await fetchSoRoles()
+    return
+  }
+  soSaving.value[username] = true
+  error.value = ''
+  try {
+    await api.memberSetRole(username, role, adminToken())
+    showSuccess(role === 'so' ? `@${username} kini SO` : `@${username} kembali anggota biasa`)
+    await fetchSoRoles()
+  } catch (e) { handleError(e, 'Gagal mengubah role.'); await fetchSoRoles() }
+  finally { soSaving.value[username] = false }
+}
+
 onMounted(async () => {
   await checkAuth()
-  if (authed.value) { await Promise.all([fetchMembers(), loadProker(), loadGroups(), fetchWhitelist(), fetchAccounts()]) }
+  if (authed.value) { await Promise.all([fetchMembers(), loadProker(), loadAnnouncements(), loadGroups(), fetchWhitelist(), fetchAccounts(), fetchSoRoles()]) }
 })
 </script>
 
@@ -536,11 +644,15 @@ onMounted(async () => {
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
           <span>Proker</span><b class="count">{{ proker.length }}</b>
         </button>
+        <button class="side-item" :class="{active: activeTab==='pengumuman'}" @click="activeTab='pengumuman'; loadAnnouncements()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+          <span>Pengumuman</span><b class="count">{{ announcements.length }}</b>
+        </button>
         <button class="side-item" :class="{active: activeTab==='spinner'}" @click="activeTab='spinner'; loadSpinner()">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
           <span>Spinner</span>
         </button>
-        <button class="side-item" :class="{active: activeTab==='accounts'}" @click="activeTab='accounts'; fetchWhitelist(); fetchAccounts()">
+        <button class="side-item" :class="{active: activeTab==='accounts'}" @click="activeTab='accounts'; fetchWhitelist(); fetchAccounts(); fetchSoRoles()">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>
           <span>Akun EC</span><b class="count">{{ accounts.length }}</b>
         </button>
@@ -667,6 +779,47 @@ onMounted(async () => {
               </div>
               <div class="card-actions">
                 <div class="action-group"><button class="btn sm" @click="saveProker(p)" :disabled="savingProker[p.id]">{{ savingProker[p.id] ? 'Menyimpan...' : 'Simpan' }}</button><button class="btn sm danger" @click="confirmDeleteProker(p)">Hapus</button></div>
+              </div>
+            </article>
+          </div>
+        </div>
+
+        <!-- Pengumuman -->
+        <div v-else-if="activeTab==='pengumuman'">
+          <div class="toolbar">
+            <h2 class="tab-title">Kelola Pengumuman</h2>
+            <span class="tiny muted">Tampil di dashboard anggota</span>
+          </div>
+          <p v-if="error" class="error">{{ error }}</p>
+          <p v-if="success" class="success">{{ success }}</p>
+          <form class="proker-create" @submit.prevent="createAnnouncement">
+            <strong class="form-heading">Tambah Pengumuman</strong>
+            <label class="field-label">Judul (3-80 karakter)</label>
+            <input v-model="newAnnouncement.title" class="field" maxlength="80" placeholder="Contoh: Absensi dibuka Sabtu 09.00" required />
+            <label class="field-label">Isi (5-500 karakter)</label>
+            <textarea v-model="newAnnouncement.body" class="field" rows="3" maxlength="500" placeholder="Tulis info untuk anggota..."></textarea>
+            <label class="announce-pin-row"><input v-model="newAnnouncement.pinned" type="checkbox" /> Pin ke atas</label>
+            <button class="btn create-submit" type="submit" :disabled="creatingAnnouncement">{{ creatingAnnouncement ? 'Menyimpan...' : '+ Tambah Pengumuman' }}</button>
+          </form>
+          <div v-if="announcementsLoading" class="proker-state">Memuat pengumuman...</div>
+          <div v-else-if="!announcements.length" class="proker-state">Belum ada pengumuman. Tambahkan lewat form di atas.</div>
+          <div class="proker-grid">
+            <article v-for="a in announcements" :key="a.id" class="proker-card">
+              <div class="proker-card-head">
+                <span class="id-badge">{{ displayTime(a) }}</span>
+                <span v-if="a.pinned" class="order-badge">📌 Pin</span>
+              </div>
+              <label class="field-label">Judul</label>
+              <input v-model="announcementDraft[a.id].title" class="field" maxlength="80" placeholder="Judul pengumuman..." />
+              <label class="field-label">Isi</label>
+              <textarea v-model="announcementDraft[a.id].body" class="field" rows="3" maxlength="500" placeholder="Isi pengumuman..."></textarea>
+              <label class="announce-pin-row"><input v-model="announcementDraft[a.id].pinned" type="checkbox" /> Pin ke atas</label>
+              <div class="card-actions">
+                <div class="action-group">
+                  <button class="btn sm" @click="saveAnnouncement(a)" :disabled="savingAnnouncement[a.id]">{{ savingAnnouncement[a.id] ? 'Menyimpan...' : 'Simpan' }}</button>
+                  <button class="btn sm ghost" @click="togglePinAnnouncement(a)" :disabled="savingAnnouncement[a.id]">{{ a.pinned ? 'Lepas Pin' : 'Pin' }}</button>
+                  <button class="btn sm danger" @click="confirmDeleteAnnouncement(a)">Hapus</button>
+                </div>
               </div>
             </article>
           </div>
@@ -836,6 +989,55 @@ onMounted(async () => {
             </article>
             <p v-if="!filteredAccounts.length" class="empty">Belum ada akun anggota</p>
           </div>
+
+          <h3 class="subsection-title" style="margin-top:28px;">Role Display QR — SO ({{ soCount }} SO)</h3>
+          <p class="tiny muted" style="margin-bottom:16px;">SO bisa membuka Display QR (read-only) di tab Absensi. Hanya biasa ↔ SO yang bisa diubah di sini; superadmin/operator tidak ditampilkan.</p>
+          <div class="toolbar">
+            <div class="search-wrap">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg>
+              <input v-model="soSearch" class="search" placeholder="Cari username / nama..." />
+            </div>
+            <button class="btn ghost sm" @click="fetchSoRoles" :disabled="soLoading">{{ soLoading ? 'Memuat...' : 'Refresh' }}</button>
+          </div>
+          <div class="table-card">
+            <div class="table-wrap">
+              <table class="admin-table">
+                <thead><tr><th>Username</th><th>Nama</th><th>Role</th></tr></thead>
+                <tbody>
+                  <tr v-for="m in filteredSoMembers" :key="'so-'+m.id">
+                    <td><b>@{{ m.username }}</b></td>
+                    <td class="tiny">{{ m.fullname }}</td>
+                    <td>
+                      <select :value="m.display_role || 'biasa'" class="field sm group-select" :disabled="!!soSaving[m.username]" :aria-label="'Role ' + m.username" @change="setSoRole(m.username, $event.target.value)">
+                        <option value="biasa">Anggota biasa</option>
+                        <option value="so">SO – Display QR</option>
+                      </select>
+                    </td>
+                  </tr>
+                  <tr v-if="!filteredSoMembers.length"><td colspan="3" class="empty">Belum ada akun anggota</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="accounts-cards">
+            <article v-for="m in filteredSoMembers" :key="'som-'+m.id" class="account-card">
+              <div class="member-top">
+                <span class="avatar sm">{{ (m.fullname || m.username || '?').charAt(0).toUpperCase() }}</span>
+                <div class="account-id">
+                  <b class="member-name">@{{ m.username }}</b>
+                  <span class="tiny muted">{{ m.fullname }}</span>
+                </div>
+                <span v-if="m.display_role === 'so'" class="jurusan-badge sm">SO</span>
+              </div>
+              <div class="reset-row">
+                <select :value="m.display_role || 'biasa'" class="field sm group-select" :disabled="!!soSaving[m.username]" :aria-label="'Role ' + m.username" @change="setSoRole(m.username, $event.target.value)">
+                  <option value="biasa">Anggota biasa</option>
+                  <option value="so">SO – Display QR</option>
+                </select>
+              </div>
+            </article>
+            <p v-if="!filteredSoMembers.length" class="empty">Belum ada akun anggota</p>
+          </div>
         </div>
         <!-- Absensi QR: display + live list (lazy, hanya saat tab dibuka) -->
         <div v-else-if="activeTab==='absensi'">
@@ -847,8 +1049,8 @@ onMounted(async () => {
     <Transition name="confirm-fade">
       <div v-if="confirmState" class="confirm-overlay" role="dialog" aria-modal="true" aria-label="Konfirmasi hapus" @click.self="cancelConfirm">
         <div class="confirm-card">
-          <strong>{{ confirmState.type === 'proker' ? 'Hapus proker ini?' : 'Hapus foto ini?' }}</strong>
-          <p>{{ confirmState.type === 'proker' ? 'Proker akan dihapus permanen dari daftar.' : 'Foto akan dihapus dari galeri proker.' }}</p>
+          <strong>{{ confirmState.type === 'proker' ? 'Hapus proker ini?' : confirmState.type === 'announcement' ? 'Hapus pengumuman ini?' : 'Hapus foto ini?' }}</strong>
+          <p>{{ confirmState.type === 'proker' ? 'Proker akan dihapus permanen dari daftar.' : confirmState.type === 'announcement' ? 'Pengumuman akan dihapus permanen dari dashboard.' : 'Foto akan dihapus dari galeri proker.' }}</p>
           <div class="confirm-actions">
             <button class="btn sm ghost" type="button" @click="cancelConfirm">Batal</button>
             <button class="btn sm danger" type="button" @click="doConfirmedDelete">Ya, hapus</button>
@@ -982,6 +1184,8 @@ onMounted(async () => {
 .gallery-add { width: 80px; height: 80px; display: grid; place-items: center; border: 1px dashed #C7D2DE; border-radius: var(--ec-radius-md, 14px); background: var(--ec-canvas, #F5F7FA); color: var(--ec-ink-soft, #6B7280); font-size: 22px; font-weight: 800; cursor: pointer; position: relative; }
 .gallery-add input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .field.textarea { resize: vertical; min-height: 72px; }
+.announce-pin-row { display: flex; align-items: center; gap: 8px; margin: 8px 0 4px; font-size: 13px; font-weight: 700; color: var(--ec-ink, #1F2937); }
+.announce-pin-row input { width: 18px; height: 18px; accent-color: var(--ec-blue, #0B569B); }
 .card-actions { display: flex; align-items: center; justify-content: flex-end; margin-top: 6px; }
 .action-group { display: flex; gap: 8px; flex-wrap: wrap; }
 .confirm-overlay { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: rgba(13,20,28,0.55); backdrop-filter: blur(4px); padding: 20px; }
@@ -1070,4 +1274,14 @@ onMounted(async () => {
 .reset-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .reset-input { flex: 1; min-width: 140px; max-width: 100%; min-height: 44px; padding: 6px 8px; }
 .reset-row .btn { min-height: 44px; }
+@media (max-width: 480px) {
+  .admin-topbar { align-items: flex-start; flex-wrap: wrap; }
+  .topbar-left { flex-basis: 100%; }
+  .user-chip { max-width: calc(100vw - 130px); }
+  .main { min-width: 0; }
+  .table-wrap { max-width: calc(100vw - 24px); }
+  .table-head { align-items: flex-start; flex-wrap: wrap; }
+  .member-card { align-items: flex-start; flex-wrap: wrap; }
+  .member-card > :last-child { max-width: 100%; }
+}
 </style>

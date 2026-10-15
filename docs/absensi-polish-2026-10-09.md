@@ -1,6 +1,14 @@
 # Polish Absensi — 2026-10-09
 
-Status: menunggu ACC.
+Status: implementasi laci sesi selesai 2026-10-14.
+
+## Update laci sesi — 2026-10-14
+- Riwayat dan sesi absensi yang sudah dibuat panitia kini tampil dalam satu daftar disclosure di `PresensiView.vue`.
+- `GET /api/attendance/sessions/mine` mengembalikan sesi aktif maupun tertutup, dengan status dan waktu hanya untuk anggota yang meminta. Respons tidak menyertakan secret sesi.
+- Sesi tanpa record anggota ditampilkan sebagai `Belum absen`; `hadir`, `izin`, dan `alpa` tetap mengikuti status tersimpan. Error memuat riwayat tidak dianggap sebagai ketidakhadiran.
+- Laci sesi aktif yang belum dihadiri terbuka otomatis. Kamera, kode manual, password, tombol check-in, dan daftar hadir sesi aktif berada di dalam laci tersebut. Setelah check-in, status laci diperbarui.
+- Sesi masa depan yang belum dibuat panitia tidak ditampilkan; aplikasi belum memiliki sumber jadwal untuk sesi tersebut.
+- Mode `Display QR`, TTL QR 7 detik, autentikasi/password, dan polling daftar hadir tetap dipertahankan.
 
 ## Masalah awal
 - Halaman Absensi (`/dashboard` > tab Absensi) terlihat penuh: dua CTA berantem
@@ -65,7 +73,7 @@ File: `frontend/src/components/PresensiView.vue` (BE, `api.js`,
    - Buka Kamera tanpa isi password → bisa. Selesai scan → diminta password.
    - Password salah → `Password salah.` QR lama → `QR kedaluwarsa...`
 3. Cek mobile 360px + desktop 1180px, tidak overflow, target sentuh ≥44px.
-4. Tab `Display QR` hanya untuk superadmin (`canDisplay`) — tidak berubah.
+ 4. Tab `Display QR` untuk superadmin (penuh) dan role `SO` (read-only: tampil QR + daftar hadir, tanpa buat/tutup sesi & tanpa koreksi). Role SO dikelola superadmin di tab Akun EC → subseksi Role Display QR (hanya biasa ↔ SO).
 
 ## Rollback
 - `git diff -- frontend/src/components/PresensiView.vue` untuk lihat diff.

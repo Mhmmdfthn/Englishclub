@@ -7,6 +7,8 @@ import { formatWIB } from '../utils/time.js'
 const AdminView = defineAsyncComponent(() => import('./AdminView.vue'))
 // Presensi QR: chunk terpisah, hanya diunduh saat tab Absensi dibuka.
 const PresensiView = defineAsyncComponent(() => import('./PresensiView.vue'))
+// Materi Canva: chunk terpisah, hanya diunduh saat tab Materi dibuka.
+const MateriView = defineAsyncComponent(() => import('./MateriView.vue'))
 
 // Flag deploy: VITE_ATTENDANCE_ENABLED=false -> tab Absensi jadi "Segera Hadir".
 // Dibake saat build; perlu rebuild + redeploy setelah ubah (mirror MEMBER_AUTH).
@@ -28,7 +30,12 @@ function openMenu(e) {
 
 // Pintu Menu Admin: hanya superadmin (UX saja; enforcement penuh
 // tetap di backend saat login admin).
+// Display QR: superadmin + SO. SO tidak dapat Menu Admin.
 const isSuperAdmin = ref(false)
+const memberRole = ref('biasa')
+const canDisplayQr = computed(() => isSuperAdmin.value || memberRole.value === 'so')
+// Kelola materi (tombol +/ubah/hapus): SO ke atas.
+const canManageMateri = computed(() => isSuperAdmin.value || memberRole.value === 'so')
 let adminChecked = false
 async function checkAdminAccess() {
   if (adminChecked) return
@@ -38,7 +45,9 @@ async function checkAdminAccess() {
   if (!t) return
   try {
     const r = await api.adminCheckMember(t)
-    isSuperAdmin.value = r?.isAdmin === true && r?.role === 'superadmin'
+    const role = String(r?.role || '').toLowerCase()
+    memberRole.value = r?.isAdmin === true ? role : 'biasa'
+    isSuperAdmin.value = r?.isAdmin === true && role === 'superadmin'
   } catch { /* gagal = pintu disembunyikan */ }
 }
 
@@ -79,8 +88,9 @@ const loading = ref(true)
 const error = ref('')
 const unauthorized = ref(false)
 const profile = ref({ username: '', fullname: '', group_name: '', created_at: '' })
-const proker = ref([])
-const prokerLoading = ref(true)
+const announcements = ref([])
+const announcementsLoading = ref(true)
+const announcementsError = ref('')
 
 const GROUP_STYLES = {
   Zeus:   { color: '#1E3A8A', bg: '#EFF6FF' },
@@ -94,20 +104,8 @@ const groupStyle = computed(() => GROUP_STYLES[profile.value.group_name] || { co
 const initial = computed(() => (profile.value.fullname || profile.value.username || '?').charAt(0).toUpperCase())
 const memberSince = computed(() => profile.value.created_at ? formatWIB(profile.value.created_at) : '—')
 
-const STATUS_MAP = {
-  upcoming:  { label: 'Upcoming',  cls: 'badge--upcoming' },
-  ongoing:   { label: 'Berlangsung', cls: 'badge--ongoing' },
-  completed: { label: 'Selesai',   cls: 'badge--done' },
-}
-
-// highlight = max 4 proker, prioritas ongoing > upcoming > completed
-const highlightProker = computed(() => {
-  const sorted = [...proker.value].sort((a, b) => {
-    const ord = { ongoing: 0, upcoming: 1, completed: 2 }
-    return (ord[a.status] ?? 9) - (ord[b.status] ?? 9)
-  })
-  return sorted.slice(0, 4)
-})
+// Pengumuman: pin di atas lalu terbaru, tampil max 5 di dashboard.
+const visibleAnnouncements = computed(() => (announcements.value || []).slice(0, 5))
 
 function clearSession() {
   localStorage.removeItem('member_token')
@@ -141,16 +139,27 @@ async function load() {
     loading.value = false
   }
 
-  // Load proker highlights (non-blocking)
-  prokerLoading.value = true
+  // Load pengumuman (non-blocking, publik)
+  announcementsLoading.value = true
+  announcementsError.value = ''
   try {
-    const data = await api.proker()
-    proker.value = data?.proker ?? data ?? []
+    const data = await api.announcements()
+    announcements.value = data?.announcements ?? []
   } catch {
-    proker.value = []
+    announcements.value = []
+    announcementsError.value = 'Pengumuman belum dapat dimuat.'
   } finally {
-    prokerLoading.value = false
+    announcementsLoading.value = false
   }
+}
+
+function retryAnnouncements() {
+  announcementsLoading.value = true
+  announcementsError.value = ''
+  api.announcements()
+    .then((data) => { announcements.value = data?.announcements ?? [] })
+    .catch(() => { announcements.value = []; announcementsError.value = 'Pengumuman belum dapat dimuat.' })
+    .finally(() => { announcementsLoading.value = false })
 }
 
 function doLogout() { clearSession(); emit('logout') }
@@ -253,7 +262,6 @@ onBeforeUnmount(() => {
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
               <span>Materi</span>
-              <span class="dash__soon">Segera</span>
             </button>
             <button
               class="dash__menu-item"
@@ -345,51 +353,71 @@ onBeforeUnmount(() => {
         <p class="dash__sub">Selamat datang di English Club UPB.</p>
       </div>
 
-      <!-- Kegiatan Sorotan (dashboard) -->
+      <!-- Quick Access -->
       <div class="dash__section-head">
-        <h2 class="dash__section-title">Kegiatan Sorotan</h2>
-        <button class="dash__see-all" type="button" @click="emit('back')">Lihat semua</button>
+        <h2 class="dash__section-title">Akses Cepat</h2>
+      </div>
+      <div class="dash__quick-grid">
+        <button class="dash__quick" type="button" aria-label="Buka absensi" @click="goTab('absensi')">
+          <span class="dash__quick-icon" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><polyline points="9 14 11 16 15 12"/></svg>
+          </span>
+          <span class="dash__quick-text"><b>Absensi</b><small>{{ ATTENDANCE_ON ? 'Scan QR kehadiran' : 'Segera hadir' }}</small></span>
+          <span v-if="!ATTENDANCE_ON" class="dash__quick-badge">Segera</span>
+        </button>
+        <button class="dash__quick" type="button" aria-label="Buka materi" @click="goTab('materi')">
+          <span class="dash__quick-icon" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+          </span>
+          <span class="dash__quick-text"><b>Materi</b><small>Modul pembelajaran</small></span>
+        </button>
+        <button class="dash__quick" type="button" aria-label="Buka profil saya" @click="goTab('profil')">
+          <span class="dash__quick-icon" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </span>
+          <span class="dash__quick-text"><b>Profil Saya</b><small>@{{ profile.username || 'anggota' }}</small></span>
+        </button>
       </div>
 
-      <!-- Proker loading -->
-      <div v-if="prokerLoading" class="dash__grid">
-        <div v-for="n in 4" :key="n" class="ec-skeleton" style="height:140px;border-radius:14px"></div>
+      <!-- Pengumuman -->
+      <div class="dash__section-head">
+        <h2 class="dash__section-title">Pengumuman</h2>
+        <span class="tiny muted">{{ announcements.length }} info</span>
       </div>
 
-      <!-- Proker list -->
-      <div v-else-if="highlightProker.length" class="dash__grid">
-        <div
-          v-for="item in highlightProker"
+      <!-- Pengumuman loading -->
+      <div v-if="announcementsLoading" class="dash__announce-list">
+        <div v-for="n in 3" :key="n" class="ec-skeleton" style="height:96px;border-radius:14px"></div>
+      </div>
+
+      <!-- Pengumuman error -->
+      <div v-else-if="announcementsError && !visibleAnnouncements.length" class="ec-state ec-state--error" role="alert">
+        <span class="ec-state__title">Pengumuman belum dapat dimuat</span>
+        <p class="ec-state__body">{{ announcementsError }}</p>
+        <button class="ec-btn ec-btn--secondary ec-btn--sm" type="button" @click="retryAnnouncements">Coba lagi</button>
+      </div>
+
+      <!-- Pengumuman list -->
+      <div v-else-if="visibleAnnouncements.length" class="dash__announce-list">
+        <article
+          v-for="item in visibleAnnouncements"
           :key="item.id"
-          class="dash__proker-card"
+          class="dash__announce-card"
+          :class="{ 'is-pinned': item.pinned }"
         >
-          <div class="dash__proker-img-wrap">
-            <img
-              v-if="item.imageUrl || item.image_url"
-              :src="item.imageUrl || item.image_url"
-              :alt="item.title"
-              class="dash__proker-img"
-              loading="lazy"
-            />
-            <div v-else class="dash__proker-img-fallback" aria-hidden="true">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-            </div>
-            <span
-              class="dash__proker-badge"
-              :class="STATUS_MAP[item.status]?.cls || 'badge--upcoming'"
-            >{{ STATUS_MAP[item.status]?.label || 'Upcoming' }}</span>
+          <div class="dash__announce-meta">
+            <span v-if="item.pinned" class="dash__pin">Disematkan</span>
+            <span class="dash__announce-date">{{ formatWIB(item.created_at) }}</span>
           </div>
-          <div class="dash__proker-body">
-            <span class="dash__proker-title">{{ item.title }}</span>
-            <p v-if="item.description" class="dash__proker-desc">{{ item.description }}</p>
-          </div>
-        </div>
+          <span class="dash__announce-title">{{ item.title }}</span>
+          <p class="dash__announce-body">{{ item.body }}</p>
+        </article>
       </div>
 
-      <!-- Empty proker -->
+      <!-- Empty pengumuman -->
       <div v-else class="dash__empty">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-        <p>Belum ada kegiatan yang tersedia.</p>
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+        <p>Belum ada pengumuman.</p>
       </div>
 
       <!-- Logout (pindah ke drawer menu) -->
@@ -447,7 +475,7 @@ onBeforeUnmount(() => {
 
       <!-- Absensi: presensi QR + password + list + recent -->
       <div v-else-if="dashTab === 'absensi'">
-        <PresensiView v-if="ATTENDANCE_ON" :can-display="isSuperAdmin" />
+        <PresensiView v-if="ATTENDANCE_ON" :can-display="canDisplayQr" :display-read-only="memberRole === 'so'" />
         <div v-else class="ec-state ec-state--notice dash__soon-card" role="status">
           <span class="ec-state__title">Absensi segera hadir</span>
           <p class="ec-state__body">Fitur presensi QR belum dibuka. Pantau pengumuman komunitas.</p>
@@ -458,14 +486,9 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <!-- Materi: belum ada kontrak backend, tampilkan status -->
-      <div v-else-if="dashTab === 'materi'" class="ec-state ec-state--notice dash__soon-card" role="status">
-        <span class="ec-state__title">Materi segera hadir</span>
-        <p class="ec-state__body">Kumpulan materi pembelajaran belum tersedia. Pantau pengumuman komunitas.</p>
-        <div class="dash__soon-actions">
-          <button class="ec-btn ec-btn--secondary ec-btn--sm" type="button" @click="dashTab = 'dashboard'">Kembali ke Dashboard</button>
-          <button class="ec-btn ec-btn--ghost ec-btn--sm" type="button" @click="goHome">Ke Beranda</button>
-        </div>
+      <!-- Materi: daftar embed Canva + viewer (tombol + untuk SO ke atas) -->
+      <div v-else-if="dashTab === 'materi'">
+        <MateriView :can-manage="canManageMateri" />
       </div>
 
       <!-- Brankas Admin tertanam (superadmin): login + fitur admin penuh di sini -->
@@ -481,14 +504,6 @@ onBeforeUnmount(() => {
     </div>
 
     </div>
-
-    <!-- ── Footer: logo + copyright ─────────────────────────── -->
-    <footer class="dash__footer" aria-label="Footer dashboard">
-      <div class="dash__footer-inner">
-        <img class="dash__footer-mark" src="/logo-ec.png" alt="" width="44" height="44" loading="lazy" />
-        <p class="dash__footer-copy">&copy; 2026 <b>English Club UPB</b> &bull; Practice Makes Progress</p>
-      </div>
-    </footer>
   </section>
 </template>
 
@@ -757,109 +772,153 @@ onBeforeUnmount(() => {
   letter-spacing: -0.01em;
 }
 
-.dash__see-all {
-  background: transparent;
-  border: 0;
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--ec-blue);
-  cursor: pointer;
-  padding: 0;
-  opacity: 0.75;
-  transition: opacity 160ms;
-}
-.dash__see-all:hover { opacity: 1; }
-
-/* ── Proker grid ──────────────────────────────────────────── */
-.dash__grid {
+/* ── Quick Access ───────────────────────────────────────── */
+.dash__quick-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 12px;
+  min-width: 0;
 }
-
-.dash__proker-card {
+.dash__quick {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 112px;
+  padding: 14px 8px 12px;
+  text-align: center;
   background: var(--ec-surface);
   border: 1px solid var(--ec-line);
   border-radius: 14px;
-  overflow: hidden;
   box-shadow: var(--ec-shadow-sm);
-  transition: transform 180ms var(--ec-ease), box-shadow 180ms var(--ec-ease), border-color 180ms;
+  cursor: pointer;
+  transition: transform 160ms var(--ec-ease), border-color 160ms, box-shadow 160ms;
+  font-family: inherit;
+  color: var(--ec-ink);
 }
-.dash__proker-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--ec-shadow-md);
-  border-color: #c9dff5;
-}
-
-.dash__proker-img-wrap {
-  position: relative;
-  aspect-ratio: 16/9;
-  background: var(--ec-canvas);
-  overflow: hidden;
-}
-
-.dash__proker-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.dash__proker-img-fallback {
-  width: 100%;
-  height: 100%;
+.dash__quick:hover { transform: translateY(-1px); border-color: #c9dff5; box-shadow: 0 20px 48px -30px rgba(31, 41, 55, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.94); }
+.dash__quick:active { transform: scale(0.97); }
+.dash__quick:focus-visible { outline: none; box-shadow: var(--ec-focus-ring); }
+.dash__quick-icon {
   display: grid;
   place-items: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  background: var(--ec-blue-050, #F1F6FC);
+  color: var(--ec-blue);
+}
+.dash__quick-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; width: 100%; align-items: center; }
+.dash__quick-text b { font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 700; }
+.dash__quick-text small {
+  font-size: 11px;
   color: var(--ec-ink-soft);
-  opacity: 0.4;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.dash__quick-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 2px 7px;
+  border-radius: 99px;
+  background: var(--ec-warning-bg, #FFFBEB);
+  border: 1px solid var(--ec-warning-line, #FDE68A);
+  color: var(--ec-warning, #B45309);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dash__quick, .dash__quick:hover, .dash__quick:active { transform: none; }
 }
 
-.dash__proker-badge {
-  position: absolute;
-  top: 7px;
-  left: 7px;
-  padding: 3px 9px;
+/* ── Pengumuman ───────────────────────────────────────────── */
+.dash__announce-list { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.dash__announce-card {
+  background: var(--ec-surface);
+  border: 1px solid var(--ec-line);
+  border-radius: 14px;
+  box-shadow: var(--ec-shadow-sm);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.dash__announce-card.is-pinned { border-color: rgba(255, 255, 255, 0.86); }
+.dash__announce-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dash__pin {
+  padding: 2px 8px;
   border-radius: 99px;
-  font-family: 'Plus Jakarta Sans', sans-serif;
+  background: rgba(227, 237, 248, 0.72);
+  border: 1px solid rgba(11, 86, 155, 0.16);
+  color: var(--ec-blue);
   font-size: 10.5px;
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  backdrop-filter: blur(6px);
 }
-
-.badge--upcoming  { background: rgba(235,248,255,0.9); color: #0B569B; border: 1px solid #C9DFF5; }
-.badge--ongoing   { background: rgba(255,251,235,0.9); color: #92400E; border: 1px solid #FDE68A; }
-.badge--done      { background: rgba(236,253,245,0.9); color: #047857; border: 1px solid #A7F3D0; }
-
-.dash__proker-body {
-  padding: 10px 12px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.dash__proker-title {
+.dash__announce-date { font-size: 11.5px; color: var(--ec-ink-soft); }
+.dash__announce-title {
   font-family: 'Outfit', sans-serif;
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--ec-ink);
-  line-height: 1.3;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.dash__announce-body {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--ec-ink);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
 }
 
-.dash__proker-desc {
-  font-size: 11.5px;
-  color: var(--ec-ink-soft);
-  line-height: 1.45;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+/* Liquid-glass surfaces for the member dashboard cards. */
+.dash .ec-card,
+.dash__quick,
+.dash__announce-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.46) 48%, rgba(227, 237, 248, 0.62));
+  border-color: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 18px 44px -28px rgba(31, 41, 55, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  backdrop-filter: blur(22px) saturate(160%);
+}
+
+.dash__announce-card.is-pinned {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.46) 48%, rgba(227, 237, 248, 0.62));
+  border-color: rgba(255, 255, 255, 0.92);
+}
+
+@media (min-width: 1024px) {
+  .dash .ec-card,
+  .dash__quick,
+  .dash__announce-card {
+    box-shadow: 0 32px 88px -52px rgba(31, 41, 55, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  }
+
+  .dash__quick:hover {
+    box-shadow: 0 38px 100px -54px rgba(31, 41, 55, 0.27), inset 0 1px 0 rgba(255, 255, 255, 0.88);
+  }
+}
+
+/* ── Proker grid (loading skeleton generik) ───────────────── */
+.dash__grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
 }
 
 /* ── Empty ────────────────────────────────────────────────── */
@@ -1097,58 +1156,15 @@ onBeforeUnmount(() => {
 }
 
 /* ── Responsive ───────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .dash__quick-grid { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+}
 @media (max-width: 400px) {
   .dash__grid { grid-template-columns: 1fr; }
   .dash__nav-inner { padding: 12px 14px; }
   .dash__body { padding: 16px 12px 48px; }
   .dash__avatar-name { display: none; }
 }
-
-/* ── Footer: watermark EC saja ──────────────────────────── */
-.dash__footer {
-  position: relative;
-  overflow: hidden;
-  border-top: 1px solid var(--ec-line);
-  background: var(--ec-surface);
-}
-
-/* Watermark logo raksasa di kanan, dekoratif saja. */
-.dash__footer::after {
-  content: '';
-  position: absolute;
-  right: -32px;
-  top: 50%;
-  width: 180px;
-  height: 180px;
-  transform: translateY(-50%);
-  background: url('/logo-ec.png') no-repeat center / contain;
-  opacity: 0.06;
-  pointer-events: none;
-}
-
-.dash__footer-inner {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  text-align: center;
-  padding: 20px 16px calc(20px + env(safe-area-inset-bottom, 0px));
-}
-
-.dash__footer-mark {
-  width: 44px;
-  height: 44px;
-  object-fit: contain;
-}
-
-.dash__footer-copy {
-  margin: 0;
-  font-size: 12px;
-  color: var(--ec-ink-soft);
-}
-.dash__footer-copy b { color: var(--ec-ink); }
 
 /* ── Desktop ≥1024px: sidebar permanen + konten fluid ─────────
  * Mobile (<1024px) tidak berubah: burger + overlay drawer. */
@@ -1159,8 +1175,7 @@ onBeforeUnmount(() => {
   }
 
   .dash__nav-inner,
-  .dash__layout,
-  .dash__footer-inner {
+  .dash__layout {
     width: 100%;
     max-width: 1180px;
     margin: 0 auto;
@@ -1234,10 +1249,11 @@ onBeforeUnmount(() => {
 
   .dash__greeting { font-size: clamp(28px, 3vw, 36px); }
 
-  /* 4 sorotan = grid 2x2 penuh tanpa lubang; kartu lebih besar. */
+  /* Quick access 3 kolom penuh di desktop; skeleton tetap 2 kolom. */
   .dash__grid { grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  .dash__quick-grid { gap: 16px; }
 
-  .dash__proker-title { font-size: 15px; }
+  .dash__announce-title { font-size: 16px; }
 
   .dash__profile-wrap {
     display: grid;

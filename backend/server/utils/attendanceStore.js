@@ -204,6 +204,147 @@ export async function myRecords(memberId, limit = 20) {
   }))
 }
 
+// ---- gabungan sekali jalan untuk tab Presensi (hemat RTT di jaringan lambat) ----
+export async function getOverview(memberId) {
+  const sessions = await sessionsForMember(memberId)
+  const hit = sessions.find((s) => s.is_active) || null
+  const active = hit ? { id: hit.id, title: hit.title, date: hit.date, is_active: true } : null
+  const list = active ? await listRecords(active.id) : []
+  return { sessions, active, list }
+}
+
+export async function sessionsForMember(memberId) {
+  const sb = getSupabase()
+  if (!sb) {
+    const recordsBySession = new Map(
+      mem.records
+        .filter((record) => record.member_id === memberId)
+        .map((record) => [record.session_id, record]),
+    )
+    return mem.sessions
+      .slice()
+      .sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.created_at || '').localeCompare(a.created_at || ''))
+      .map((session) => {
+        const record = recordsBySession.get(session.id)
+        return {
+          id: session.id,
+          title: session.title,
+          date: session.date,
+          is_active: session.is_active,
+          attendance: record ? { status: record.status, scanned_at: record.scanned_at } : null,
+        }
+      })
+  }
+
+  const [{ data: sessions, error: sessionsError }, { data: records, error: recordsError }] = await Promise.all([
+    sb.from('ec_attendance_sessions')
+      .select('id, title, date, is_active, created_at')
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: false }),
+    sb.from('ec_attendance_records')
+      .select('session_id, status, scanned_at')
+      .eq('member_id', memberId),
+  ])
+  if (sessionsError || recordsError) throw fail(503, 'Database sibuk, silakan coba lagi')
+
+  const recordsBySession = new Map((records || []).map((record) => [record.session_id, record]))
+  return (sessions || []).map((session) => {
+    const record = recordsBySession.get(session.id)
+    return {
+      id: session.id,
+      title: session.title,
+      date: session.date,
+      is_active: session.is_active,
+      attendance: record ? { status: record.status, scanned_at: record.scanned_at } : null,
+    }
+  })
+}
+
+export async function listSessionRoster(sessionId) {
+  const sb = getSupabase()
+  if (!sb) {
+    const recordMap = new Map(
+      mem.records
+        .filter((record) => record.session_id === sessionId)
+        .map((record) => [record.member_id, { status: record.status, scanned_at: record.scanned_at }]),
+    )
+    return [{ id: 'mem-demo', username: 'demo', fullname: 'Demo member', status: recordMap.get('mem-demo')?.status || 'belum', scanned_at: recordMap.get('mem-demo')?.scanned_at || null }]
+  }
+
+  const [{ data: session, error: sessionError }, { data: members, error: membersError }, { data: records, error: recordsError }] = await Promise.all([
+    sb.from('ec_attendance_sessions').select('id').eq('id', sessionId).maybeSingle(),
+    sb.from('member_profiles').select('id, username, fullname').order('fullname', { ascending: true }),
+    sb.from('ec_attendance_records').select('member_id, status, scanned_at').eq('session_id', sessionId),
+  ])
+
+  if (sessionError || membersError || recordsError) throw fail(503, 'Database sibuk, silakan coba lagi')
+  if (!session) throw fail(404, 'Sesi tidak ditemukan.')
+
+  const recordMap = new Map((records || []).map((record) => [record.member_id, record]))
+  return (members || []).map((member) => {
+    const record = recordMap.get(member.id)
+    return {
+      id: member.id,
+      username: member.username || '',
+      fullname: member.fullname || member.username || '',
+      status: record ? record.status : 'belum',
+      scanned_at: record ? record.scanned_at : null,
+    }
+  })
+}
+
+export async function upsertSessionMemberStatus(memberId, sessionId, status = 'hadir') {
+  const allowed = new Set(['hadir', 'izin', 'alpa', 'belum'])
+  if (!allowed.has(status)) throw fail(422, 'status harus hadir/izin/alpa/belum')
+
+  const sb = getSupabase()
+  if (!sb) {
+    const idx = mem.records.findIndex((record) => record.member_id === memberId && record.session_id === sessionId)
+    if (status === 'belum') {
+      if (idx >= 0) mem.records.splice(idx, 1)
+      return { deleted: idx >= 0, member_id: memberId, session_id: sessionId, status }
+    }
+    const next = {
+      id: idx >= 0 ? mem.records[idx].id : mem.records.length + 1,
+      member_id: memberId,
+      session_id: sessionId,
+      status,
+      scanned_at: new Date().toISOString(),
+      token_win: null,
+    }
+    if (idx >= 0) mem.records[idx] = next
+    else mem.records.push(next)
+    return { ...next, member_id: memberId, session_id: sessionId, status }
+  }
+
+  const { data: existing, error: existingError } = await sb
+    .from('ec_attendance_records')
+    .select('*')
+    .eq('member_id', memberId)
+    .eq('session_id', sessionId)
+    .maybeSingle()
+  if (existingError) throw fail(503, 'Database sibuk, silakan coba lagi')
+
+  if (status === 'belum') {
+    if (existing) {
+      const { error: deleteError } = await sb.from('ec_attendance_records').delete().eq('id', existing.id)
+      if (deleteError) throw fail(503, 'Database sibuk, silakan coba lagi')
+    }
+    return { deleted: !!existing, member_id: memberId, session_id: sessionId, status }
+  }
+
+  const payload = { member_id: memberId, session_id: sessionId, status, scanned_at: new Date().toISOString(), token_win: null }
+  if (existing) {
+    const { data, error } = await sb.from('ec_attendance_records').update({ status, scanned_at: payload.scanned_at, token_win: null }).eq('id', existing.id).select('*').single()
+    if (error) throw fail(503, 'Database sibuk, silakan coba lagi')
+    return { ...data, member_id: memberId, session_id: sessionId, status }
+  }
+
+  const { data, error } = await sb.from('ec_attendance_records').insert(payload).select('*').single()
+  if (error) throw fail(503, 'Database sibuk, silakan coba lagi')
+  return { ...data, member_id: memberId, session_id: sessionId, status }
+}
+
 // ---- rate limit password (memory; catat batasan multi-instance di PRD) ----
 const pwFails = new Map() // key memberId -> { fails, firstTs, blockedUntil }
 const PW_MAX_FAILS = 3
