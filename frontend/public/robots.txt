@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /ec-admin-2026
+
+# Domain produksi: https://www.englishclubupb.my.id
+Sitemap: https://www.englishclubupb.my.id/sitemap.xml

@@ -34,6 +34,7 @@ const emit = defineEmits(['action'])
         </p>
 
         <h1 class="hero__title">Learn. Connect. <span class="hero__title-accent">Grow.</span></h1>
+        <p class="ec-sr-only">English Club UPB — UKM bahasa Inggris di bawah BEM Departemen Keilmuan Universitas Putra Bangsa Kebumen. Latihan speaking, public speaking, debate, dan persiapan TOEFL.</p>
 
         <p class="hero__lede">A place to practice English, discover new activities, and grow together.</p>
 
