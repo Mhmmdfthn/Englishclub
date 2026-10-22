@@ -1,5 +1,5 @@
 <script setup>
-import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, ref } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { api } from '../api.js'
 import { formatWIB } from '../utils/time.js'
 
@@ -82,6 +82,22 @@ const alreadyCheckedIn = computed(() => {
 let scanner = null
 let pollTimer = null
 let scanAttempt = 0
+// Scanner layar penuh: kunci scroll halaman agar konten di belakang tidak
+// ikut bergeser saat kamera aktif. Nilai lama dipulihkan saat kamera tutup.
+let prevBodyOverflow = null
+function lockBodyScroll(lock) {
+  if (typeof document === 'undefined') return
+  if (lock) {
+    if (prevBodyOverflow === null) prevBodyOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return
+  }
+  if (prevBodyOverflow !== null) {
+    document.body.style.overflow = prevBodyOverflow
+    prevBodyOverflow = null
+  }
+}
+watch(cameraOpen, (open) => lockBodyScroll(open))
 
 async function loadAll() {
   loadError.value = ''
@@ -218,7 +234,7 @@ function badgeClass(status) {
 async function startScan() {
   result.value = null
   if (typeof window !== 'undefined' && window.isSecureContext === false) {
-    result.value = { ok: false, message: 'Kamera web butuh koneksi aman (HTTPS/localhost). Karena dibuka via IP, salin kode dari layar panitia ke kolom manual di bawah.' }
+    result.value = { ok: false, message: 'Kamera web butuh koneksi aman (HTTPS/localhost). Karena dibuka via IP, salin kode dari layar SO ke kolom manual di bawah.' }
     document.getElementById('presensi-manual')?.focus?.()
     return
   }
@@ -233,7 +249,16 @@ async function startScan() {
     scanning.value = true
     await scanner.start(
       { facingMode: 'environment' },
-      { fps: 10, qrbox: { width: 250, height: 250 } },
+      {
+        fps: 10,
+        // Samakan area scan dengan bingkai bidik (.presensi__reticle):
+        // min(68vmin, 260px), dengan batas aman untuk jendela sangat kecil.
+        qrbox: (vw, vh) => {
+          const max = Math.min(vw, vh)
+          const side = Math.max(120, Math.min(260, Math.round(max * 0.68)))
+          return { width: Math.min(side, max), height: Math.min(side, max) }
+        },
+      },
       async (decoded) => {
         if (attempt !== scanAttempt || !cameraOpen.value) return
         await closeCamera()
@@ -337,6 +362,7 @@ pollTimer = setInterval(() => {
 onBeforeUnmount(async () => {
   scanAttempt += 1
   cameraOpen.value = false
+  lockBodyScroll(false)
   if (pollTimer) clearInterval(pollTimer)
   await stopScan()
   try { if (scanner) await scanner.clear() } catch { /* abaikan */ }
@@ -422,7 +448,7 @@ onBeforeUnmount(async () => {
                 <h3 class="presensi__session-title">{{ item.title || 'Sesi absensi' }}</h3>
                 <p v-if="item.attendance?.scanned_at" class="presensi__session-time">Check-in {{ fmtTime(item.attendance.scanned_at) }}</p>
                 <p v-else-if="item.attendance" class="presensi__session-time">Status kehadiran: {{ item.attendance.status }}</p>
-                <p v-else-if="item.is_active" class="ec-body">Kamu belum absen di sesi ini. Pindai QR panitia untuk mencatat kehadiran.</p>
+                <p v-else-if="item.is_active" class="ec-body">Kamu belum absen di sesi ini. Pindai QR SO untuk mencatat kehadiran.</p>
                 <p v-else class="ec-body">Sesi sudah ditutup dan kamu belum tercatat hadir.</p>
               </div>
 
@@ -447,7 +473,7 @@ onBeforeUnmount(async () => {
                 <details class="presensi__manual">
                   <summary>Kamera bermasalah? Pakai kode manual</summary>
                   <label class="ec-label" for="presensi-manual">Kode manual</label>
-                  <input id="presensi-manual" v-model="qrText" class="ec-field ec-field--mono" placeholder="ECA1:... (salin dari layar panitia)" autocomplete="off" spellcheck="false" />
+                  <input id="presensi-manual" v-model="qrText" class="ec-field ec-field--mono" placeholder="ECA1:... (salin dari layar SO)" autocomplete="off" spellcheck="false" />
                 </details>
                 <button class="ec-btn ec-btn--secondary ec-btn--block" type="submit" :disabled="submitting || !qrText.trim()">
                   {{ submitting ? 'Memproses...' : 'Catat Kehadiran' }}
@@ -475,23 +501,27 @@ onBeforeUnmount(async () => {
         <p v-else class="ec-body">Belum ada sesi absensi.</p>
       </div>
     </template>
+    <!-- Scanner kamera layar penuh: keluar lewat tombol × atau ESC saja -->
     <div
       v-if="cameraOpen"
-      class="presensi__popup-backdrop"
-      @click.self="closeCamera"
+      class="presensi__scanner"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="presensi-camera-title"
       @keydown.esc.stop.prevent="closeCamera"
     >
-      <section class="presensi__popup" role="dialog" aria-modal="true" aria-labelledby="presensi-camera-title">
-        <header class="presensi__popup-head">
-          <div>
-            <h2 id="presensi-camera-title" class="presensi__popup-title">Pindai QR presensi</h2>
-            <p class="ec-caption">Arahkan kamera ke QR di layar panitia.</p>
-          </div>
-          <button ref="cameraCloseButton" class="presensi__popup-close" type="button" aria-label="Tutup kamera" @click="closeCamera">×</button>
-        </header>
-        <div id="presensi-qr-reader" class="presensi__reader"></div>
-        <p class="ec-caption">Pastikan QR terlihat jelas dan berada di dalam bingkai kamera.</p>
-      </section>
+      <header class="presensi__scanner-head">
+        <div class="presensi__scanner-copy">
+          <h2 id="presensi-camera-title" class="presensi__scanner-title">Pindai QR presensi</h2>
+          <p class="presensi__scanner-cap">Arahkan kamera ke QR di layar SO.</p>
+        </div>
+        <button ref="cameraCloseButton" class="presensi__scanner-close" type="button" aria-label="Tutup kamera" @click="closeCamera">×</button>
+      </header>
+      <div class="presensi__scanner-stage">
+        <div id="presensi-qr-reader" class="presensi__reader presensi__reader--full"></div>
+        <div class="presensi__reticle" aria-hidden="true"><span class="presensi__reticle-corner presensi__reticle-corner--tl"></span><span class="presensi__reticle-corner presensi__reticle-corner--tr"></span><span class="presensi__reticle-corner presensi__reticle-corner--bl"></span><span class="presensi__reticle-corner presensi__reticle-corner--br"></span></div>
+      </div>
+      <p class="presensi__scanner-foot">Pastikan QR terlihat jelas di dalam bingkai kamera.</p>
     </div>
     <div
       v-if="successNotice"
@@ -553,15 +583,38 @@ onBeforeUnmount(async () => {
 .presensi__reader { overflow: hidden; border-radius: var(--ec-radius-md); border: 1px solid var(--ec-line); margin-top: 10px; max-width: 100%; }
 .presensi__reader, .presensi__reader * { max-width: 100%; }
 .presensi__reader video { width: 100% !important; border-radius: var(--ec-radius-md); }
+
+/* ---- Scanner kamera layar penuh ---- */
+.presensi__scanner { position: fixed; inset: 0; z-index: 90; height: 100vh; height: 100dvh; background: #000; overscroll-behavior: contain; }
+.presensi__scanner-stage { position: absolute; inset: 0; overflow: hidden; background: #000; }
+.presensi__scanner-head { position: absolute; z-index: 2; top: 0; right: 0; left: 0; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: max(14px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 28px max(16px, env(safe-area-inset-left)); background: linear-gradient(180deg, rgba(11, 18, 32, 0.92) 0%, rgba(11, 18, 32, 0.55) 55%, rgba(11, 18, 32, 0) 100%); }
+.presensi__scanner-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.presensi__scanner-title { margin: 0; color: #fff; font-family: 'Outfit', sans-serif; font-size: 1.05rem; font-weight: 800; line-height: 1.25; }
+.presensi__scanner-cap { margin: 0; color: rgba(255, 255, 255, 0.78); font-size: 0.8125rem; line-height: 1.4; }
+.presensi__scanner-close { display: grid; place-items: center; flex: 0 0 44px; width: 44px; height: 44px; border: 1px solid rgba(255, 255, 255, 0.28); border-radius: 50%; background: rgba(255, 255, 255, 0.14); color: #fff; font: inherit; font-size: 1.5rem; line-height: 1; cursor: pointer; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.presensi__scanner-close:hover { background: rgba(255, 255, 255, 0.24); }
+.presensi__scanner-close:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.6); }
+.presensi__scanner-foot { position: absolute; z-index: 2; right: 0; bottom: 0; left: 0; margin: 0; padding: 28px max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); background: linear-gradient(0deg, rgba(11, 18, 32, 0.92) 0%, rgba(11, 18, 32, 0.45) 55%, rgba(11, 18, 32, 0) 100%); color: rgba(255, 255, 255, 0.8); font-size: 0.8125rem; text-align: center; }
+/* Video memenuhi layar (cover). Bingkai bidik digambar sendiri agar tetap
+   di tengah, ukurannya disamakan dengan qrbox scanner (lihat startScan).
+   html5-qrcode membuat elemen video/canvas saat runtime tanpa atribut scoped
+   Vue, jadi wajib lewat :deep(). */
+.presensi__reader--full { position: absolute; inset: 0; width: 100% !important; height: 100% !important; max-width: none; margin: 0; border: 0; border-radius: 0; background: #000; }
+.presensi__reader--full :deep(video) { display: block; width: 100% !important; height: 100% !important; max-width: none !important; border-radius: 0; object-fit: cover; }
+.presensi__reader--full :deep(#qr-canvas) { display: none !important; }
+/* Masker gelap di luar area scan milik pustaka: pertahankan, tapi sudut
+   bawaannya disembunyikan karena sudah diganti bingkai bidik sendiri. */
+.presensi__reader--full :deep(#qr-shaded-region > div) { display: none; }
+.presensi__reticle { position: absolute; top: 50%; left: 50%; width: min(68vmin, 260px); aspect-ratio: 1; transform: translate(-50%, -50%); pointer-events: none; }
+.presensi__reticle-corner { position: absolute; width: 34px; height: 34px; border: 0 solid rgba(255, 255, 255, 0.92); }
+.presensi__reticle-corner--tl { top: 0; left: 0; border-top-width: 4px; border-left-width: 4px; border-top-left-radius: 12px; }
+.presensi__reticle-corner--tr { top: 0; right: 0; border-top-width: 4px; border-right-width: 4px; border-top-right-radius: 12px; }
+.presensi__reticle-corner--bl { bottom: 0; left: 0; border-bottom-width: 4px; border-left-width: 4px; border-bottom-left-radius: 12px; }
+.presensi__reticle-corner--br { right: 0; bottom: 0; border-right-width: 4px; border-bottom-width: 4px; border-bottom-right-radius: 12px; }
+
 .presensi__popup-backdrop { position: fixed; z-index: 80; inset: 0; display: grid; place-items: center; overflow-y: auto; padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); background: rgba(15, 23, 42, 0.68); }
 .presensi__popup { display: flex; flex-direction: column; gap: 14px; width: min(100%, 520px); max-height: calc(100vh - 24px); max-height: min(calc(100dvh - 24px), 760px); overflow-y: auto; padding: 18px; border: 1px solid var(--ec-line); border-radius: var(--ec-radius-lg); background: var(--ec-surface); box-shadow: var(--ec-shadow-lg); overscroll-behavior: contain; }
-.presensi__popup-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .presensi__popup-title { margin: 0; color: var(--ec-ink); font-family: 'Outfit', sans-serif; font-size: 1.2rem; font-weight: 800; }
-.presensi__popup-close { display: grid; place-items: center; flex: 0 0 40px; width: 40px; height: 40px; border: 1px solid var(--ec-line); border-radius: 50%; background: var(--ec-canvas); color: var(--ec-ink); font: inherit; font-size: 1.4rem; cursor: pointer; }
-.presensi__popup .presensi__reader { width: 100%; min-width: 0; margin-top: 0; }
-.presensi__popup .presensi__reader > div { min-width: 0 !important; width: 100% !important; }
-.presensi__popup .presensi__reader video,
-.presensi__popup .presensi__reader canvas { display: block; max-width: 100% !important; height: auto !important; }
 .presensi__popup--success { align-items: center; width: min(100%, 380px); text-align: center; padding: 26px 22px; }
 .presensi__success-mark { display: grid; place-items: center; width: 54px; height: 54px; border-radius: 50%; background: var(--ec-success-bg); color: var(--ec-success); font-size: 1.8rem; font-weight: 800; }
 .presensi__success-session { margin: 0; color: var(--ec-ink); font-weight: 700; }
@@ -589,6 +642,10 @@ onBeforeUnmount(async () => {
   .presensi__popup-backdrop { place-items: start center; }
   .presensi__popup { max-height: calc(100vh - 16px); max-height: calc(100dvh - 16px); }
   .presensi__popup--success { align-self: center; }
+  .presensi__scanner-head { padding-top: max(10px, env(safe-area-inset-top)); padding-bottom: 20px; }
+  .presensi__scanner-cap { display: none; }
+  .presensi__scanner-foot { padding-top: 20px; padding-bottom: max(10px, env(safe-area-inset-bottom)); }
+  .presensi__reticle-corner { width: 26px; height: 26px; }
 }
 .presensi__result { font-size: 0.875rem; font-weight: 700; padding: 10px 14px; border-radius: var(--ec-radius-md); }
 .presensi__result--ok { background: var(--ec-success-bg); color: var(--ec-success); border: 1px solid var(--ec-success-line); }

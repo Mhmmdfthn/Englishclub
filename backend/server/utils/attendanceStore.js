@@ -3,6 +3,8 @@
 // Anti-replay: UNIQUE(member_id, session_id) — satu check-in per anggota per sesi.
 import { randomBytes, createHmac, timingSafeEqual } from 'crypto'
 import { getSupabase } from './supabase.js'
+import { listAllowed } from './adminAllowlist.js'
+import { GROUP_NAMES } from './memberAuthStore.js'
 
 export const QR_WINDOW_MS = 7000
 export const QR_PREFIX = 'ECA1'
@@ -57,7 +59,7 @@ export function verifyQrToken(secret, win, hmac, now = Date.now()) {
 // ---- storage (Supabase primary, memory fallback ala pola repo) ----
 const mem = { sessions: [], records: [] }
 
-// ---- sesi manual: dibuka/ditutup panitia, maksimal 1 aktif ----
+// ---- sesi manual: dibuka/ditutup SO, maksimal 1 aktif ----
 export async function getActiveSession() {
   const sb = getSupabase()
   if (!sb) {
@@ -291,6 +293,85 @@ export async function listSessionRoster(sessionId) {
       scanned_at: record ? record.scanned_at : null,
     }
   })
+}
+
+// ---- statistik sesi (layar Display QR) ----
+const STATS_STATUSES = ['hadir', 'izin', 'alpa', 'belum']
+// Akun panitia tidak ikut statistik anggota; dihitung terpisah sebagai `staff`.
+const STAFF_ROLES = new Set(['so', 'superadmin', 'operator'])
+
+function emptyCounts() {
+  return { total: 0, hadir: 0, izin: 0, alpa: 0, belum: 0 }
+}
+
+function addStatus(bucket, status) {
+  bucket.total += 1
+  bucket[STATS_STATUSES.includes(status) ? status : 'belum'] += 1
+}
+
+// Overall + per kelompok untuk sesi tertentu. Hanya akun terdaftar
+// (member_profiles) yang dihitung. Akun ber-role SO/superadmin/operator
+// dipisah ke `staff` agar tidak mengotori donut kehadiran anggota.
+export async function sessionStats(sessionId) {
+  const sb = getSupabase()
+  if (!sb) {
+    const overall = emptyCounts()
+    const demo = mem.records.filter((r) => r.session_id === sessionId)
+    addStatus(overall, demo[0]?.status || 'belum')
+    return { ...overall, groups: [], staff: emptyCounts() }
+  }
+
+  const [
+    { data: session, error: sessionError },
+    { data: members, error: membersError },
+    { data: records, error: recordsError },
+  ] = await Promise.all([
+    sb.from('ec_attendance_sessions').select('id').eq('id', sessionId).maybeSingle(),
+    sb.from('member_profiles').select('id, username, fullname, group_name'),
+    sb.from('ec_attendance_records').select('member_id, status').eq('session_id', sessionId),
+  ])
+  if (sessionError || membersError || recordsError) throw fail(503, 'Database sibuk, silakan coba lagi')
+  if (!session) throw fail(404, 'Sesi tidak ditemukan.')
+
+  const statusByMember = new Map((records || []).map((record) => [record.member_id, record.status]))
+
+  let staffUsernames = new Set()
+  try {
+    const allow = await listAllowed()
+    staffUsernames = new Set(
+      allow
+        .filter((a) => STAFF_ROLES.has(String(a.role || '').toLowerCase()))
+        .map((a) => String(a.username || '').toLowerCase()),
+    )
+  } catch { /* allowlist tak terbaca: anggap tak ada staf */ }
+
+  const overall = emptyCounts()
+  const staff = emptyCounts()
+  const groupMap = new Map(GROUP_NAMES.map((name) => [name, emptyCounts()]))
+  let noGroup = null
+
+  for (const member of members || []) {
+    const status = statusByMember.get(member.id)
+    const username = String(member.username || '').toLowerCase()
+    if (staffUsernames.has(username)) {
+      addStatus(staff, status)
+      continue
+    }
+    addStatus(overall, status)
+    const group = String(member.group_name || '').trim()
+    const bucket = groupMap.get(group)
+    if (bucket) {
+      addStatus(bucket, status)
+    } else {
+      if (!noGroup) noGroup = emptyCounts()
+      addStatus(noGroup, status)
+    }
+  }
+
+  const groups = GROUP_NAMES.map((name) => ({ name, ...groupMap.get(name) }))
+  if (noGroup) groups.push({ name: 'Tanpa kelompok', ...noGroup })
+
+  return { ...overall, groups, staff }
 }
 
 export async function upsertSessionMemberStatus(memberId, sessionId, status = 'hadir') {

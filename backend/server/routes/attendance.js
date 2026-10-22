@@ -6,7 +6,7 @@ import { emailFor, findProfileById } from '../utils/memberAuthStore.js'
 import { auditAdmin } from '../utils/audit.js'
 import {
   getActiveSession, createSession, getSession, closeSession, recordCheckin, listRecords, myRecords, sessionsForMember, getOverview,
-  listSessionRoster, upsertSessionMemberStatus, buildQrPayload, parseQrPayload, verifyQrToken,
+  listSessionRoster, upsertSessionMemberStatus, sessionStats, buildQrPayload, parseQrPayload, verifyQrToken,
   checkPwRate, recordPwFail, resetPwRate,
 } from '../utils/attendanceStore.js'
 
@@ -23,14 +23,14 @@ function sendStoreError(res, e, fallback) {
 
 function requireSupabaseDb(req, res) {
   if (!isSupabaseEnabled()) {
-    res.status(503).json({ error: 'Fitur absensi butuh database. Hubungi panitia.' })
+    res.status(503).json({ error: 'Fitur absensi butuh database. Hubungi SO.' })
     return false
   }
   return true
 }
 
 // Flag deploy: ATTENDANCE_ENABLED=false (Vercel production) -> endpoint anggota
-// jawab "segera hadir". Endpoint panitia/admin tidak kena flag (mirror MEMBER_AUTH).
+// jawab "segera hadir". Endpoint SO/admin tidak kena flag (mirror MEMBER_AUTH).
 function requireAttendanceOn(req, res, next) {
   if (process.env.ATTENDANCE_ENABLED === 'false') {
     return res.status(503).json({ error: 'Fitur absensi segera hadir' })
@@ -62,7 +62,7 @@ async function requireMember(req, res) {
   }
 }
 
-// ---- Sesi aktif (tanpa auto-create): untuk anggota maupun panitia ----
+// ---- Sesi aktif (tanpa auto-create): untuk anggota maupun SO ----
 r.get('/active', requireAttendanceOn, async (req, res) => {
   try {
     if (!requireSupabaseDb(req, res)) return
@@ -89,7 +89,7 @@ r.get('/active', requireAttendanceOn, async (req, res) => {
   }
 })
 
-// ---- Panitia: daftar sesi untuk pengelolaan manual per sesi ----
+// ---- SO: daftar sesi untuk pengelolaan manual per sesi ----
 r.get('/sessions', requireAdmin, async (req, res) => {
   try {
     if (!requireSupabaseDb(req, res)) return
@@ -107,7 +107,7 @@ r.get('/sessions', requireAdmin, async (req, res) => {
   }
 })
 
-// ---- Panitia: buat sesi baru (otomatis tutup sesi aktif lain; maks 1 aktif) ----
+// ---- SO: buat sesi baru (otomatis tutup sesi aktif lain; maks 1 aktif) ----
 r.post('/sessions', requireAdmin, async (req, res) => {
   try {
     if (!requireSupabaseDb(req, res)) return
@@ -231,7 +231,7 @@ r.get('/overview', requireAttendanceOn, async (req, res) => {
   }
 })
 
-// ---- Panitia: koreksi status (hadir/izin/alpa) ----
+// ---- SO: koreksi status (hadir/izin/alpa) ----
 r.get('/sessions/:id/roster', requireAdmin, async (req, res) => {
   try {
     if (!requireSupabaseDb(req, res)) return
@@ -239,6 +239,17 @@ r.get('/sessions/:id/roster', requireAdmin, async (req, res) => {
     res.json({ ok: true, members: roster })
   } catch (e) {
     sendStoreError(res, e, 'Absensi roster error:')
+  }
+})
+
+// ---- Statistik sesi untuk layar Display QR (overall + per kelompok) ----
+// Read-only: superadmin + SO, sama seperti display-token.
+r.get('/sessions/:id/stats', requireCanDisplay, async (req, res) => {
+  try {
+    const stats = await sessionStats(req.params.id)
+    res.json({ ok: true, ...stats })
+  } catch (e) {
+    sendStoreError(res, e, 'Absensi stats error:')
   }
 })
 

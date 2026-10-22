@@ -345,6 +345,11 @@ export const api = {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     }),
 
+  attendanceSessionStats: (session, token) =>
+    req(`/api/attendance/sessions/${encodeURIComponent(session)}/stats`, {
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    }),
+
   attendanceClose: (session, token) =>
     req(`/api/attendance/sessions/${encodeURIComponent(session)}/close`, {
       method: 'POST',
