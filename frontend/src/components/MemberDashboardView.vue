@@ -1,7 +1,7 @@
 ﻿<script setup>
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 'vue'
 import { api } from '../api.js'
-import { formatWIB } from '../utils/time.js'
+import { formatWIB, parseAsUTC } from '../utils/time.js'
 
 // Brankas admin: chunk terpisah, hanya diunduh saat tab Admin dibuka.
 const AdminView = defineAsyncComponent(() => import('./AdminView.vue'))
@@ -115,6 +115,16 @@ const memberSinceShort = computed(() => {
     return d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
   } catch { return memberSince.value }
 })
+const memberSinceDate = computed(() => {
+  const d = parseAsUTC(profile.value.created_at)
+  if (!d) return '—'
+  return d.toLocaleDateString('id-ID', {
+    timeZone: 'Asia/Jakarta',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
+})
 
 // ── Aktivitas absensi (mengisi profil ala timeline X) ────────
 const activity = ref(null) // null = belum dimuat
@@ -143,11 +153,19 @@ async function loadProfileActivity(force = false) {
   }
   try {
     const r = await api.attendanceSessionsMine(t)
-    const attended = (r.sessions || []).filter((s) => s.attendance?.status)
-    const counts = { hadir: 0, izin: 0, alpa: 0 }
-    for (const s of attended) {
-      const status = s.attendance.status
-      if (counts[status] != null) counts[status] += 1
+    const sessions = Array.isArray(r.sessions) ? r.sessions : []
+    const attended = sessions.filter((s) => s.attendance?.status)
+    const counts = { hadir: 0, izin: 0, alpa: 0, belum: 0 }
+    // Sesuaikan dengan tanggal bergabung supaya sesi lama (sebelum jadi
+    // anggota) tidak dihitung sebagai "belum absen".
+    const joined = joinedDateKey()
+    for (const s of sessions) {
+      const status = s.attendance?.status
+      if (status === 'hadir' || status === 'izin' || status === 'alpa') {
+        counts[status] += 1
+      } else if (!joined || (s.date && s.date >= joined)) {
+        counts.belum += 1
+      }
     }
     attendanceCounts.value = counts
     activity.value = attended.slice(0, 5)
@@ -170,6 +188,15 @@ function attendanceStatusLabel(status) {
   if (status === 'izin') return 'Izin'
   if (status === 'alpa') return 'Alpa'
   return 'Belum absen'
+}
+
+function joinedDateKey() {
+  const raw = profile.value.created_at
+  if (!raw) return ''
+  const d = new Date(typeof raw === 'string' ? raw.replace(' ', 'T') : raw)
+  if (isNaN(d)) return ''
+  // Tanggal bisnis absensi memakai WIB.
+  return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' })
 }
 
 function fmtSessionDate(value) {
@@ -577,21 +604,32 @@ onBeforeUnmount(() => {
                   Anggota aktif
                 </span>
               </div>
+
+              <p class="dash__profile-joined">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <rect x="3" y="5" width="18" height="16" rx="2" /><path d="M8 3v4M16 3v4M3 11h18" />
+                </svg>
+                Bergabung sejak {{ memberSinceDate }}
+              </p>
             </div>
 
-            <dl class="dash__profile-stats">
+            <dl class="dash__profile-stats" :class="{ 'dash__profile-stats--fallback': !showAttendanceStats }">
               <template v-if="showAttendanceStats">
-                <div class="dash__profile-stat">
+                <div class="dash__profile-stat dash__profile-stat--hadir">
                   <dt>Hadir</dt>
                   <dd>{{ attendanceCounts?.hadir ?? '—' }}</dd>
                 </div>
-                <div class="dash__profile-stat">
+                <div class="dash__profile-stat dash__profile-stat--izin">
                   <dt>Izin</dt>
                   <dd>{{ attendanceCounts?.izin ?? '—' }}</dd>
                 </div>
-                <div class="dash__profile-stat">
+                <div class="dash__profile-stat dash__profile-stat--alpa">
                   <dt>Alpa</dt>
                   <dd>{{ attendanceCounts?.alpa ?? '—' }}</dd>
+                </div>
+                <div class="dash__profile-stat dash__profile-stat--belum">
+                  <dt>Belum absen</dt>
+                  <dd>{{ attendanceCounts?.belum ?? '—' }}</dd>
                 </div>
               </template>
               <template v-else>
@@ -1168,15 +1206,26 @@ onBeforeUnmount(() => {
   margin-top: 10px;
 }
 
+.dash__profile-joined {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: var(--ec-ink-soft);
+}
+.dash__profile-joined svg { flex-shrink: 0; opacity: 0.8; }
+
 .dash__profile-stats {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
   margin: 0;
   padding: 14px 20px 18px;
   border-top: 1px solid var(--ec-line);
   background: var(--ec-canvas);
 }
+.dash__profile-stats--fallback { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .dash__profile-stat {
   display: flex;
   flex-direction: column;
@@ -1199,6 +1248,10 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.dash__profile-stat--hadir dd { color: var(--ec-success); }
+.dash__profile-stat--izin dd { color: var(--ec-warning); }
+.dash__profile-stat--alpa dd { color: var(--ec-danger); }
+.dash__profile-stat--belum dd { color: var(--ec-ink-soft); }
 
 @media (max-width: 520px) {
   .dash__profile-banner { height: 120px; }
@@ -1207,7 +1260,9 @@ onBeforeUnmount(() => {
   .dash__profile-topline { margin-top: -38px; }
   .dash__avatar-xl { width: 84px; height: 84px; border-width: 3px; font-size: 32px; }
   .dash__profile-displayname { margin-top: 12px; font-size: 20px; }
-  .dash__profile-stats { padding: 12px 16px 16px; gap: 8px; }
+  .dash__profile-joined { font-size: 12.5px; }
+  .dash__profile-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 12px 16px 16px; gap: 10px 8px; }
+  .dash__profile-stats--fallback { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .dash__profile-stat dd { font-size: 13px; }
 }
 

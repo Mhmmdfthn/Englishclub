@@ -1,6 +1,6 @@
 <script setup>
 import { onBeforeUnmount, onMounted, ref } from 'vue'
-import { LogOut } from 'lucide-vue-next'
+import { LogIn, LogOut } from 'lucide-vue-next'
 
 /**
  * PublicNavbar — sticky navigation for the public site.
@@ -71,7 +71,8 @@ onBeforeUnmount(() => {
             <span class="ec-sr-only">Keluar dari akun {{ memberName }}</span>
           </button>
         </template>
-        <button v-else-if="authEnabled" class="ec-btn ec-btn--primary ec-btn--sm" type="button" @click="emit('goLogin')">
+        <button v-else-if="authEnabled" class="ec-btn ec-btn--primary ec-btn--sm ec-nav__login" type="button" @click="emit('goLogin')">
+          <LogIn :size="15" :stroke-width="2.2" aria-hidden="true" />
           Login
         </button>
       </div>
@@ -196,6 +197,27 @@ onBeforeUnmount(() => {
   margin-left: 0;
 }
 
+/* Tombol akun di navbar: pill gradient dengan sedikit glow, bukan biru flat. */
+.ec-nav__account .ec-btn {
+  background: linear-gradient(135deg, var(--ec-blue) 0%, #1D4ED8 100%);
+  box-shadow:
+    0 8px 20px -14px rgba(11, 86, 155, 0.75),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  padding-inline: 18px;
+}
+
+.ec-nav__account .ec-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--ec-blue-600) 0%, #1E40AF 100%);
+  box-shadow:
+    0 10px 24px -14px rgba(11, 86, 155, 0.85),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.ec-nav__login svg {
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+
 .ec-nav__logout {
   display: grid;
   place-items: center;
@@ -220,55 +242,62 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 720px) {
+  /* Mobile: satu baris saja. Link bagian pindah ke footer (PRD §7.7),
+     jadi navbar tidak lagi bertumpuk dua tingkat. */
   .ec-nav__inner {
-    min-height: 56px;
-    gap: 6px 12px;
-    flex-wrap: wrap;
-    padding-block: 6px;
+    flex-wrap: nowrap;
+    min-height: 64px;
+    gap: 10px;
+    padding-block: 8px;
   }
 
   .ec-nav__links {
-    order: 3;
-    flex: 0 0 100%;
-    min-width: 0;
-    justify-content: flex-start;
-    gap: 4px;
-    margin-left: 0;
-    overflow-x: auto;
-    /* Tahan rambatan swipe diagonal ke halaman (miring dikit = halaman ikut
-       geser di Safari iPhone). Pola sama seperti .ec-rail__track. */
-    overscroll-behavior-x: contain;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
-    padding-bottom: 2px;
-  }
-
-  .ec-nav__links::-webkit-scrollbar {
     display: none;
   }
 
-  .ec-nav__link {
-    font-size: 0.78rem;
-    min-height: 44px;
-    display: inline-flex;
-    align-items: center;
-    padding: 10px 8px;
-    flex: 0 0 auto;
+  .ec-nav__brand {
+    min-width: 0;
+    gap: 8px;
   }
 
-  .ec-nav__account {
-    margin-left: auto;
-  }
-
-  .ec-nav__account .ec-btn {
-    min-height: 44px;
+  .ec-nav__logo {
+    width: 32px;
+    height: 32px;
   }
 
   .ec-nav__brand-text {
+    min-width: 0;
+    max-width: none;
     font-size: 0.938rem;
-    max-width: 38vw;
     overflow: hidden;
     text-overflow: ellipsis;
   }
+
+  /* Link disembunyikan, jadi tombol akun harus tetap terdorong ke pojok kanan.
+     Selector gabungan perlu menyamai spesifisitas `.ec-nav__links + .ec-nav__account`. */
+  .ec-nav__account,
+  .ec-nav__links + .ec-nav__account {
+    margin-left: auto;
+    gap: 6px;
+  }
+
+  .ec-nav__account .ec-btn {
+    min-height: 40px;
+    padding-inline: 16px 18px;
+    font-size: 0.82rem;
+    box-shadow:
+      0 6px 16px -12px rgba(11, 86, 155, 0.8),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+
+  .ec-nav__logout {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+@media (max-width: 360px) {
+  .ec-nav__brand-text { font-size: 0.82rem; }
+  .ec-nav__account .ec-btn { padding-inline: 11px; }
 }
 </style>
