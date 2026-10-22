@@ -314,7 +314,7 @@ export const api = {
   attendanceSessionsMine: (token) =>
     req('/api/attendance/sessions/mine', {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    }),
+    }, 12000),
 
   attendanceSessions: (token) =>
     req('/api/attendance/sessions', {

@@ -64,12 +64,13 @@ function closeMenu(returnFocus = true) {
 function goTab(tab) {
   dashTab.value = tab
   closeMenu()
+  // Profil bisa dibuka dari quick access maupun avatar, jadi muat aktivitas
+  // di satu tempat ini agar statistik tidak kosong.
+  if (tab === 'profil') loadProfileActivity()
 }
 
 function goProfile() {
-  dashTab.value = 'profil'
-  closeMenu()
-  loadProfileActivity()
+  goTab('profil')
 }
 
 function goHome() {
@@ -119,16 +120,27 @@ const memberSinceShort = computed(() => {
 const activity = ref(null) // null = belum dimuat
 const activityLoading = ref(false)
 const activityError = ref(false)
+const activityUnavailable = ref(false) // backend mematikan fitur absensi (503)
 const attendanceCounts = ref(null) // { hadir, izin, alpa }
-const showAttendanceStats = computed(() => ATTENDANCE_ON && !activityError.value)
+const showAttendanceStats = computed(() => ATTENDANCE_ON && !activityError.value && !activityUnavailable.value)
 
-async function loadProfileActivity() {
-  if (!ATTENDANCE_ON || activityLoading.value || activity.value !== null) return
+async function loadProfileActivity(force = false) {
+  if (!ATTENDANCE_ON || activityLoading.value) return
+  if (!force && activity.value !== null) return
   let t = ''
   try { t = localStorage.getItem('member_token') || '' } catch { return }
-  if (!t) return
+  if (!t) {
+    activityError.value = true
+    activity.value = []
+    return
+  }
   activityLoading.value = true
   activityError.value = false
+  activityUnavailable.value = false
+  if (force) {
+    activity.value = null
+    attendanceCounts.value = null
+  }
   try {
     const r = await api.attendanceSessionsMine(t)
     const attended = (r.sessions || []).filter((s) => s.attendance?.status)
@@ -139,9 +151,15 @@ async function loadProfileActivity() {
     }
     attendanceCounts.value = counts
     activity.value = attended.slice(0, 5)
-  } catch {
-    activityError.value = true
-    activity.value = []
+  } catch (e) {
+    if (e?.status === 503) {
+      activityUnavailable.value = true
+      activity.value = []
+    } else {
+      activityError.value = true
+      activity.value = []
+    }
+    attendanceCounts.value = null
   } finally {
     activityLoading.value = false
   }
@@ -603,7 +621,7 @@ onBeforeUnmount(() => {
               <button v-if="ATTENDANCE_ON" class="dash__activity-link" type="button" @click="goTab('absensi')">Lihat semua</button>
             </div>
 
-            <div v-if="!ATTENDANCE_ON" class="dash__activity-empty">
+            <div v-if="!ATTENDANCE_ON || activityUnavailable" class="dash__activity-empty">
               <p>Fitur absensi belum dibuka.</p>
             </div>
 
@@ -612,7 +630,13 @@ onBeforeUnmount(() => {
             </div>
 
             <div v-else-if="activityError" class="dash__activity-empty">
-              <p>Gagal memuat aktivitas. Coba buka tab Absensi.</p>
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M18.4 18.4A8.5 8.5 0 0 1 5.6 5.6" />
+                <path d="M3.5 3.5l17 17" />
+                <path d="M9 5.2A8.5 8.5 0 0 1 20.4 15" />
+              </svg>
+              <p>Aktivitas belum bisa dimuat.</p>
+              <button class="ec-btn ec-btn--secondary ec-btn--sm" type="button" @click="loadProfileActivity(true)">Coba lagi</button>
             </div>
 
             <ul v-else-if="activity?.length" class="dash__activity-list">
