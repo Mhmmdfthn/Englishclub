@@ -69,6 +69,7 @@ function goTab(tab) {
 function goProfile() {
   dashTab.value = 'profil'
   closeMenu()
+  loadProfileActivity()
 }
 
 function goHome() {
@@ -77,7 +78,7 @@ function goHome() {
 }
 
 const tabTitle = computed(() => (
-  { dashboard: 'Dashboard', absensi: 'Absensi', materi: 'Materi', profil: 'Profil Saya', admin: 'Admin' }[dashTab.value] || 'Dashboard'
+  { dashboard: 'Dashboard', absensi: 'Absensi', materi: 'Materi', utilitas: 'Utilitas', profil: 'Profil Saya', admin: 'Admin' }[dashTab.value] || 'Dashboard'
 ))
 
 function onMenuKey(e) {
@@ -93,16 +94,84 @@ const announcementsLoading = ref(true)
 const announcementsError = ref('')
 
 const GROUP_STYLES = {
-  Zeus:   { color: '#1E3A8A', bg: '#EFF6FF' },
-  Athena: { color: '#0E7490', bg: '#ECFEFF' },
-  Hades:  { color: '#374151', bg: '#F3F4F6' },
-  Apollo: { color: '#B45309', bg: '#FFFBEB' },
-  Hermes: { color: '#15803D', bg: '#F0FDF4' },
+  Zeus:   { color: '#1E3A8A', bg: '#EFF6FF', banner: 'linear-gradient(135deg, #1E3A8A 0%, #2563EB 58%, #60A5FA 100%)' },
+  Athena: { color: '#0E7490', bg: '#ECFEFF', banner: 'linear-gradient(135deg, #0E7490 0%, #0891B2 58%, #67E8F9 100%)' },
+  Hades:  { color: '#374151', bg: '#F3F4F6', banner: 'linear-gradient(135deg, #312E81 0%, #4C1D95 58%, #7C3AED 100%)' },
+  Apollo: { color: '#B45309', bg: '#FFFBEB', banner: 'linear-gradient(135deg, #B45309 0%, #D97706 58%, #FBBF24 100%)' },
+  Hermes: { color: '#15803D', bg: '#F0FDF4', banner: 'linear-gradient(135deg, #15803D 0%, #16A34A 58%, #4ADE80 100%)' },
 }
 
-const groupStyle = computed(() => GROUP_STYLES[profile.value.group_name] || { color: '#0B569B', bg: '#EFF6FF' })
+const FALLBACK_GROUP_STYLE = { color: '#0B569B', bg: '#EFF6FF', banner: 'linear-gradient(135deg, #0B569B 0%, #1D4ED8 58%, #38BDF8 100%)' }
+
+const groupStyle = computed(() => GROUP_STYLES[profile.value.group_name] || FALLBACK_GROUP_STYLE)
 const initial = computed(() => (profile.value.fullname || profile.value.username || '?').charAt(0).toUpperCase())
 const memberSince = computed(() => profile.value.created_at ? formatWIB(profile.value.created_at) : '—')
+const memberSinceShort = computed(() => {
+  if (!profile.value.created_at) return '—'
+  try {
+    const d = new Date(profile.value.created_at)
+    if (isNaN(d)) return memberSince.value
+    return d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
+  } catch { return memberSince.value }
+})
+
+// ── Aktivitas absensi (mengisi profil ala timeline X) ────────
+const activity = ref(null) // null = belum dimuat
+const activityLoading = ref(false)
+const activityError = ref(false)
+const attendanceCounts = ref(null) // { hadir, izin, alpa }
+const showAttendanceStats = computed(() => ATTENDANCE_ON && !activityError.value)
+
+async function loadProfileActivity() {
+  if (!ATTENDANCE_ON || activityLoading.value || activity.value !== null) return
+  let t = ''
+  try { t = localStorage.getItem('member_token') || '' } catch { return }
+  if (!t) return
+  activityLoading.value = true
+  activityError.value = false
+  try {
+    const r = await api.attendanceSessionsMine(t)
+    const attended = (r.sessions || []).filter((s) => s.attendance?.status)
+    const counts = { hadir: 0, izin: 0, alpa: 0 }
+    for (const s of attended) {
+      const status = s.attendance.status
+      if (counts[status] != null) counts[status] += 1
+    }
+    attendanceCounts.value = counts
+    activity.value = attended.slice(0, 5)
+  } catch {
+    activityError.value = true
+    activity.value = []
+  } finally {
+    activityLoading.value = false
+  }
+}
+
+function attendanceStatusLabel(status) {
+  if (status === 'hadir') return 'Hadir'
+  if (status === 'izin') return 'Izin'
+  if (status === 'alpa') return 'Alpa'
+  return 'Belum absen'
+}
+
+function fmtSessionDate(value) {
+  if (!value) return '—'
+  try {
+    const d = new Date(`${value}T00:00:00`)
+    if (isNaN(d)) return value
+    return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
+  } catch { return value }
+}
+
+function fmtTimeWIB(iso) {
+  if (!iso) return ''
+  try {
+    const d = new Date(iso)
+    if (isNaN(d)) return ''
+    const time = d.toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', hour12: false })
+    return `${time} WIB`
+  } catch { return '' }
+}
 
 // Pengumuman: pin di atas lalu terbaru, tampil max 5 di dashboard.
 const visibleAnnouncements = computed(() => (announcements.value || []).slice(0, 5))
@@ -228,7 +297,11 @@ onBeforeUnmount(() => {
                 <small>@{{ profile.username }}</small>
               </div>
             </div>
-            <button class="dash__menu-close" type="button" @click="closeMenu()" aria-label="Tutup menu">×</button>
+            <button class="dash__menu-close" type="button" @click="closeMenu()" aria-label="Tutup menu">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M18 6 6 18M6 6l12 12" />
+              </svg>
+            </button>
           </div>
 
           <nav class="dash__menu-nav" aria-label="Menu anggota">
@@ -251,7 +324,13 @@ onBeforeUnmount(() => {
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><polyline points="9 14 11 16 15 12"/></svg>
               <span>Absensi</span>
-              <span v-if="!ATTENDANCE_ON" class="dash__soon">Segera</span>
+              <span v-if="!ATTENDANCE_ON" class="dash__soon">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M12 7v5l3 2" />
+                </svg>
+                Segera
+              </span>
             </button>
             <button
               class="dash__menu-item"
@@ -262,6 +341,23 @@ onBeforeUnmount(() => {
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
               <span>Materi</span>
+            </button>
+            <button
+              class="dash__menu-item"
+              :class="{ active: dashTab === 'utilitas' }"
+              type="button"
+              :aria-current="dashTab === 'utilitas' ? 'page' : null"
+              @click="goTab('utilitas')"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+              <span>Utilitas</span>
+              <span class="dash__soon">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M12 7v5l3 2" />
+                </svg>
+                Segera
+              </span>
             </button>
             <button
               class="dash__menu-item"
@@ -406,7 +502,13 @@ onBeforeUnmount(() => {
           :class="{ 'is-pinned': item.pinned }"
         >
           <div class="dash__announce-meta">
-            <span v-if="item.pinned" class="dash__pin">Disematkan</span>
+            <span v-if="item.pinned" class="dash__pin">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 17v5" />
+                <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />
+              </svg>
+              Disematkan
+            </span>
             <span class="dash__announce-date">{{ formatWIB(item.created_at) }}</span>
           </div>
           <span class="dash__announce-title">{{ item.title }}</span>
@@ -423,53 +525,128 @@ onBeforeUnmount(() => {
       <!-- Logout (pindah ke drawer menu) -->
       </template>
 
-      <!-- Profil Saya: card netral + info lengkap (pindahan dashboard) -->
+      <!-- Profil Saya: layout ala X (banner + avatar overlap) -->
       <template v-else-if="dashTab === 'profil'">
-        <div class="dash__head">
-          <span class="dash__eyebrow">Profil Saya</span>
-          <h1 class="dash__greeting">
-            {{ profile.fullname || profile.username || 'Anggota EC' }}
-          </h1>
-          <p class="dash__sub">@{{ profile.username }}</p>
-        </div>
-
         <div class="dash__profile-wrap">
-          <div class="ec-card dash__profile-card">
-            <div class="dash__avatar-lg" :style="{ background: groupStyle.color }">{{ initial }}</div>
-            <div class="dash__profile-info">
-              <span class="dash__profile-name">{{ profile.fullname || profile.username }}</span>
-              <span class="dash__profile-meta">@{{ profile.username }}</span>
+          <article class="ec-card dash__profile-hero">
+            <div class="dash__profile-banner" :style="{ background: groupStyle.banner }" aria-hidden="true">
+              <span class="dash__profile-banner-mark">EC</span>
+            </div>
+
+            <div class="dash__profile-body">
+              <div class="dash__profile-topline">
+                <div class="dash__avatar-xl" :style="{ background: groupStyle.color }" aria-hidden="true">{{ initial }}</div>
+              </div>
+
+              <h1 class="dash__profile-displayname">{{ profile.fullname || profile.username || 'Anggota EC' }}</h1>
+              <p class="dash__profile-handle">@{{ profile.username }}</p>
+
+              <p class="dash__profile-bio">
+                Anggota English Club UPB<span v-if="profile.group_name"> · Kelompok {{ profile.group_name }}</span>.
+              </p>
+
               <div class="dash__profile-tags">
-                <span v-if="profile.group_name" class="dash__tag" :style="{ color: groupStyle.color, background: groupStyle.bg, borderColor: groupStyle.color + '40' }">
+                <span v-if="profile.group_name" class="dash__tag" :style="{ color: groupStyle.color, background: groupStyle.bg }">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 3l7 3v5c0 4.4-3 8.4-7 10-4-1.6-7-5.6-7-10V6l7-3z" />
+                  </svg>
                   {{ profile.group_name }}
                 </span>
-                <span class="dash__tag dash__tag--muted">Anggota aktif</span>
+                <span class="dash__tag dash__tag--active">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" /><path d="m8.5 12.5 2.5 2.5 4.5-5" />
+                  </svg>
+                  Anggota aktif
+                </span>
               </div>
             </div>
-          </div>
 
-          <dl class="ec-card dash__info">
-            <div class="dash__info-row">
-              <dt class="dash__info-label">Username</dt>
-              <dd class="dash__info-val">@{{ profile.username }}</dd>
+            <dl class="dash__profile-stats">
+              <template v-if="showAttendanceStats">
+                <div class="dash__profile-stat">
+                  <dt>Hadir</dt>
+                  <dd>{{ attendanceCounts?.hadir ?? '—' }}</dd>
+                </div>
+                <div class="dash__profile-stat">
+                  <dt>Izin</dt>
+                  <dd>{{ attendanceCounts?.izin ?? '—' }}</dd>
+                </div>
+                <div class="dash__profile-stat">
+                  <dt>Alpa</dt>
+                  <dd>{{ attendanceCounts?.alpa ?? '—' }}</dd>
+                </div>
+              </template>
+              <template v-else>
+                <div class="dash__profile-stat">
+                  <dt>Kelompok</dt>
+                  <dd>{{ profile.group_name || '—' }}</dd>
+                </div>
+                <div class="dash__profile-stat">
+                  <dt>Status</dt>
+                  <dd>Aktif</dd>
+                </div>
+                <div class="dash__profile-stat">
+                  <dt>Bergabung</dt>
+                  <dd>{{ memberSinceShort }}</dd>
+                </div>
+              </template>
+            </dl>
+          </article>
+
+          <!-- Timeline aktivitas: meniru feed profil X -->
+          <section class="ec-card dash__activity" aria-label="Aktivitas absensi terbaru">
+            <div class="dash__activity-head">
+              <div>
+                <h2 class="dash__activity-title">Aktivitas terbaru</h2>
+                <p class="dash__activity-sub">Riwayat kehadiranmu di sesi absensi.</p>
+              </div>
+              <button v-if="ATTENDANCE_ON" class="dash__activity-link" type="button" @click="goTab('absensi')">Lihat semua</button>
             </div>
-            <div class="dash__info-row">
-              <dt class="dash__info-label">Nama lengkap</dt>
-              <dd class="dash__info-val">{{ profile.fullname }}</dd>
+
+            <div v-if="!ATTENDANCE_ON" class="dash__activity-empty">
+              <p>Fitur absensi belum dibuka.</p>
             </div>
-            <div class="dash__info-row">
-              <dt class="dash__info-label">Kelompok</dt>
-              <dd class="dash__info-val">{{ profile.group_name || '—' }}</dd>
+
+            <div v-else-if="activityLoading" class="dash__activity-skel" aria-hidden="true">
+              <div v-for="n in 3" :key="n" class="ec-skeleton" style="height:48px;border-radius:12px"></div>
             </div>
-            <div class="dash__info-row">
-              <dt class="dash__info-label">Status</dt>
-              <dd class="dash__info-val">Anggota aktif</dd>
+
+            <div v-else-if="activityError" class="dash__activity-empty">
+              <p>Gagal memuat aktivitas. Coba buka tab Absensi.</p>
             </div>
-            <div class="dash__info-row">
-              <dt class="dash__info-label">Bergabung sejak</dt>
-              <dd class="dash__info-val">{{ memberSince }}</dd>
+
+            <ul v-else-if="activity?.length" class="dash__activity-list">
+              <li v-for="item in activity" :key="item.id" class="dash__activity-row">
+                <span class="dash__activity-icon" :class="`is-${item.attendance.status}`" aria-hidden="true">
+                  <svg v-if="item.attendance.status === 'hadir'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="9" /><path d="m8.5 12.5 2.5 2.5 4.5-5" />
+                  </svg>
+                  <svg v-else-if="item.attendance.status === 'izin'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
+                  </svg>
+                  <svg v-else-if="item.attendance.status === 'alpa'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="9" /><path d="m15 9-6 6M9 9l6 6" />
+                  </svg>
+                  <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="9" /><path d="M8 12h8" />
+                  </svg>
+                </span>
+                <span class="dash__activity-main">
+                  <b>{{ item.title || 'Sesi absensi' }}</b>
+                  <small>{{ fmtSessionDate(item.date) }}{{ item.attendance.scanned_at ? ` · ${fmtTimeWIB(item.attendance.scanned_at)}` : '' }}</small>
+                </span>
+                <span class="dash__activity-status" :class="`is-${item.attendance.status}`">{{ attendanceStatusLabel(item.attendance.status) }}</span>
+              </li>
+            </ul>
+
+            <div v-else class="dash__activity-empty">
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="3" y="5" width="18" height="16" rx="2" /><path d="M8 3v4M16 3v4M3 11h18" /><path d="m9 16 2 2 4-4" />
+              </svg>
+              <p>Belum ada aktivitas absensi.</p>
+              <button v-if="ATTENDANCE_ON" class="ec-btn ec-btn--secondary ec-btn--sm" type="button" @click="goTab('absensi')">Buka Absensi</button>
             </div>
-          </dl>
+          </section>
         </div>
       </template>
 
@@ -489,6 +666,83 @@ onBeforeUnmount(() => {
       <!-- Materi: daftar embed Canva + viewer (tombol + untuk SO ke atas) -->
       <div v-else-if="dashTab === 'materi'">
         <MateriView :can-manage="canManageMateri" />
+      </div>
+
+      <!-- Utilitas: berkas administrasi anggota (tampilan awal / segera hadir) -->
+      <div v-else-if="dashTab === 'utilitas'">
+        <div class="dash__head">
+          <span class="dash__eyebrow">Administrasi</span>
+          <h1 class="dash__greeting">Utilitas</h1>
+          <p class="dash__sub">Berkas administrasi keanggotaan yang siap dicetak.</p>
+        </div>
+
+        <div class="dash__section-head">
+          <h2 class="dash__section-title">Berkas Administrasi</h2>
+        </div>
+
+        <div class="dash__util-grid">
+          <article class="ec-card dash__util-card">
+            <div class="dash__util-top">
+              <span class="dash__util-icon" aria-hidden="true">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="2" y="5" width="20" height="14" rx="2" />
+                  <circle cx="8" cy="11" r="2" />
+                  <path d="M5 16c.6-1.5 1.7-2 3-2s2.4.5 3 2" />
+                  <path d="M14 10h5M14 14h5" />
+                </svg>
+              </span>
+              <span class="dash__util-badge">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M12 7v5l3 2" />
+                </svg>
+                Segera
+              </span>
+            </div>
+            <div class="dash__util-copy">
+              <h3 class="dash__util-title">Kartu Anggota</h3>
+              <p class="dash__util-desc">Cetak kartu identitas resmi anggota English Club UPB.</p>
+            </div>
+            <button class="ec-btn ec-btn--secondary ec-btn--sm dash__util-btn" type="button" disabled>Cetak kartu</button>
+          </article>
+
+          <article class="ec-card dash__util-card">
+            <div class="dash__util-top">
+              <span class="dash__util-icon" aria-hidden="true">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <path d="m9 15 2 2 4-4" />
+                </svg>
+              </span>
+              <span class="dash__util-badge">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M12 7v5l3 2" />
+                </svg>
+                Segera
+              </span>
+            </div>
+            <div class="dash__util-copy">
+              <h3 class="dash__util-title">Surat Keaktifan</h3>
+              <p class="dash__util-desc">Unduh surat keterangan aktif sebagai anggota English Club UPB.</p>
+            </div>
+            <button class="ec-btn ec-btn--secondary ec-btn--sm dash__util-btn" type="button" disabled>Cetak surat</button>
+          </article>
+        </div>
+
+        <div class="dash__util-note" role="status">
+          <span class="dash__util-note-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 3l1.7 4.3L18 9l-4.3 1.7L12 15l-1.7-4.3L6 9l4.3-1.7z" />
+              <path d="M18.5 15.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z" />
+            </svg>
+          </span>
+          <div class="dash__util-note-copy">
+            <b>Sedang disiapkan</b>
+            <p>Berkas administrasi akan bisa dicetak setelah data keanggotaan selesai diverifikasi pengurus.</p>
+          </div>
+        </div>
       </div>
 
       <!-- Brankas Admin tertanam (superadmin): login + fitur admin penuh di sini -->
@@ -627,11 +881,12 @@ onBeforeUnmount(() => {
 /* ── Brand header (desktop saja) ──────────────────────────── */
 .dash__brand { display: none; }
 
-/* ── Profil wrap: stack di mobile, 2 kolom di desktop ─────── */
+/* ── Profil ala X: satu kolom terpusat ────────────────────── */
 .dash__profile-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  display: block;
+  width: 100%;
+  max-width: 640px;
+  margin-inline: auto;
   min-width: 0;
 }
 
@@ -641,6 +896,106 @@ onBeforeUnmount(() => {
   gap: 8px;
   flex-wrap: wrap;
   margin-top: 4px;
+}
+
+/* ── Utilitas: berkas administrasi ────────────────────────── */
+.dash__util-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  min-width: 0;
+}
+.dash__util-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+  border-radius: 16px;
+}
+.dash__util-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.dash__util-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  background: var(--ec-blue-050, #F1F6FC);
+  color: var(--ec-blue);
+}
+.dash__util-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px 4px 7px;
+  border-radius: 99px;
+  background: linear-gradient(135deg, #FEF3C7 0%, #FFFBEB 100%);
+  color: #92400E;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.dash__util-badge svg { flex-shrink: 0; opacity: 0.85; }
+.dash__util-copy { min-width: 0; }
+.dash__util-title {
+  margin: 0;
+  font-family: 'Outfit', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ec-ink);
+}
+.dash__util-desc {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ec-ink-soft);
+}
+.dash__util-btn { margin-top: auto; align-self: flex-start; }
+
+.dash__util-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(180, 83, 9, 0.09) 0%, rgba(180, 83, 9, 0.03) 100%);
+}
+.dash__util-note-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: rgba(180, 83, 9, 0.12);
+  color: #B45309;
+}
+.dash__util-note-copy { min-width: 0; }
+.dash__util-note-copy b {
+  display: block;
+  font-family: 'Outfit', sans-serif;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #92400E;
+}
+.dash__util-note-copy p {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ec-ink-soft);
+}
+
+@media (max-width: 520px) {
+  .dash__util-grid { grid-template-columns: 1fr; }
 }
 
 /* ── Tab admin tertanam ───────────────────────────────────── */
@@ -690,7 +1045,7 @@ onBeforeUnmount(() => {
   margin-top: 2px;
 }
 
-/* ── Profile card (netral, tanpa aksen setrip warna) ───────── */
+/* Skeleton loading dashboard masih memakai kartu ringkas ini. */
 .dash__profile-card {
   display: flex;
   align-items: center;
@@ -699,30 +1054,121 @@ onBeforeUnmount(() => {
   border-radius: 16px;
 }
 
-.dash__avatar-lg {
-  width: 52px;
-  height: 52px;
+/* ── Hero profil ala X ────────────────────────────────────── */
+.dash__profile-hero {
+  overflow: hidden;
+  padding: 0;
+  border-radius: 16px;
+  box-shadow: none;
+}
+
+.dash__profile-banner {
+  position: relative;
+  height: 160px;
+  background: linear-gradient(135deg, #0B569B 0%, #1D4ED8 58%, #38BDF8 100%);
+}
+.dash__profile-banner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(120% 150% at 12% 0%, rgba(255, 255, 255, 0.22), transparent 58%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(15, 23, 42, 0.35));
+}
+.dash__profile-banner-mark {
+  position: absolute;
+  right: 16px;
+  bottom: -14px;
+  z-index: 1;
+  font-family: 'Outfit', sans-serif;
+  font-size: 104px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.08em;
+  color: rgba(255, 255, 255, 0.16);
+  user-select: none;
+}
+
+.dash__profile-body { padding: 0 20px 18px; }
+
+.dash__profile-topline {
+  display: flex;
+  margin-top: -46px;
+}
+
+.dash__avatar-xl {
+  position: relative;
+  z-index: 1;
+  width: 104px;
+  height: 104px;
+  border: 4px solid var(--ec-surface);
   border-radius: 50%;
   color: #fff;
   font-family: 'Outfit', sans-serif;
-  font-size: 22px;
+  font-size: 40px;
   font-weight: 800;
   display: grid;
   place-items: center;
   flex-shrink: 0;
+  box-shadow: var(--ec-shadow-sm);
 }
 
-.dash__profile-info {
-  flex: 1;
-  min-width: 0;
+.dash__profile-displayname {
+  margin: 14px 0 0;
+  font-family: 'Outfit', sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--ec-ink);
+  overflow-wrap: anywhere;
+}
+
+.dash__profile-handle {
+  margin: 2px 0 0;
+  font-size: 14px;
+  color: var(--ec-ink-soft);
+}
+
+.dash__profile-bio {
+  margin: 10px 0 0;
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--ec-ink);
+}
+
+.dash__profile-tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.dash__profile-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 14px 20px 18px;
+  border-top: 1px solid var(--ec-line);
+  background: var(--ec-canvas);
+}
+.dash__profile-stat {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
+  min-width: 0;
 }
-
-.dash__profile-name {
-  font-family: 'Outfit', sans-serif;
-  font-size: 16px;
+.dash__profile-stat dt {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ec-ink-soft);
+}
+.dash__profile-stat dd {
+  margin: 0;
+  font-size: 14px;
   font-weight: 700;
   color: var(--ec-ink);
   overflow: hidden;
@@ -730,30 +1176,142 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
-.dash__profile-meta {
+@media (max-width: 520px) {
+  .dash__profile-banner { height: 120px; }
+  .dash__profile-banner-mark { font-size: 84px; right: 12px; }
+  .dash__profile-body { padding: 0 16px 16px; }
+  .dash__profile-topline { margin-top: -38px; }
+  .dash__avatar-xl { width: 84px; height: 84px; border-width: 3px; font-size: 32px; }
+  .dash__profile-displayname { margin-top: 12px; font-size: 20px; }
+  .dash__profile-stats { padding: 12px 16px 16px; gap: 8px; }
+  .dash__profile-stat dd { font-size: 13px; }
+}
+
+/* ── Aktivitas terbaru (timeline profil ala X) ────────────── */
+.dash__activity {
+  margin-top: 16px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.dash__activity-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.dash__activity-title {
+  margin: 0;
+  font-family: 'Outfit', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ec-ink);
+}
+.dash__activity-sub {
+  margin: 2px 0 0;
   font-size: 12.5px;
   color: var(--ec-ink-soft);
 }
-
-.dash__profile-tags {
+.dash__activity-link {
+  flex-shrink: 0;
+  min-height: 36px;
+  padding: 6px 4px;
+  border: 0;
+  background: none;
+  color: var(--ec-blue);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.dash__activity-link:hover { text-decoration: underline; }
+.dash__activity-link:focus-visible { outline: none; box-shadow: var(--ec-focus-ring); border-radius: 8px; }
+.dash__activity-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.dash__activity-row {
   display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin-top: 4px;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--ec-line);
+}
+.dash__activity-row:last-child { padding-bottom: 0; border-bottom: 0; }
+.dash__activity-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--ec-canvas);
+  color: var(--ec-ink-soft);
+}
+.dash__activity-icon.is-hadir { background: var(--ec-success-bg); color: var(--ec-success); }
+.dash__activity-icon.is-izin { background: var(--ec-warning-bg); color: var(--ec-warning); }
+.dash__activity-icon.is-alpa { background: var(--ec-danger-bg); color: var(--ec-danger); }
+.dash__activity-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.dash__activity-main b {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ec-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dash__activity-main small {
+  font-size: 12px;
+  color: var(--ec-ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dash__activity-status { flex-shrink: 0; font-size: 12px; font-weight: 700; }
+.dash__activity-status.is-hadir { color: var(--ec-success); }
+.dash__activity-status.is-izin { color: var(--ec-warning); }
+.dash__activity-status.is-alpa { color: var(--ec-danger); }
+.dash__activity-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 8px;
+  text-align: center;
+  color: var(--ec-ink-soft);
+  font-size: 13px;
+}
+.dash__activity-empty p { margin: 0; }
+.dash__activity-empty svg { opacity: 0.55; }
+.dash__activity-skel { display: flex; flex-direction: column; gap: 10px; }
+
+@media (max-width: 520px) {
+  .dash__activity { padding: 14px; }
+  .dash__activity-link { font-size: 12.5px; }
 }
 
 .dash__tag {
   display: inline-flex;
   align-items: center;
-  padding: 3px 10px;
-  border: 1px solid var(--ec-line);
-  border-radius: 99px;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 8px;
   font-family: 'Plus Jakarta Sans', sans-serif;
   font-size: 11.5px;
   font-weight: 700;
   letter-spacing: 0.02em;
+  line-height: 1.4;
+  white-space: nowrap;
 }
-.dash__tag--muted { color: var(--ec-ink-soft); background: var(--ec-canvas); }
+.dash__tag svg { flex-shrink: 0; opacity: 0.9; }
+.dash__tag--active { color: var(--ec-success); background: var(--ec-success-bg); }
 
 /* ── Section head ─────────────────────────────────────────── */
 .dash__section-head {
@@ -858,16 +1416,21 @@ onBeforeUnmount(() => {
 .dash__announce-card.is-pinned { border-color: rgba(255, 255, 255, 0.86); }
 .dash__announce-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .dash__pin {
-  padding: 2px 8px;
-  border-radius: 99px;
-  background: rgba(227, 237, 248, 0.72);
-  border: 1px solid rgba(11, 86, 155, 0.16);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--ec-blue-050, #F1F6FC);
   color: var(--ec-blue);
   font-size: 10.5px;
   font-weight: 800;
   letter-spacing: 0.04em;
+  line-height: 1.5;
   text-transform: uppercase;
 }
+.dash__pin svg { flex-shrink: 0; }
 .dash__announce-date { font-size: 11.5px; color: var(--ec-ink-soft); }
 .dash__announce-title {
   font-family: 'Outfit', sans-serif;
@@ -931,40 +1494,6 @@ onBeforeUnmount(() => {
   color: var(--ec-ink-soft);
   text-align: center;
   font-size: 14px;
-}
-
-/* ── Info table ───────────────────────────────────────────── */
-.dash__info {
-  margin: 0;
-  padding: 4px 18px;
-  border-radius: 14px;
-  box-shadow: none;
-}
-
-.dash__info-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--ec-line);
-}
-.dash__info-row:last-child { border-bottom: 0; }
-
-.dash__info-label {
-  font-size: 13px;
-  color: var(--ec-ink-soft);
-  font-weight: 500;
-}
-
-.dash__info-val {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--ec-ink);
-  text-align: right;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 /* ── Logout ───────────────────────────────────────────────── */
@@ -1075,19 +1604,20 @@ onBeforeUnmount(() => {
 .dash__menu-close {
   display: grid;
   place-items: center;
+  width: 44px;
+  height: 44px;
   min-width: 44px;
   min-height: 44px;
-  border: 1px solid var(--ec-line);
-  border-radius: 12px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
   background: transparent;
-  color: var(--ec-ink);
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1;
+  color: var(--ec-ink-soft);
   cursor: pointer;
   flex-shrink: 0;
+  transition: background 160ms, color 160ms;
 }
-.dash__menu-close:hover { background: var(--ec-canvas); }
+.dash__menu-close:hover { background: var(--ec-canvas); color: var(--ec-ink); }
 .dash__menu-close:focus-visible { outline: none; box-shadow: var(--ec-focus-ring); }
 
 .dash__menu-nav {
@@ -1132,18 +1662,21 @@ onBeforeUnmount(() => {
 .dash__menu-item.active svg { color: var(--ec-blue); }
 
 .dash__soon {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   margin-left: auto;
-  padding: 3px 8px;
+  padding: 3px 7px 3px 5px;
   border-radius: 99px;
-  background: var(--ec-warning-bg, #FFFBEB);
-  border: 1px solid var(--ec-warning-line, #FDE68A);
-  color: var(--ec-warning, #B45309);
-  font-size: 10px;
+  background: linear-gradient(135deg, #FEF3C7 0%, #FFFBEB 100%);
+  color: #92400E;
+  font-size: 9px;
   font-weight: 800;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   flex-shrink: 0;
 }
+.dash__soon svg { flex-shrink: 0; opacity: 0.85; }
 
 .dash__menu-sep { height: 1px; background: var(--ec-line); margin: 6px 2px; }
 .dash__menu-home { margin-top: auto; }
@@ -1164,6 +1697,21 @@ onBeforeUnmount(() => {
   .dash__nav-inner { padding: 12px 14px; }
   .dash__body { padding: 16px 12px 48px; }
   .dash__avatar-name { display: none; }
+}
+
+/* ── Tablet 641–1023px: bar & isi melebar, bukan kolom 640px ──
+ * <1024px masih memakai burger + drawer, tapi layar tablet cukup lebar
+ * sehingga nav/konten tidak perlu dikunci selebar ponsel. */
+@media (min-width: 641px) and (max-width: 1023.98px) {
+  .dash { max-width: none; }
+
+  .dash__nav-inner,
+  .dash__body {
+    width: 100%;
+    max-width: 920px;
+    margin-inline: auto;
+    padding-inline: 24px;
+  }
 }
 
 /* ── Desktop ≥1024px: sidebar permanen + konten fluid ─────────
@@ -1254,13 +1802,6 @@ onBeforeUnmount(() => {
   .dash__quick-grid { gap: 16px; }
 
   .dash__announce-title { font-size: 16px; }
-
-  .dash__profile-wrap {
-    display: grid;
-    grid-template-columns: 320px minmax(0, 1fr);
-    gap: 20px;
-    align-items: start;
-  }
 
   .dash__soon-card { max-width: 640px; }
 }

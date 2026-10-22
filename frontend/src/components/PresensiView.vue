@@ -70,6 +70,8 @@ const successCloseButton = ref(null)
 const submitting = ref(false)
 const result = ref(null) // { ok, message }
 const list = ref([])
+// Total check-in sebenarnya (list bisa dipotong limit server).
+const listTotal = ref(0)
 const listLoading = ref(false)
 const attendanceSessions = ref([])
 const sessionsLoading = ref(false)
@@ -169,6 +171,7 @@ function saveOverviewCache(data) {
 function applyOverview(data) {
   session.value = data.active || null
   list.value = data.list || []
+  listTotal.value = Number.isFinite(Number(data.total)) ? Number(data.total) : list.value.length
   applySessions(data.sessions || [])
 }
 
@@ -187,6 +190,7 @@ async function refreshList(showSpin = true) {
   try {
     const response = await api.attendanceList(session.value.id, memberToken())
     list.value = response.records || []
+    listTotal.value = Number.isFinite(Number(response.total)) ? Number(response.total) : list.value.length
   } catch { /* polling diam-diam gagal: abaikan, coba lagi berikutnya */ }
   finally { listLoading.value = false }
 }
@@ -227,9 +231,11 @@ function fmtSessionDate(date) {
     : parsed.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 }
 
-function badgeClass(status) {
-  if (!status || status === 'izin') return 'ec-badge--warning'
-  return status === 'hadir' ? 'ec-badge--completed' : 'ec-badge--danger'
+function statusLabel(status) {
+  if (status === 'hadir') return 'Hadir'
+  if (status === 'izin') return 'Izin'
+  if (status === 'alpa') return 'Alpa'
+  return 'Belum absen'
 }
 
 async function startScan() {
@@ -388,12 +394,14 @@ onBeforeUnmount(async () => {
     <div class="presensi__head">
       <span class="presensi__eyebrow">Absensi</span>
       <h1 class="presensi__title">Presensi Kehadiran</h1>
-      <p class="presensi__sub" v-if="session">
-        <span v-if="session.is_active !== false" class="ec-badge ec-badge--completed presensi__live"><span class="presensi__dot" aria-hidden="true"></span>Live</span>
-        {{ session.title }} &middot; {{ session.date }}
-      </p>
+      <p class="presensi__sub" v-if="session">{{ session.title }} &middot; {{ session.date }}</p>
       <p class="presensi__sub" v-else>Belum ada sesi aktif hari ini.</p>
-      <p v-if="alreadyCheckedIn" class="presensi__result presensi__result--ok" role="status">Kamu sudah tercatat hadir di sesi ini.</p>
+      <p v-if="alreadyCheckedIn" class="presensi__checked" role="status">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" /><path d="m8.5 12.5 2.5 2.5 4.5-5" />
+        </svg>
+        <span>Kamu sudah tercatat hadir di sesi ini.</span>
+      </p>
     </div>
 
     <div v-if="loading" class="presensi__skel">
@@ -451,8 +459,29 @@ onBeforeUnmount(async () => {
               <span class="presensi__session-summary-main">
                 <span class="presensi__session-title">{{ item.title || 'Sesi absensi' }}</span>
                 <span class="presensi__session-preview">
-                  <span v-if="item.is_active" class="ec-badge ec-badge--completed">Berlangsung</span>
-                  <span class="ec-badge" :class="badgeClass(item.attendance?.status)">{{ item.attendance?.status || 'Belum absen' }}</span>
+                  <span v-if="item.is_active" class="presensi__state">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M4.9 19.1a10 10 0 0 1 0-14.2M7.8 16.2a6 6 0 0 1 0-8.4" />
+                      <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+                      <path d="M16.2 7.8a6 6 0 0 1 0 8.4M19.1 4.9a10 10 0 0 1 0 14.2" />
+                    </svg>
+                    Berlangsung
+                  </span>
+                  <span class="presensi__status" :class="`is-${item.attendance?.status || 'belum'}`">
+                    <svg v-if="item.attendance?.status === 'hadir'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <circle cx="12" cy="12" r="9" /><path d="m8.5 12.5 2.5 2.5 4.5-5" />
+                    </svg>
+                    <svg v-else-if="item.attendance?.status === 'izin'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
+                    </svg>
+                    <svg v-else-if="item.attendance?.status === 'alpa'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <circle cx="12" cy="12" r="9" /><path d="m15 9-6 6M9 9l6 6" />
+                    </svg>
+                    <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <circle cx="12" cy="12" r="9" /><path d="M8 12h8" />
+                    </svg>
+                    {{ statusLabel(item.attendance?.status) }}
+                  </span>
                 </span>
               </span>
               <svg class="presensi__chevron" :class="{ 'presensi__chevron--open': isExpanded(item) }" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
@@ -497,7 +526,7 @@ onBeforeUnmount(async () => {
 
               <div v-if="item.is_active" class="presensi__attendees">
                 <div class="presensi__sechead">
-                  <h4 class="presensi__attendees-title">Hadir ({{ list.length }})</h4>
+                  <h4 class="presensi__attendees-title">Hadir ({{ listTotal || list.length }})</h4>
                   <button class="presensi__seeall" type="button" :disabled="listLoading" @click="refreshList(true)">{{ listLoading ? 'Memuat...' : 'Refresh' }}</button>
                 </div>
                 <ul v-if="list.length" class="presensi__list">
@@ -585,9 +614,6 @@ onBeforeUnmount(async () => {
 .presensi__manual summary { font-size: 0.875rem; font-weight: 700; color: var(--ec-ink); cursor: pointer; min-height: 44px; display: flex; align-items: center; }
 .presensi__manual summary:focus-visible { outline: none; box-shadow: var(--ec-focus-ring); border-radius: 8px; }
 .presensi__manual .ec-label { margin-top: 8px; display: block; }
-.presensi__live { gap: 6px; margin-right: 6px; }
-.presensi__dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; display: inline-block; animation: presensi-pulse 1.6s ease-in-out infinite; }
-@keyframes presensi-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 .presensi__skel { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
 @media (max-width: 400px) { .presensi__skel { grid-template-columns: 1fr; } }
 .presensi__card { padding: 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
@@ -661,11 +687,25 @@ onBeforeUnmount(async () => {
   .presensi__scanner-foot { padding-top: 20px; padding-bottom: max(10px, env(safe-area-inset-bottom)); }
   .presensi__reticle-corner { width: 26px; height: 26px; }
 }
+.presensi__checked {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 8px 14px 8px 10px;
+  border-radius: var(--ec-radius-pill);
+  background: var(--ec-success-bg);
+  color: var(--ec-success);
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+.presensi__checked svg { flex-shrink: 0; }
 .presensi__result { font-size: 0.875rem; font-weight: 700; padding: 10px 14px; border-radius: var(--ec-radius-md); }
 .presensi__result--ok { background: var(--ec-success-bg); color: var(--ec-success); border: 1px solid var(--ec-success-line); }
 .presensi__result--err { background: var(--ec-danger-bg); color: var(--ec-danger); border: 1px solid var(--ec-danger-line); }
 .presensi__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; max-height: 320px; overflow-y: auto; }
-@media (prefers-reduced-motion: reduce) { .presensi__dot { animation: none; } }
 .presensi__row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--ec-line); }
 .presensi__row:last-child { border-bottom: 0; }
 .presensi__avatar { width: 32px; height: 32px; font-size: 13px; flex-shrink: 0; border-radius: 50%; background: var(--ec-blue); color: #fff; font-family: 'Outfit', sans-serif; font-weight: 700; display: grid; place-items: center; }
@@ -698,7 +738,35 @@ onBeforeUnmount(async () => {
 .presensi__session-date time { font-size: 0.875rem; font-weight: 700; line-height: 1.45; color: var(--ec-ink); }
 .presensi__session-summary-main { display: flex; flex: 1; min-width: 0; flex-direction: column; justify-content: center; gap: 8px; }
 .presensi__session-title { margin: 0; font-family: 'Outfit', sans-serif; font-size: 0.9375rem; font-weight: 700; line-height: 1.4; color: var(--ec-ink); overflow-wrap: anywhere; }
-.presensi__session-preview { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.presensi__session-preview { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+/* Status sesi: ikon siaran + teks biru, tanpa dot/border. */
+.presensi__state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--ec-blue);
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+/* Status kehadiran: ikon + label berwarna, tanpa dot/border/background. */
+.presensi__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.presensi__state svg,
+.presensi__status svg { flex-shrink: 0; }
+.presensi__status.is-hadir { color: var(--ec-success); }
+.presensi__status.is-izin { color: var(--ec-warning); }
+.presensi__status.is-alpa { color: var(--ec-danger); }
+.presensi__status.is-belum { color: var(--ec-ink-soft); }
 .presensi__chevron { flex: 0 0 auto; color: var(--ec-ink-soft); transition: transform 180ms var(--ec-ease); }
 .presensi__chevron--open { transform: rotate(180deg); }
 .presensi__session-body { display: flex; flex-direction: column; gap: 14px; padding: 14px; border-top: 1px solid var(--ec-line); background: var(--ec-canvas); }

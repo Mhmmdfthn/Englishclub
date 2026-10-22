@@ -5,8 +5,9 @@ import { loginWithPassword } from '../utils/auth.js'
 import { emailFor, findProfileById } from '../utils/memberAuthStore.js'
 import { auditAdmin } from '../utils/audit.js'
 import {
-  getActiveSession, createSession, getSession, closeSession, recordCheckin, listRecords, myRecords, sessionsForMember, getOverview,
+  getActiveSession, createSession, getSession, closeSession, recordCheckin, myRecords, sessionsForMember, getOverview,
   listSessionRoster, upsertSessionMemberStatus, sessionStats, buildQrPayload, parseQrPayload, verifyQrToken,
+  listRecordsPage,
   QR_WINDOW_MS,
   checkPwRate, recordPwFail, resetPwRate,
 } from '../utils/attendanceStore.js'
@@ -191,9 +192,12 @@ r.get('/list', requireAttendanceOn, async (req, res) => {
   const me = await requireMember(req, res)
   if (!me) return
   try {
-    const { session } = req.query
+    const { session, limit } = req.query
     if (!session) return res.status(422).json({ detail: 'session required' })
-    res.json({ ok: true, records: await listRecords(String(session)) })
+    const id = String(session)
+    // `total` = jumlah check-in sebenarnya, supaya label tidak mentok di limit.
+    const { records, total } = await listRecordsPage(id, limit)
+    res.json({ ok: true, records, total })
   } catch (e) {
     sendStoreError(res, e, 'Absensi list error:')
   }
@@ -225,8 +229,8 @@ r.get('/overview', requireAttendanceOn, async (req, res) => {
   const me = await requireMember(req, res)
   if (!me) return
   try {
-    const { sessions, active, list } = await getOverview(me.profile.id)
-    res.json({ ok: true, sessions, active, list })
+    const { sessions, active, list, total } = await getOverview(me.profile.id)
+    res.json({ ok: true, sessions, active, list, total })
   } catch (e) {
     sendStoreError(res, e, 'Absensi overview error:')
   }

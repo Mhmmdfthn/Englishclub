@@ -161,27 +161,36 @@ export async function recordCheckin(memberId, sessionId, status = 'hadir', win =
   return { ...data, already: false }
 }
 
-export async function listRecords(sessionId, limit = 100) {
-  const n = Math.max(1, Math.min(Number(limit) || 100, 200))
+// Satu query: baris daftar hadir + total sebenarnya (count exact).
+// `total` penting supaya label tidak mentok di batas limit.
+export async function listRecordsPage(sessionId, limit = 500) {
+  const n = Math.max(1, Math.min(Number(limit) || 500, 1000))
   const sb = getSupabase()
   if (!sb) {
-    return mem.records
+    const all = mem.records
       .filter((r) => r.session_id === sessionId)
       .sort((a, b) => (a.scanned_at < b.scanned_at ? 1 : -1))
-      .slice(0, n)
-      .map((r) => ({ ...r, username: '', fullname: '' }))
+    return {
+      records: all.slice(0, n).map((r) => ({ ...r, username: '', fullname: '' })),
+      total: all.length,
+    }
   }
-  const { data, error } = await sb
+  const { data, error, count } = await sb
     .from('ec_attendance_records')
-    .select('id, status, scanned_at, member:member_id(username, fullname)')
+    .select('id, status, scanned_at, member:member_id(username, fullname)', { count: 'exact' })
     .eq('session_id', sessionId)
     .order('scanned_at', { ascending: false })
     .limit(n)
   if (error) throw fail(503, 'Database sibuk, silakan coba lagi')
-  return (data || []).map((r) => ({
+  const records = (data || []).map((r) => ({
     id: r.id, status: r.status, scanned_at: r.scanned_at,
     username: r.member?.username || '', fullname: r.member?.fullname || '',
   }))
+  return { records, total: count ?? records.length }
+}
+
+export async function listRecords(sessionId, limit = 500) {
+  return (await listRecordsPage(sessionId, limit)).records
 }
 
 export async function myRecords(memberId, limit = 20) {
@@ -211,8 +220,8 @@ export async function getOverview(memberId) {
   const sessions = await sessionsForMember(memberId)
   const hit = sessions.find((s) => s.is_active) || null
   const active = hit ? { id: hit.id, title: hit.title, date: hit.date, is_active: true } : null
-  const list = active ? await listRecords(active.id) : []
-  return { sessions, active, list }
+  const page = active ? await listRecordsPage(active.id) : { records: [], total: 0 }
+  return { sessions, active, list: page.records, total: page.total }
 }
 
 export async function sessionsForMember(memberId) {

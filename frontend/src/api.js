@@ -296,8 +296,8 @@ export const api = {
       body: JSON.stringify({ qr, password }),
     }),
 
-  attendanceList: (session, token) =>
-    req(`/api/attendance/list?session=${encodeURIComponent(session)}`, {
+  attendanceList: (session, token, limit) =>
+    req(`/api/attendance/list?session=${encodeURIComponent(session)}${limit ? `&limit=${encodeURIComponent(limit)}` : ''}`, {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     }),
 

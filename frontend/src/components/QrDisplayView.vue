@@ -47,6 +47,8 @@ const expiresIn = ref(0)
 const loading = ref(true)
 const loadError = ref('')
 const list = ref([])
+// Jumlah check-in sebenarnya dari server (list bisa dipotong limit).
+const listTotal = ref(0)
 const roster = ref([])
 const rosterSearch = ref('')
 const rosterPage = ref(1)
@@ -85,6 +87,11 @@ const isNativeFs = ref(false)
 const stats = ref(null)
 const statsLoading = ref(false)
 const statsUpdatedAt = ref(null)
+// Statistik hanya untuk layar lebar (laptop/proyektor). Di HP dimatikan
+// sekaligus polling-nya agar tidak membebani database.
+const MOBILE_STATS_QUERY = '(max-width: 900px)'
+const isMobile = ref(typeof window !== 'undefined' ? !!window.matchMedia?.(MOBILE_STATS_QUERY).matches : false)
+let mobileMq = null
 let statsTimer = null
 let prevBodyOverflow = null
 // iOS Safari tidak mendukung Fullscreen API untuk elemen biasa.
@@ -137,6 +144,7 @@ async function loadActive() {
     session.value = activeResult.session || null
     selectedSessionId.value = session.value?.id || ''
     list.value = []
+    listTotal.value = 0
     roster.value = []
     qrUrl.value = ''
     return
@@ -149,6 +157,7 @@ async function loadActive() {
   session.value = activeResult.session || null
   selectedSessionId.value = session.value?.id || ''
   list.value = []
+  listTotal.value = 0
   roster.value = []
   qrUrl.value = ''
 }
@@ -166,6 +175,7 @@ async function selectSession(sessionId) {
   selectedSessionId.value = String(selected.id)
   qrUrl.value = ''
   list.value = []
+  listTotal.value = 0
   roster.value = []
   await Promise.all([refreshList(), refreshRoster(), ...(selected.is_active ? [refreshQr()] : [])])
   if (selected.is_active) startTimers()
@@ -223,6 +233,7 @@ async function refreshList() {
   try {
     const r = await api.attendanceList(session.value.id, props.token)
     list.value = r.records || []
+    listTotal.value = Number.isFinite(Number(r.total)) ? Number(r.total) : list.value.length
   } catch { /* polling diam: abaikan */ }
 }
 
@@ -277,7 +288,7 @@ function stopStatsTimer() {
 }
 
 async function refreshStats() {
-  if (!session.value) return
+  if (isMobile.value || !session.value) return
   if (stats.value === null) statsLoading.value = true
   try {
     const r = await api.attendanceSessionStats(session.value.id, props.token)
@@ -288,6 +299,27 @@ async function refreshStats() {
   } finally {
     statsLoading.value = false
   }
+}
+
+function startStatsTimer() {
+  stopStatsTimer()
+  if (isMobile.value || !zoomOpen.value) return
+  refreshStats()
+  statsTimer = setInterval(refreshStats, STATS_REFRESH_MS)
+}
+
+// Pindah breakpoint saat overlay terbuka: desktop mulai polling, HP berhenti.
+function onMobileChange(event) {
+  isMobile.value = !!event.matches
+  if (!zoomOpen.value) return
+  if (isMobile.value) {
+    stopStatsTimer()
+    stats.value = null
+    statsUpdatedAt.value = null
+    statsLoading.value = false
+    return
+  }
+  startStatsTimer()
 }
 
 // Polling berhenti saat tab tidak aktif; begitu kembali terlihat, tarik data
@@ -339,9 +371,7 @@ function openZoom() {
   lockScroll(true)
   stats.value = null
   statsUpdatedAt.value = null
-  refreshStats()
-  stopStatsTimer()
-  statsTimer = setInterval(refreshStats, STATS_REFRESH_MS)
+  startStatsTimer()
   requestNativeFullscreen()
   nextTick(() => zoomPanel.value?.focus?.())
 }
@@ -366,6 +396,12 @@ function closeZoom() {
 onMounted(() => {
   document.addEventListener('fullscreenchange', onFullscreenChange)
   document.addEventListener('visibilitychange', onVisibilityChange)
+  if (typeof window !== 'undefined' && window.matchMedia) {
+    mobileMq = window.matchMedia(MOBILE_STATS_QUERY)
+    isMobile.value = mobileMq.matches
+    if (mobileMq.addEventListener) mobileMq.addEventListener('change', onMobileChange)
+    else mobileMq.addListener?.(onMobileChange)
+  }
 })
 
 async function start() {
@@ -435,6 +471,10 @@ start()
 onBeforeUnmount(() => {
   document.removeEventListener('fullscreenchange', onFullscreenChange)
   document.removeEventListener('visibilitychange', onVisibilityChange)
+  if (mobileMq) {
+    if (mobileMq.removeEventListener) mobileMq.removeEventListener('change', onMobileChange)
+    else mobileMq.removeListener?.(onMobileChange)
+  }
   stopTimers()
   stopStatsTimer()
   lockScroll(false)
@@ -513,7 +553,7 @@ onBeforeUnmount(() => {
         </button>
       </div>
       <div class="qr-display__listhead">
-        <h3 class="qr-display__title">{{ session.is_active ? 'Baru check-in' : 'Riwayat check-in' }} ({{ list.length }})</h3>
+        <h3 class="qr-display__title">{{ session.is_active ? 'Baru check-in' : 'Riwayat check-in' }} ({{ listTotal || list.length }})</h3>
         <button class="ec-btn ec-btn--ghost ec-btn--sm" type="button" @click="refreshList">Refresh</button>
       </div>
       <ul v-if="list.length" class="qr-display__list">
@@ -723,7 +763,7 @@ onBeforeUnmount(() => {
             <p class="qr-zoom__hint">Pindai dengan kamera HP &middot; QR berganti tiap {{ QR_ROTATE_SECONDS }} detik</p>
           </section>
 
-          <aside class="qr-zoom__stats" aria-label="Statistik kehadiran">
+          <aside v-if="!isMobile" class="qr-zoom__stats" aria-label="Statistik kehadiran">
             <div class="qr-zoom__card">
               <div class="qr-zoom__card-head">
                 <h3 class="qr-zoom__card-title">Kehadiran anggota</h3>
@@ -870,6 +910,7 @@ onBeforeUnmount(() => {
 @media (max-width: 900px) {
   .qr-zoom__body { grid-template-columns: 1fr; align-items: start; }
   .qr-zoom__qr-panel { grid-template-rows: auto auto; }
+  .qr-zoom__stats { display: none; }
   .qr-zoom__qr { width: min(86vmin, 460px); height: auto; aspect-ratio: 1; justify-self: center; }
   .qr-zoom__qr-skel { width: min(86vmin, 460px); height: auto; aspect-ratio: 1; }
   .qr-zoom__stats { max-height: none; overflow: visible; }
