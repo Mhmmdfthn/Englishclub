@@ -1,12 +1,12 @@
-// Presensi QR 7-detik: sesi/pertemuan + token HMAC window + record kehadiran.
-// Token QR = HMAC(secret_sesi, window_7s); backend terima window berjalan + 1 sebelumnya.
+// Presensi QR 10-detik: sesi/pertemuan + token HMAC window + record kehadiran.
+// Token QR = HMAC(secret_sesi, window_10s); backend terima window berjalan + 1 sebelumnya.
 // Anti-replay: UNIQUE(member_id, session_id) — satu check-in per anggota per sesi.
 import { randomBytes, createHmac, timingSafeEqual } from 'crypto'
 import { getSupabase } from './supabase.js'
 import { listAllowed } from './adminAllowlist.js'
 import { GROUP_NAMES } from './memberAuthStore.js'
 
-export const QR_WINDOW_MS = 7000
+export const QR_WINDOW_MS = 10000
 export const QR_PREFIX = 'ECA1'
 
 function fail(status, detail) {

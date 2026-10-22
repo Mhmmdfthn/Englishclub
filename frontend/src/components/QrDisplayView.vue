@@ -12,19 +12,20 @@ const props = defineProps({
 })
 
 // Satu sumber TTL QR (detik). Harus sama dengan BE + copy PresensiView.
-// Refresh sengaja < TTL (6s < 7) agar QR tidak sempat kedaluwarsa di layar.
+// Refresh sengaja < TTL (8s < 10) agar QR tidak sempat kedaluwarsa di layar.
 const QR_ROTATE_SECONDS = 10
-const QR_REFRESH_MS = 6000
+const QR_REFRESH_MS = 8000
 const LIST_REFRESH_MS = 3000
 const STATS_REFRESH_MS = 5000
 // Resolusi QR: besar agar tetap tajam di proyektor saat dibuka layar penuh.
 const QR_IMAGE_WIDTH = 1024
 // Warna statistik: versi gelap agar terbaca di latar putih.
+// Palet mengikuti design system English Club (--ec-blue / --ec-warning / --ec-danger / --ec-ink-soft).
 const STAT_META = [
-  { key: 'hadir', label: 'Hadir', color: '#059669' },
-  { key: 'izin', label: 'Izin', color: '#D97706' },
-  { key: 'alpa', label: 'Alpa', color: '#DC2626' },
-  { key: 'belum', label: 'Belum', color: '#94A3B8' },
+  { key: 'hadir', label: 'Hadir', color: '#0B569B' },
+  { key: 'izin', label: 'Izin', color: '#B45309' },
+  { key: 'alpa', label: 'Alpa', color: '#B91C1C' },
+  { key: 'belum', label: 'Belum', color: '#6B7280' },
 ]
 
 const session = ref(null)
@@ -79,10 +80,11 @@ const creating = ref(false)
 // ---- layar penuh + statistik (hanya tampil saat overlay terbuka) ----
 const zoomOpen = ref(false)
 const zoomTriggerButton = ref(null)
-const zoomCloseButton = ref(null)
+const zoomPanel = ref(null)
 const isNativeFs = ref(false)
 const stats = ref(null)
 const statsLoading = ref(false)
+const statsUpdatedAt = ref(null)
 let statsTimer = null
 let prevBodyOverflow = null
 // iOS Safari tidak mendukung Fullscreen API untuk elemen biasa.
@@ -115,6 +117,12 @@ function barWidth(value) {
   if (!staffTotal.value) return '0%'
   return `${Math.round((Number(value || 0) / staffTotal.value) * 100)}%`
 }
+const statsUpdatedLabel = computed(() => {
+  if (!statsUpdatedAt.value) return ''
+  const d = statsUpdatedAt.value
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${pad(d.getHours())}.${pad(d.getMinutes())}.${pad(d.getSeconds())}`
+})
 
 let qrTimer = null
 let listTimer = null
@@ -122,6 +130,7 @@ let countTimer = null
 
 async function loadActive() {
   stats.value = null
+  statsUpdatedAt.value = null
   if (props.readOnly) {
     const activeResult = await api.attendanceActive(props.token)
     sessions.value = []
@@ -152,6 +161,7 @@ async function selectSession(sessionId) {
   if (!selected || String(session.value?.id) === String(selected.id)) return
   stopTimers()
   stats.value = null
+  statsUpdatedAt.value = null
   session.value = selected
   selectedSessionId.value = String(selected.id)
   qrUrl.value = ''
@@ -199,7 +209,7 @@ async function refreshQr() {
   try {
     const r = await api.attendanceDisplayToken(session.value.id, props.token)
     qrUrl.value = await QRCode.toDataURL(r.payload, { width: QR_IMAGE_WIDTH, margin: 2 })
-    expiresIn.value = Math.max(0, Math.round((r.expires_in_ms || 7000) / 1000))
+    expiresIn.value = Math.max(0, Math.round((r.expires_in_ms || QR_ROTATE_SECONDS * 1000) / 1000))
   } catch (e) {
     if (e?.status === 410) {
       stopTimers()
@@ -272,11 +282,18 @@ async function refreshStats() {
   try {
     const r = await api.attendanceSessionStats(session.value.id, props.token)
     stats.value = r
+    statsUpdatedAt.value = new Date()
   } catch {
     // Diam saja: polling berikutnya mencoba lagi (overlay tetap menampilkan data terakhir).
   } finally {
     statsLoading.value = false
   }
+}
+
+// Polling berhenti saat tab tidak aktif; begitu kembali terlihat, tarik data
+// langsung supaya angka tidak tertinggal sampai interval berikutnya.
+function onVisibilityChange() {
+  if (document.visibilityState === 'visible' && zoomOpen.value) refreshStats()
 }
 
 function lockScroll(lock) {
@@ -321,11 +338,20 @@ function openZoom() {
   zoomOpen.value = true
   lockScroll(true)
   stats.value = null
+  statsUpdatedAt.value = null
   refreshStats()
   stopStatsTimer()
   statsTimer = setInterval(refreshStats, STATS_REFRESH_MS)
   requestNativeFullscreen()
-  nextTick(() => zoomCloseButton.value?.focus?.())
+  nextTick(() => zoomPanel.value?.focus?.())
+}
+
+// Tap/klik di area kosong (di luar QR, header, dan kartu statistik) = tutup.
+function onZoomTap(event) {
+  const target = event.target
+  if (!(target instanceof Element)) return
+  if (target.closest('.qr-zoom__head, .qr-zoom__stats, .qr-zoom__qr, .qr-zoom__qr-skel, .qr-zoom__hint')) return
+  closeZoom()
 }
 
 function closeZoom() {
@@ -337,7 +363,10 @@ function closeZoom() {
   nextTick(() => zoomTriggerButton.value?.focus?.())
 }
 
-onMounted(() => document.addEventListener('fullscreenchange', onFullscreenChange))
+onMounted(() => {
+  document.addEventListener('fullscreenchange', onFullscreenChange)
+  document.addEventListener('visibilitychange', onVisibilityChange)
+})
 
 async function start() {
   loading.value = true
@@ -405,6 +434,7 @@ start()
 
 onBeforeUnmount(() => {
   document.removeEventListener('fullscreenchange', onFullscreenChange)
+  document.removeEventListener('visibilitychange', onVisibilityChange)
   stopTimers()
   stopStatsTimer()
   lockScroll(false)
@@ -661,10 +691,13 @@ onBeforeUnmount(() => {
     <Teleport to="body">
       <div
         v-if="zoomOpen && session"
+        ref="zoomPanel"
         class="qr-zoom"
         role="dialog"
         aria-modal="true"
         aria-labelledby="qr-zoom-title"
+        tabindex="-1"
+        @click="onZoomTap"
         @keydown.esc.stop.prevent="closeZoom"
       >
         <header class="qr-zoom__head">
@@ -680,7 +713,6 @@ onBeforeUnmount(() => {
             <button v-if="canNativeFullscreen" class="qr-zoom__btn" type="button" @click="toggleNativeFullscreen">
               {{ isNativeFs ? 'Keluar layar penuh' : 'Layar penuh' }}
             </button>
-            <button ref="zoomCloseButton" class="qr-zoom__close" type="button" aria-label="Tutup tampilan besar" @click="closeZoom">×</button>
           </div>
         </header>
 
@@ -753,6 +785,9 @@ onBeforeUnmount(() => {
                 </li>
               </ul>
             </div>
+            <p v-if="statsUpdatedLabel" class="qr-zoom__updated">
+              Diperbarui {{ statsUpdatedLabel }} &middot; otomatis tiap 5 detik
+            </p>
           </aside>
         </div>
       </div>
@@ -791,6 +826,7 @@ onBeforeUnmount(() => {
 
 /* ---- Overlay layar penuh: QR besar + statistik ---- */
 .qr-zoom { position: fixed; inset: 0; z-index: 120; display: flex; flex-direction: column; gap: 12px; height: 100vh; height: 100dvh; overflow-y: auto; padding: max(14px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); background: #fff; color: var(--ec-ink, #1F2937); overscroll-behavior: contain; }
+.qr-zoom:focus { outline: none; }
 .qr-zoom__head { display: flex; flex: 0 0 auto; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .qr-zoom__titles { min-width: 0; }
 .qr-zoom__eyebrow { margin: 0 0 3px; color: var(--ec-blue, #0B569B); font-size: 0.68rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
@@ -799,17 +835,14 @@ onBeforeUnmount(() => {
 .qr-zoom__actions { display: flex; align-items: center; gap: 8px; }
 .qr-zoom__btn { min-height: 40px; padding: 8px 14px; border: 1px solid var(--ec-line, #E5E7EB); border-radius: 999px; background: var(--ec-canvas, #F5F7FA); color: var(--ec-ink, #1F2937); font: inherit; font-size: 0.8rem; font-weight: 700; white-space: nowrap; cursor: pointer; }
 .qr-zoom__btn:hover { border-color: var(--ec-blue, #0B569B); color: var(--ec-blue, #0B569B); background: #fff; }
-.qr-zoom__close { display: grid; place-items: center; flex: 0 0 44px; width: 44px; height: 44px; border: 1px solid var(--ec-line, #E5E7EB); border-radius: 50%; background: var(--ec-canvas, #F5F7FA); color: var(--ec-ink, #1F2937); font: inherit; font-size: 1.5rem; line-height: 1; cursor: pointer; }
-.qr-zoom__close:hover { background: #fff; border-color: var(--ec-blue, #0B569B); color: var(--ec-blue, #0B569B); }
-.qr-zoom__btn:focus-visible, .qr-zoom__close:focus-visible { outline: none; box-shadow: var(--ec-focus-ring, 0 0 0 3px rgba(11, 86, 155, 0.35)); }
-.qr-zoom__body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(292px, 360px); align-items: stretch; gap: 18px; flex: 1; min-height: 0; }
+.qr-zoom__btn:focus-visible { outline: none; box-shadow: var(--ec-focus-ring, 0 0 0 3px rgba(11, 86, 155, 0.35)); }
+.qr-zoom__body { display: grid; grid-template-columns: minmax(0, 1fr) clamp(280px, 25vw, 350px); align-items: stretch; justify-content: center; gap: 14px; width: 100%; max-width: calc(100dvh + 240px); margin: 0 auto; flex: 1; min-height: 0; }
 .qr-zoom__qr-panel { display: grid; grid-template-rows: minmax(0, 1fr) auto; align-items: center; justify-items: center; gap: 8px; min-width: 0; min-height: 0; }
-/* max-width + max-height membuat bingkai stroke pas mengelilingi QR (persegi),
-   bukan mengelilingi seluruh area kosong. */
-.qr-zoom__qr { display: block; width: auto; height: auto; max-width: 100%; max-height: 100%; min-height: 0; padding: 6px; box-sizing: border-box; object-fit: contain; border: 1px solid var(--ec-blue, #0B569B); border-radius: 12px; background: #fff; }
+/* Tanpa stroke: QR tampil polos, hanya dibatasi bidang putihnya sendiri. */
+.qr-zoom__qr { display: block; width: auto; height: auto; max-width: 100%; max-height: 100%; min-height: 0; object-fit: contain; border: 0; border-radius: 12px; background: #fff; }
 .qr-zoom__qr-skel { width: 100%; height: 100%; border-radius: 14px; }
 .qr-zoom__hint { margin: 0; color: var(--ec-ink-soft, #6B7280); font-size: 0.76rem; text-align: center; }
-.qr-zoom__stats { display: flex; flex-direction: column; gap: 10px; min-width: 0; max-height: 100%; overflow-y: auto; padding-right: 2px; }
+.qr-zoom__stats { display: flex; flex-direction: column; justify-content: safe center; gap: 10px; min-width: 0; max-height: 100%; overflow-y: auto; padding-right: 2px; }
 .qr-zoom__card { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border: 1px solid var(--ec-line, #E5E7EB); border-radius: 14px; background: var(--ec-canvas, #F7F9FC); }
 .qr-zoom__card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .qr-zoom__card-title { margin: 0; color: var(--ec-ink, #1F2937); font-family: 'Outfit', sans-serif; font-size: 0.88rem; font-weight: 700; }
@@ -825,11 +858,12 @@ onBeforeUnmount(() => {
 .qr-zoom__group-name { color: var(--ec-ink, #1F2937); font-size: 0.72rem; font-weight: 700; }
 .qr-zoom__group-meta { color: var(--ec-ink-soft, #6B7280); font-size: 0.68rem; font-variant-numeric: tabular-nums; }
 .qr-zoom__empty { margin: 0; color: var(--ec-ink-soft, #6B7280); font-size: 0.8rem; }
+.qr-zoom__updated { margin: 0; text-align: center; color: var(--ec-ink-soft, #6B7280); font-size: 0.68rem; }
 /* Grafik batang horizontal untuk SO / panitia (di luar statistik anggota) */
 .qr-zoom__bars { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
 .qr-zoom__bar-row { display: grid; grid-template-columns: 52px minmax(0, 1fr) 26px; align-items: center; gap: 8px; font-size: 0.74rem; }
 .qr-zoom__bar-label { color: var(--ec-ink-soft, #6B7280); font-weight: 600; }
-.qr-zoom__bar-track { display: block; height: 8px; overflow: hidden; border-radius: 999px; background: rgba(15, 23, 42, 0.09); }
+.qr-zoom__bar-track { display: block; height: 8px; overflow: hidden; border-radius: 999px; background: var(--ec-line, #E5E7EB); }
 .qr-zoom__bar-fill { display: block; height: 100%; border-radius: 999px; transition: width 220ms ease; }
 .qr-zoom__bar-value { color: var(--ec-ink, #1F2937); font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
 

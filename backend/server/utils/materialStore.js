@@ -33,7 +33,8 @@ function normalize(item) {
 }
 
 function sortList(rows) {
-  return [...rows].sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
+  // Urutan tampil: pertemuan terlama di atas, terbaru di bawah.
+  return [...rows].sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')))
 }
 
 // Terima URL share Canva atau potongan <iframe> dari menu Embed Canva.
@@ -85,7 +86,7 @@ export function validateMaterial({ title, canva_url, canvaUrl }, required = fals
 export async function getAll() {
   if (isSupabaseEnabled()) {
     const sb = getSupabase()
-    const { data, error } = await sb.from('materials').select('*').order('created_at', { ascending: false })
+    const { data, error } = await sb.from('materials').select('*').order('created_at', { ascending: true })
     if (error && isMissingTable(error)) {
       console.warn('Materials: tabel belum ada. Jalankan backend/supabase-materi-schema.sql')
       return []

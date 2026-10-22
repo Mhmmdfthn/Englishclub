@@ -56,7 +56,10 @@ async function load() {
   loadError.value = ''
   try {
     const r = await api.materials(memberToken())
-    items.value = r.materials || []
+    // Pertemuan terlama paling atas, terbaru paling bawah.
+    items.value = [...(r.materials || [])].sort((a, b) =>
+      String(a.created_at || '').localeCompare(String(b.created_at || '')),
+    )
   } catch (e) {
     loadError.value = e?.message || 'Gagal memuat materi.'
   } finally {

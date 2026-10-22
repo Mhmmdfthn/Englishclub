@@ -64,7 +64,8 @@ const scanning = ref(false)
 const cameraOpen = ref(false)
 const successNotice = ref(null)
 const cameraTriggerButton = ref(null)
-const cameraCloseButton = ref(null)
+const scannerPanel = ref(null)
+const scannerReticle = ref(null)
 const successCloseButton = ref(null)
 const submitting = ref(false)
 const result = ref(null) // { ok, message }
@@ -241,7 +242,7 @@ async function startScan() {
   const attempt = ++scanAttempt
   cameraOpen.value = true
   await nextTick()
-  cameraCloseButton.value?.focus?.()
+  scannerPanel.value?.focus?.()
   try {
     const Ctor = await getScannerCtor()
     if (attempt !== scanAttempt || !cameraOpen.value) return
@@ -317,6 +318,19 @@ async function closeCamera() {
   cameraOpen.value = false
   await nextTick()
   cameraTriggerButton.value?.focus?.()
+}
+
+// Tap/klik di luar bingkai bidik = tutup scanner. Area di dalam bingkai
+// dibiarkan supaya tetap bisa dipakai untuk mengarahkan kamera.
+function onScannerTap(event) {
+  const target = event.target
+  if (target instanceof Element && target.closest('.presensi__scanner-head')) return
+  const rect = scannerReticle.value?.getBoundingClientRect?.()
+  if (rect) {
+    const { clientX: x, clientY: y } = event
+    if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) return
+  }
+  closeCamera()
 }
 
 async function submit() {
@@ -504,22 +518,24 @@ onBeforeUnmount(async () => {
     <!-- Scanner kamera layar penuh: keluar lewat tombol × atau ESC saja -->
     <div
       v-if="cameraOpen"
+      ref="scannerPanel"
       class="presensi__scanner"
       role="dialog"
       aria-modal="true"
       aria-labelledby="presensi-camera-title"
+      tabindex="-1"
+      @click="onScannerTap"
       @keydown.esc.stop.prevent="closeCamera"
     >
       <header class="presensi__scanner-head">
         <div class="presensi__scanner-copy">
           <h2 id="presensi-camera-title" class="presensi__scanner-title">Pindai QR presensi</h2>
-          <p class="presensi__scanner-cap">Arahkan kamera ke QR di layar SO.</p>
+          <p class="presensi__scanner-cap">Arahkan kamera ke QR di layar SO. Ketuk di luar bingkai untuk menutup.</p>
         </div>
-        <button ref="cameraCloseButton" class="presensi__scanner-close" type="button" aria-label="Tutup kamera" @click="closeCamera">×</button>
       </header>
       <div class="presensi__scanner-stage">
         <div id="presensi-qr-reader" class="presensi__reader presensi__reader--full"></div>
-        <div class="presensi__reticle" aria-hidden="true"><span class="presensi__reticle-corner presensi__reticle-corner--tl"></span><span class="presensi__reticle-corner presensi__reticle-corner--tr"></span><span class="presensi__reticle-corner presensi__reticle-corner--bl"></span><span class="presensi__reticle-corner presensi__reticle-corner--br"></span></div>
+        <div ref="scannerReticle" class="presensi__reticle" aria-hidden="true"><span class="presensi__reticle-corner presensi__reticle-corner--tl"></span><span class="presensi__reticle-corner presensi__reticle-corner--tr"></span><span class="presensi__reticle-corner presensi__reticle-corner--bl"></span><span class="presensi__reticle-corner presensi__reticle-corner--br"></span></div>
       </div>
       <p class="presensi__scanner-foot">Pastikan QR terlihat jelas di dalam bingkai kamera.</p>
     </div>
@@ -586,14 +602,12 @@ onBeforeUnmount(async () => {
 
 /* ---- Scanner kamera layar penuh ---- */
 .presensi__scanner { position: fixed; inset: 0; z-index: 90; height: 100vh; height: 100dvh; background: #000; overscroll-behavior: contain; }
+.presensi__scanner:focus { outline: none; }
 .presensi__scanner-stage { position: absolute; inset: 0; overflow: hidden; background: #000; }
 .presensi__scanner-head { position: absolute; z-index: 2; top: 0; right: 0; left: 0; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: max(14px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 28px max(16px, env(safe-area-inset-left)); background: linear-gradient(180deg, rgba(11, 18, 32, 0.92) 0%, rgba(11, 18, 32, 0.55) 55%, rgba(11, 18, 32, 0) 100%); }
 .presensi__scanner-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .presensi__scanner-title { margin: 0; color: #fff; font-family: 'Outfit', sans-serif; font-size: 1.05rem; font-weight: 800; line-height: 1.25; }
 .presensi__scanner-cap { margin: 0; color: rgba(255, 255, 255, 0.78); font-size: 0.8125rem; line-height: 1.4; }
-.presensi__scanner-close { display: grid; place-items: center; flex: 0 0 44px; width: 44px; height: 44px; border: 1px solid rgba(255, 255, 255, 0.28); border-radius: 50%; background: rgba(255, 255, 255, 0.14); color: #fff; font: inherit; font-size: 1.5rem; line-height: 1; cursor: pointer; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
-.presensi__scanner-close:hover { background: rgba(255, 255, 255, 0.24); }
-.presensi__scanner-close:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.6); }
 .presensi__scanner-foot { position: absolute; z-index: 2; right: 0; bottom: 0; left: 0; margin: 0; padding: 28px max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); background: linear-gradient(0deg, rgba(11, 18, 32, 0.92) 0%, rgba(11, 18, 32, 0.45) 55%, rgba(11, 18, 32, 0) 100%); color: rgba(255, 255, 255, 0.8); font-size: 0.8125rem; text-align: center; }
 /* Video memenuhi layar (cover). Bingkai bidik digambar sendiri agar tetap
    di tengah, ukurannya disamakan dengan qrbox scanner (lihat startScan).

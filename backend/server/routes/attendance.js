@@ -7,6 +7,7 @@ import { auditAdmin } from '../utils/audit.js'
 import {
   getActiveSession, createSession, getSession, closeSession, recordCheckin, listRecords, myRecords, sessionsForMember, getOverview,
   listSessionRoster, upsertSessionMemberStatus, sessionStats, buildQrPayload, parseQrPayload, verifyQrToken,
+  QR_WINDOW_MS,
   checkPwRate, recordPwFail, resetPwRate,
 } from '../utils/attendanceStore.js'
 
@@ -143,7 +144,7 @@ r.get('/display-token', requireCanDisplay, async (req, res) => {
     const s = await getSession(String(session))
     if (!s.is_active) return res.status(410).json({ detail: 'Sesi sudah ditutup.' })
     const payload = buildQrPayload(s.id, s.secret)
-    const winEnd = (Math.floor(Date.now() / 7000) + 1) * 7000
+    const winEnd = (Math.floor(Date.now() / QR_WINDOW_MS) + 1) * QR_WINDOW_MS
     res.json({ ok: true, session_id: s.id, payload, expires_in_ms: Math.max(0, winEnd - Date.now()) })
   } catch (e) {
     sendStoreError(res, e, 'Absensi display token error:')
@@ -170,7 +171,7 @@ r.post('/checkin', requireAttendanceOn, async (req, res) => {
       recordPwFail(memberId)
       return res.status(401).json({ detail: 'Password salah.' })
     }
-    // 2. Validasi token QR 7-detik.
+    // 2. Validasi token QR 10-detik.
     const { sessionId, win, hmac } = parseQrPayload(qr)
     const s = await getSession(sessionId)
     if (!s.is_active) return res.status(410).json({ detail: 'Sesi sudah ditutup.' })

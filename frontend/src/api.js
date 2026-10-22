@@ -348,6 +348,7 @@ export const api = {
   attendanceSessionStats: (session, token) =>
     req(`/api/attendance/sessions/${encodeURIComponent(session)}/stats`, {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      cache: 'no-store',
     }),
 
   attendanceClose: (session, token) =>

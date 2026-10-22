@@ -12,7 +12,7 @@ const props = defineProps({
   gap: { type: Number, default: 2 },
   centerValue: { type: [String, Number], default: '' },
   centerLabel: { type: String, default: '' },
-  trackColor: { type: String, default: 'rgba(148, 163, 184, 0.22)' },
+  trackColor: { type: String, default: '#E5E7EB' },
 })
 
 const radius = computed(() => Math.max(1, (props.size - props.thickness) / 2))
